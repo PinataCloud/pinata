@@ -29,26 +29,4 @@ const pinata = new PinataSDK({
 });
 ```
 
-## Full Docs
-
-Docs are still a WIP, please follow the instructions below
-
-Install Mintlify CLI
-```bash
-npm i -g mintlify
-```
-
-Clone docs repo with the SDK branch
-```bash
-git clone -b chore/sdk-update https://github.com/PinataCloud/docs && cd docs
-```
-
-Run server
-```bash
-mintlify dev
-```
-
-Navigate to SDK page
-```
-http://localhost:3000/sdk/getting/started
-```
+## [Full Docs](https://docs.pinata.cloud/sdk-beta)
