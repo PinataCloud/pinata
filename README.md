@@ -39,8 +39,6 @@ const data = await pinata.testAuthentication()
 
 ### `upload`
 
-Additional properties after methods
-
 #### `file`
 
 ```typescript
