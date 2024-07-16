@@ -29,4 +29,4 @@ const pinata = new PinataSDK({
 });
 ```
 
-## [Full Docs](https://docs.pinata.cloud/sdk-beta)
+## [Full Docs](https://docs.pinata.cloud/sdk-beta/getting-started)
