@@ -3,7 +3,7 @@
  * @returns message
  */
 
-import { PinataConfig } from "../types";
+import { PinataConfig, AuthTestResponse } from "../types";
 
 export const testAuthentication = async (config: PinataConfig | undefined) => {
   try {
@@ -16,7 +16,7 @@ export const testAuthentication = async (config: PinataConfig | undefined) => {
         },
       },
     );
-    const res = await request.json();
+    const res: AuthTestResponse = await request.json();
     return res;
   } catch (error) {
     throw error;

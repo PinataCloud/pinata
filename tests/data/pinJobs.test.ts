@@ -1,6 +1,5 @@
 import { pinJobs } from "../../src/core/data/pinJobs";
-import { PinataConfig, PinJobItem } from "../../src";
-import { PinJobQuery } from "../../dist";
+import { PinataConfig, PinJobItem, PinJobQuery } from "../../src";
 
 describe("pinJobs", () => {
   const mockConfig: PinataConfig = {

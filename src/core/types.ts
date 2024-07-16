@@ -4,6 +4,10 @@ export type PinataConfig = {
   pinataGatewayKey?: string;
 };
 
+export type AuthTestResponse = {
+  message: string;
+};
+
 export type PinResponse = {
   IpfsHash: string;
   PinSize: number;
@@ -95,7 +99,7 @@ export type PinListQuery = {
   name?: string;
   groupId?: string;
   key?: string;
-  value?: string;
+  value?: string | number;
   operator?:
     | "gt"
     | "gte"

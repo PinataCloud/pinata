@@ -22,6 +22,8 @@ import {
   GroupCIDOptions,
   GroupQueryOptions,
   GetGroupOptions,
+  AuthTestResponse,
+  UnpinResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./pinning/file";
@@ -77,11 +79,11 @@ export class PinataSDK {
     this.groups = new Groups(this.config);
   }
 
-  testAuthentication(): Promise<any> {
+  testAuthentication(): Promise<AuthTestResponse> {
     return testAuthentication(this.config);
   }
 
-  unpin(files: string[]): Promise<any> {
+  unpin(files: string[]): Promise<UnpinResponse[]> {
     return unpinFile(this.config, files);
   }
 
@@ -285,7 +287,7 @@ class FilterFiles {
 
   keyValue(
     key: string,
-    value: string,
+    value: string | number,
     operator?: PinListQuery["operator"],
   ): FilterFiles {
     this.query.key = key;
@@ -379,6 +381,20 @@ class FilterPinJobs {
 
   cid(cid: string): FilterPinJobs {
     this.query.ipfs_pin_hash = cid;
+    return this;
+  }
+
+  status(
+    status:
+      | "prechecking"
+      | "retrieving"
+      | "expired"
+      | "over_free_limit"
+      | "over_max_size"
+      | "invalid_object"
+      | "bad_host_node",
+  ): FilterPinJobs {
+    this.query.status = status;
     return this;
   }
 

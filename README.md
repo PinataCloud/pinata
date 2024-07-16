@@ -29,19 +29,26 @@ const pinata = new PinataSDK({
 });
 ```
 
-## Usage
+## Full Docs
 
-### `testAuthentication`
+Docs are still a WIP, please follow the instructions below
 
-```typescript
-const data = await pinata.testAuthentication()
+Install Mintlify CLI
+```bash
+npm i -g mintlify
 ```
 
-### `upload`
+Clone docs repo with the SDK branch
+```bash
+git clone -b chore/sdk-update https://github.com/PinataCloud/docs && cd docs
+```
 
-#### `file`
+Run server
+```bash
+mintlify dev
+```
 
-```typescript
-const file = new File(["hello"], "Testing.txt", { type: "text/plain" });
-const upload = await pinata.upload.file(file);
+Navigate to SDK page
+```
+http://localhost:3000/sdk/getting/started
 ```
