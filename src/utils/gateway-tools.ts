@@ -104,7 +104,7 @@ export function convertToDesiredGateway(
   }
 
   //case 4 - the CID is in the subdomain
-  if (urlObj.hostname.includes(results.cid)) {
+  if (urlObj.hostname.includes(results.cid!)) {
     return `${desiredGatewayPrefix}/ipfs/${results.cid}${path}`;
   }
 
