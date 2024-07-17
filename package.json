@@ -1,47 +1,46 @@
 {
-  "name": "@pinata/sdk",
-  "version": "3.0.0",
-  "description": "Official SDK for the Pinata IPFS platform",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsup src/index.ts",
-    "test": "jest --watchAll --verbose --coverage"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/PinataCloud/Pinata-SDK.git"
-  },
-  "keywords": [
-    "webpack",
-    "es6",
-    "starter",
-    "library",
-    "universal",
-    "umd",
-    "commonjs"
-  ],
-  "author": "Steve Simkins",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/PinataCloud/Pinata-SDK/issues"
-  },
-  "homepage": "https://github.com/PinataCloud/Pinata-SDK",
-  "devDependencies": {
-    "@types/jest": "^29.5.12",
-    "@types/node": "^20.11.17",
-    "ts-node": "^10.9.2",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "is-ipfs": "^8.0.4",
-    "jest": "^29.7.0",
-    "node-fetch": "^3.3.1",
-    "ts-jest": "^29.2.2"
-  }
+	"name": "@pinata/sdk",
+	"version": "3.0.0",
+	"description": "Official SDK for the Pinata IPFS platform",
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsup src/index.ts",
+		"test": "jest --watchAll --verbose --coverage"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/PinataCloud/Pinata-SDK.git"
+	},
+	"keywords": [
+		"webpack",
+		"es6",
+		"starter",
+		"library",
+		"universal",
+		"umd",
+		"commonjs"
+	],
+	"author": "Steve Simkins",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/PinataCloud/Pinata-SDK/issues"
+	},
+	"homepage": "https://github.com/PinataCloud/Pinata-SDK",
+	"devDependencies": {
+		"@biomejs/biome": "1.8.3",
+		"@types/jest": "^29.5.12",
+		"@types/node": "^20.11.17",
+		"ts-node": "^10.9.2",
+		"tsup": "^8.0.1",
+		"typescript": "^5.3.3"
+	},
+	"dependencies": {
+		"is-ipfs": "^8.0.4",
+		"jest": "^29.7.0",
+		"node-fetch": "^3.3.1",
+		"ts-jest": "^29.2.2"
+	}
 }
