@@ -155,9 +155,28 @@ export type PinJobResponse = {
   rows: PinJobItem[];
 };
 
+export type ContentType =
+  | "application/json"
+  | "application/xml"
+  | "text/plain"
+  | "text/html"
+  | "text/css"
+  | "text/javascript"
+  | "application/javascript"
+  | "image/jpeg"
+  | "image/png"
+  | "image/gif"
+  | "image/svg+xml"
+  | "audio/mpeg"
+  | "audio/ogg"
+  | "video/mp4"
+  | "application/pdf"
+  | "application/octet-stream"
+  | string; // Allow for other MIME types
+
 export type GetCIDResponse = {
-  data?: string | Blob | null;
-  contentType: any;
+  data?: JSON | string | Blob | null;
+  contentType: ContentType;
 };
 
 export type UserPinnedDataResponse = {

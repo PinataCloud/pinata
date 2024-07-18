@@ -6,60 +6,63 @@
 import type { PinataConfig, PinResponse, UploadOptions } from "../types";
 
 export const uploadUrl = async (
-	config: PinataConfig | undefined,
-	url: string,
-	options?: UploadOptions,
+  config: PinataConfig | undefined,
+  url: string,
+  options?: UploadOptions,
 ) => {
-	try {
-		let jwt;
-		if (options && options.keys) {
-			jwt = options.keys;
-		} else {
-			jwt = config?.pinataJwt;
-		}
-		const data = new FormData();
+  let jwt: string | undefined;
+  if (options?.keys) {
+    jwt = options.keys;
+  } else {
+    jwt = config?.pinataJwt;
+  }
+  const data = new FormData();
 
-		const stream = await fetch(url);
+  const stream = await fetch(url);
 
-		const arrayBuffer = await stream.arrayBuffer();
+  if (!stream.ok) {
+    throw new Error("Problem fetching URL");
+  }
 
-		const blob = new Blob([arrayBuffer]);
+  const arrayBuffer = await stream.arrayBuffer();
 
-		const name = options?.metadata ? options.metadata.name : `url_upload`;
+  const blob = new Blob([arrayBuffer]);
 
-		const file = new File([blob], name!);
+  const name = options?.metadata?.name ?? "url_upload";
 
-		data.append("file", file, name);
+  const file = new File([blob], name);
 
-		data.append(
-			"pinataOptions",
-			JSON.stringify({
-				cidVersion: options?.cidVersion,
-				groupId: options?.groupId,
-			}),
-		);
+  data.append("file", file, name);
 
-		data.append(
-			"pinataMetadata",
-			JSON.stringify({
-				name: name,
-				keyvalues: options?.metadata?.keyValues,
-			}),
-		);
+  data.append(
+    "pinataOptions",
+    JSON.stringify({
+      cidVersion: options?.cidVersion,
+      groupId: options?.groupId,
+    }),
+  );
 
-		const request = await fetch(
-			`https://api.pinata.cloud/pinning/pinFileToIPFS`,
-			{
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${jwt}`,
-				},
-				body: data,
-			},
-		);
-		const res: PinResponse = await request.json();
-		return res;
-	} catch (error) {
-		throw error;
-	}
+  data.append(
+    "pinataMetadata",
+    JSON.stringify({
+      name: name,
+      keyvalues: options?.metadata?.keyValues,
+    }),
+  );
+
+  const request = await fetch(
+    "https://api.pinata.cloud/pinning/pinFileToIPFS",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+      body: data,
+    },
+  );
+  if (!request.ok) {
+    throw new Error("Problem uploading URL");
+  }
+  const res: PinResponse = await request.json();
+  return res;
 };
