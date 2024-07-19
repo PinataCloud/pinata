@@ -7,17 +7,13 @@ import { convertToDesiredGateway } from "../../utils/gateway-tools";
 import type { PinataConfig } from "../types";
 
 export const convertIPFSUrl = (
-	config: PinataConfig | undefined,
-	url: string,
+  config: PinataConfig | undefined,
+  url: string,
 ): string => {
-	try {
-		let newUrl: string;
-		newUrl = convertToDesiredGateway(url, config?.pinataGateway);
-		if (config?.pinataGatewayKey) {
-			newUrl + `?pinataGatewayToken=${config?.pinataGatewayKey}`;
-		}
-		return newUrl;
-	} catch (error) {
-		throw error;
-	}
+  let newUrl: string;
+  newUrl = convertToDesiredGateway(url, config?.pinataGateway);
+  if (config?.pinataGatewayKey) {
+    `${newUrl}?pinataGatewayToken=${config?.pinataGatewayKey}`;
+  }
+  return newUrl;
 };
