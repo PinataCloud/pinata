@@ -187,22 +187,28 @@ export type UserPinnedDataResponse = {
 
 export type KeyPermissions = {
   admin?: boolean;
-  endpoints?: {
-    data?: {
-      pinList?: boolean;
-      userPinnedDataTotal?: boolean;
-    };
-    pinning?: {
-      hashMetadata?: boolean;
-      hashPinPolicy?: boolean;
-      pinByHash?: boolean;
-      pinFileToIPFS?: boolean;
-      pinJSONToIPFS?: boolean;
-      pinJobs?: boolean;
-      unpin?: boolean;
-      userPinPolicy?: boolean;
-    };
-  };
+  endpoints?: Endpoints;
+};
+
+export type Endpoints = {
+  data?: DataEndponts;
+  pinning?: PinningEndpoints;
+};
+
+export type DataEndponts = {
+  pinList?: boolean;
+  userPinnedDataTotal?: boolean;
+};
+
+export type PinningEndpoints = {
+  hashMetadata?: boolean;
+  hashPinPolicy?: boolean;
+  pinByHash?: boolean;
+  pinFileToIPFS?: boolean;
+  pinJSONToIPFS?: boolean;
+  pinJobs?: boolean;
+  unpin?: boolean;
+  userPinPolicy?: boolean;
 };
 
 export type KeyOptions = {
