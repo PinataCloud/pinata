@@ -10,10 +10,21 @@ import type {
   PinataConfig,
 } from "../types";
 
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../utils/custom-errors";
+
 export const listKeys = async (
   config: PinataConfig | undefined,
   options?: KeyListQuery,
 ): Promise<KeyListItem[]> => {
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
+  }
+
   const params = new URLSearchParams();
 
   if (options) {
@@ -30,16 +41,40 @@ export const listKeys = async (
 
   const url = `https://api.pinata.cloud/v3/pinata/keys?${params.toString()}`;
 
-  const request = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config?.pinataJwt}`,
-    },
-  });
-  if (!request.ok) {
-    throw new Error("Problem fetching files");
+  try {
+    const request = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config?.pinataJwt}`,
+      },
+    });
+
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError(
+          "Authentication failed",
+          request.status,
+          errorData,
+        );
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+
+    const res: KeyListResponse = await request.json();
+    return res.keys;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing listKeys: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while listing API keys");
   }
-  const res: KeyListResponse = await request.json();
-  return res.keys;
 };
