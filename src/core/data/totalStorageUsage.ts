@@ -50,11 +50,11 @@ export const totalStorageUsage = async (
     }
     if (error instanceof Error) {
       throw new PinataError(
-        `Error processing pinnedFileUsage: ${error.message}`,
+        `Error processing totalStorageUsage: ${error.message}`,
       );
     }
     throw new PinataError(
-      "An unknown error occurred while getting pinned file usage",
+      "An unknown error occurred while getting total storage usage",
     );
   }
 };

@@ -60,11 +60,9 @@ export const updateMetadata = async (
     }
     if (error instanceof Error) {
       throw new PinataError(
-        `Error processing pinnedFileUsage: ${error.message}`,
+        `Error processing updateMetadata: ${error.message}`,
       );
     }
-    throw new PinataError(
-      "An unknown error occurred while getting pinned file usage",
-    );
+    throw new PinataError("An unknown error occurred while updating metadata");
   }
 };
