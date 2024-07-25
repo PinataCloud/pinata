@@ -9,11 +9,21 @@ import type {
   PinJobResponse,
   PinataConfig,
 } from "../types";
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../utils/custom-errors";
 
 export const pinJobs = async (
   config: PinataConfig | undefined,
   options?: PinJobQuery,
 ): Promise<PinJobItem[]> => {
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
+  }
+
   const params = new URLSearchParams({
     includesCount: "false",
   });
@@ -30,15 +40,37 @@ export const pinJobs = async (
 
   const url = `https://api.pinata.cloud/pinning/pinJobs?${params.toString()}`;
 
-  const request = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${config?.pinataJwt}`,
-    },
-  });
-  if (!request.ok) {
-    throw new Error("Problem fetching pin jobs");
+  try {
+    const request = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${config?.pinataJwt}`,
+      },
+    });
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError(
+          "Authentication failed",
+          request.status,
+          errorData,
+        );
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+    const res: PinJobResponse = await request.json();
+    return res.rows;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing pinJobs: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while listing pin jobs");
   }
-  const res: PinJobResponse = await request.json();
-  return res.rows;
 };

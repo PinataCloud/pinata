@@ -9,11 +9,21 @@ import type {
   PinListResponse,
   PinataConfig,
 } from "../types";
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../utils/custom-errors";
 
 export const listFiles = async (
   config: PinataConfig | undefined,
   options?: PinListQuery,
 ): Promise<PinListItem[]> => {
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
+  }
+
   const params = new URLSearchParams({
     includesCount: "false",
   });
@@ -53,15 +63,38 @@ export const listFiles = async (
 
   const url = `https://api.pinata.cloud/data/pinList?status=pinned&${params.toString()}`;
 
-  const request = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${config?.pinataJwt}`,
-    },
-  });
-  const res: PinListResponse = await request.json();
-  if (!request.ok) {
-    throw new Error("Problem fetching files");
+  try {
+    const request = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${config?.pinataJwt}`,
+      },
+    });
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError(
+          "Authentication failed",
+          request.status,
+          errorData,
+        );
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+
+    const res: PinListResponse = await request.json();
+    return res.rows;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing list files: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while listing files");
   }
-  return res.rows;
 };
