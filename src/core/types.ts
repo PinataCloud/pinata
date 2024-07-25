@@ -172,7 +172,8 @@ export type ContentType =
   | "video/mp4"
   | "application/pdf"
   | "application/octet-stream"
-  | string; // Allow for other MIME types
+  | string
+  | null; // Allow for other MIME types
 
 export type GetCIDResponse = {
   data?: JSON | string | Blob | null;
