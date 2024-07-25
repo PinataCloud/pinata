@@ -5,23 +5,34 @@
 
 import type { PinataConfig, PinResponse, UploadOptions } from "../types";
 
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../utils/custom-errors";
+
 export const uploadUrl = async (
   config: PinataConfig | undefined,
   url: string,
   options?: UploadOptions,
 ) => {
-  let jwt: string | undefined;
-  if (options?.keys) {
-    jwt = options.keys;
-  } else {
-    jwt = config?.pinataJwt;
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
   }
+
+  const jwt: string = options?.keys || config?.pinataJwt;
   const data = new FormData();
 
   const stream = await fetch(url);
 
   if (!stream.ok) {
-    throw new Error("Problem fetching URL");
+    const errorData = await stream.json();
+    throw new NetworkError(
+      `HTTP error! status: ${stream.status}`,
+      stream.status,
+      errorData,
+    );
   }
 
   const arrayBuffer = await stream.arrayBuffer();
@@ -50,19 +61,43 @@ export const uploadUrl = async (
     }),
   );
 
-  const request = await fetch(
-    "https://api.pinata.cloud/pinning/pinFileToIPFS",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
+  try {
+    const request = await fetch(
+      "https://api.pinata.cloud/pinning/pinFileToIPFS",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: data,
       },
-      body: data,
-    },
-  );
-  if (!request.ok) {
-    throw new Error("Problem uploading URL");
+    );
+
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError(
+          "Authentication failed",
+          request.status,
+          errorData,
+        );
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+
+    const res: PinResponse = await request.json();
+    return res;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing url: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while uploading by url");
   }
-  const res: PinResponse = await request.json();
-  return res;
 };

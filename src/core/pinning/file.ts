@@ -13,7 +13,7 @@ import {
 
 export const uploadFile = async (
   config: PinataConfig | undefined,
-  file: any,
+  file: File,
   options?: UploadOptions,
 ) => {
   if (!config || !config.pinataJwt) {
