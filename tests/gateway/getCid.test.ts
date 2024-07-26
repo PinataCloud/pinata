@@ -1,106 +1,136 @@
 import { getCid } from "../../src/core/gateway/getCid";
-import { type PinataConfig, GetCIDResponse } from "../../src";
+import type { PinataConfig, GetCIDResponse } from "../../src";
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../src/utils/custom-errors";
 
-// Mock the gateway-tools module
+// Mock the entire gateway-tools module
 jest.mock("../../src/utils/gateway-tools", () => ({
-	convertToDesiredGateway: jest.fn((cid, gateway) => {
-		return `${gateway}/ipfs/${cid}`;
-	}),
+  convertToDesiredGateway: jest.fn((sourceUrl, desiredGatewayPrefix) => {
+    // Simple mock implementation
+    return `${desiredGatewayPrefix}/ipfs/${sourceUrl.split("/").pop()}`;
+  }),
 }));
 
-describe("getCid", () => {
-	const mockConfig: PinataConfig = {
-		pinataJwt: "test-jwt",
-		pinataGateway: "https://mygateway.mypinata.cloud",
-		pinataGatewayKey: "my-gateway-key",
-	};
+describe("getCid function", () => {
+  let originalFetch: typeof fetch;
 
-	const mockCid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
 
-	beforeEach(() => {
-		global.fetch = jest.fn();
-	});
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.clearAllMocks();
+  });
 
-	it("should fetch JSON data", async () => {
-		const mockJsonData = { key: "value" };
-		(global.fetch as jest.Mock).mockResolvedValueOnce({
-			headers: new Headers({ "content-type": "application/json" }),
-			json: jest.fn().mockResolvedValueOnce(mockJsonData),
-		});
+  const mockConfig: PinataConfig = {
+    pinataJwt: "test_jwt",
+    pinataGateway: "https://test.mypinata.cloud",
+    pinataGatewayKey: "test_gateway_key",
+  };
 
-		const result = await getCid(mockConfig, mockCid);
+  it("should retrieve JSON data successfully", async () => {
+    const mockResponse = { key: "value" };
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: jest.fn().mockResolvedValueOnce(mockResponse),
+    });
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG?pinataGatewayToken=my-gateway-key",
-			{
-				method: "GET",
-				headers: {
-					Authorization: "Bearer test-jwt",
-				},
-			},
-		);
-		expect(result).toEqual({
-			data: mockJsonData,
-			contentType: "application/json",
-		});
-	});
+    const result = await getCid(mockConfig, "QmTest...");
 
-	it("should fetch text data", async () => {
-		const mockTextData = "Hello, World!";
-		(global.fetch as jest.Mock).mockResolvedValueOnce({
-			headers: new Headers({ "content-type": "text/plain" }),
-			text: jest.fn().mockResolvedValueOnce(mockTextData),
-		});
+    expect(result).toEqual({
+      data: mockResponse,
+      contentType: "application/json",
+    });
+  });
 
-		const result = await getCid(mockConfig, mockCid);
+  it("should retrieve text data successfully", async () => {
+    const mockResponse = "Hello, world!";
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/plain" }),
+      text: jest.fn().mockResolvedValueOnce(mockResponse),
+    });
 
-		expect(result).toEqual({
-			data: mockTextData,
-			contentType: "text/plain",
-		});
-	});
+    const result = await getCid(mockConfig, "QmTest...");
 
-	it("should fetch blob data", async () => {
-		const mockBlobData = new Blob(["binary data"], {
-			type: "application/octet-stream",
-		});
-		(global.fetch as jest.Mock).mockResolvedValueOnce({
-			headers: new Headers({ "content-type": "application/octet-stream" }),
-			blob: jest.fn().mockResolvedValueOnce(mockBlobData),
-		});
+    expect(result).toEqual({
+      data: mockResponse,
+      contentType: "text/plain",
+    });
+  });
 
-		const result = await getCid(mockConfig, mockCid);
+  it("should retrieve blob data successfully", async () => {
+    const mockBlob = new Blob(["test data"], {
+      type: "application/octet-stream",
+    });
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "application/octet-stream" }),
+      blob: jest.fn().mockResolvedValueOnce(mockBlob),
+    });
 
-		expect(result).toEqual({
-			data: mockBlobData,
-			contentType: "application/octet-stream",
-		});
-	});
+    const result = await getCid(mockConfig, "QmTest...");
 
-	it("should handle URLs without a gateway key", async () => {
-		const configWithoutKey: PinataConfig = {
-			pinataJwt: "test-jwt",
-			pinataGateway: "https://mygateway.mypinata.cloud",
-		};
+    expect(result).toEqual({
+      data: mockBlob,
+      contentType: "application/octet-stream",
+    });
+  });
 
-		const mockJsonData = { key: "value" };
-		(global.fetch as jest.Mock).mockResolvedValueOnce({
-			headers: new Headers({ "content-type": "application/json" }),
-			json: jest.fn().mockResolvedValueOnce(mockJsonData),
-		});
+  it("should throw ValidationError if config is missing", async () => {
+    await expect(getCid(undefined, "QmTest...")).rejects.toThrow(
+      ValidationError,
+    );
+  });
 
-		await getCid(configWithoutKey, mockCid);
+  it("should throw AuthenticationError on 401 response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+    });
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
-			expect.any(Object),
-		);
-	});
+    await expect(getCid(mockConfig, "QmTest...")).rejects.toThrow(
+      AuthenticationError,
+    );
+  });
 
-	it("should throw an error when fetch fails", async () => {
-		const error = new Error("Fetch failed");
-		(global.fetch as jest.Mock).mockRejectedValueOnce(error);
+  it("should throw NetworkError on non-401 error response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+    });
 
-		await expect(getCid(mockConfig, mockCid)).rejects.toThrow("Fetch failed");
-	});
+    await expect(getCid(mockConfig, "QmTest...")).rejects.toThrow(NetworkError);
+  });
+
+  it("should throw PinataError on unexpected errors", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("Unexpected error"));
+
+    await expect(getCid(mockConfig, "QmTest...")).rejects.toThrow(PinataError);
+  });
+
+  it("should use the correct URL with gateway and token", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/plain" }),
+      text: jest.fn().mockResolvedValueOnce("test"),
+    });
+
+    await getCid(mockConfig, "QmTest...");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://test.mypinata.cloud/ipfs/QmTest...?pinataGatewayToken=test_gateway_key",
+      expect.any(Object),
+    );
+  });
 });

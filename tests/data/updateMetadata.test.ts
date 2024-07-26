@@ -1,88 +1,180 @@
 import { updateMetadata } from "../../src/core/data/updateMetadata";
 import type { PinataConfig, PinataMetadataUpdate } from "../../src";
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../src/utils/custom-errors";
 
-describe("updateMetadata", () => {
-	const mockConfig: PinataConfig = {
-		pinataJwt: "test-jwt",
-	};
+describe("updateMetadata function", () => {
+  let originalFetch: typeof fetch;
 
-	const mockOptions: PinataMetadataUpdate = {
-		cid: "Qm...1",
-		name: "Updated File Name",
-		keyValues: {
-			key1: "value1",
-			key2: "value2",
-		},
-	};
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
 
-	let originalFetch: typeof fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
-	beforeEach(() => {
-		originalFetch = global.fetch;
-	});
+  const mockConfig: PinataConfig = {
+    pinataJwt: "test_jwt",
+    pinataGateway: "test.cloud",
+  };
 
-	afterEach(() => {
-		global.fetch = originalFetch;
-	});
+  const mockOptions: PinataMetadataUpdate = {
+    cid: "QmTest...",
+    name: "Updated File Name",
+    keyValues: {
+      key1: "value1",
+      key2: 2,
+    },
+  };
 
-	it("should update metadata successfully", async () => {
-		const mockResponse = "Metadata updated successfully";
+  it("should update metadata successfully", async () => {
+    const mockResponse = "Metadata updated successfully";
 
-		global.fetch = jest.fn().mockResolvedValue({
-			text: jest.fn().mockResolvedValue(mockResponse),
-		} as unknown as Response);
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      text: jest.fn().mockResolvedValueOnce(mockResponse),
+    });
 
-		const result = await updateMetadata(mockConfig, mockOptions);
+    const result = await updateMetadata(mockConfig, mockOptions);
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/hashMetadata",
-			{
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: "Bearer test-jwt",
-				},
-				body: JSON.stringify({
-					ipfsPinHash: mockOptions.cid,
-					name: mockOptions.name,
-					keyvalues: mockOptions.keyValues,
-				}),
-			},
-		);
-		expect(result).toEqual(mockResponse);
-	});
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.pinata.cloud/pinning/hashMetadata",
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${mockConfig.pinataJwt}`,
+        },
+        body: JSON.stringify({
+          ipfsPinHash: mockOptions.cid,
+          name: mockOptions.name,
+          keyvalues: mockOptions.keyValues,
+        }),
+      },
+    );
+    expect(result).toEqual(mockResponse);
+  });
 
-	it("should handle errors", async () => {
-		const error = new Error("API error");
-		global.fetch = jest.fn().mockRejectedValue(error);
+  it("should throw ValidationError if config is missing", async () => {
+    await expect(updateMetadata(undefined, mockOptions)).rejects.toThrow(
+      ValidationError,
+    );
+  });
 
-		await expect(updateMetadata(mockConfig, mockOptions)).rejects.toThrow(
-			"API error",
-		);
-	});
+  it("should throw AuthenticationError on 401 response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+    });
 
-	it("should update metadata with only CID", async () => {
-		const mockResponse = "Metadata updated successfully";
-		const minimalOptions: PinataMetadataUpdate = { cid: "Qm...1" };
+    await expect(updateMetadata(mockConfig, mockOptions)).rejects.toThrow(
+      AuthenticationError,
+    );
+  });
 
-		global.fetch = jest.fn().mockResolvedValue({
-			text: jest.fn().mockResolvedValue(mockResponse),
-		} as unknown as Response);
+  it("should throw NetworkError on non-401 error response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+    });
 
-		await updateMetadata(mockConfig, minimalOptions);
+    await expect(updateMetadata(mockConfig, mockOptions)).rejects.toThrow(
+      NetworkError,
+    );
+  });
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/hashMetadata",
-			{
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: "Bearer test-jwt",
-				},
-				body: JSON.stringify({
-					ipfsPinHash: minimalOptions.cid,
-				}),
-			},
-		);
-	});
+  it("should throw PinataError on unexpected errors", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("Unexpected error"));
+
+    await expect(updateMetadata(mockConfig, mockOptions)).rejects.toThrow(
+      PinataError,
+    );
+  });
+
+  it("should handle updating only name", async () => {
+    const nameOnlyOptions: PinataMetadataUpdate = {
+      cid: "QmTest...",
+      name: "New Name Only",
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      text: jest.fn().mockResolvedValueOnce("Metadata updated successfully"),
+    });
+
+    await updateMetadata(mockConfig, nameOnlyOptions);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          ipfsPinHash: nameOnlyOptions.cid,
+          name: nameOnlyOptions.name,
+          keyvalues: undefined,
+        }),
+      }),
+    );
+  });
+
+  it("should handle updating only keyValues", async () => {
+    const keyValuesOnlyOptions: PinataMetadataUpdate = {
+      cid: "QmTest...",
+      keyValues: {
+        newKey: "newValue",
+      },
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      text: jest.fn().mockResolvedValueOnce("Metadata updated successfully"),
+    });
+
+    await updateMetadata(mockConfig, keyValuesOnlyOptions);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          ipfsPinHash: keyValuesOnlyOptions.cid,
+          name: undefined,
+          keyvalues: keyValuesOnlyOptions.keyValues,
+        }),
+      }),
+    );
+  });
+
+  it("should handle empty keyValues object", async () => {
+    const emptyKeyValuesOptions: PinataMetadataUpdate = {
+      cid: "QmTest...",
+      name: "Test Name",
+      keyValues: {},
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      text: jest.fn().mockResolvedValueOnce("Metadata updated successfully"),
+    });
+
+    await updateMetadata(mockConfig, emptyKeyValuesOptions);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          ipfsPinHash: emptyKeyValuesOptions.cid,
+          name: emptyKeyValuesOptions.name,
+          keyvalues: {},
+        }),
+      }),
+    );
+  });
 });

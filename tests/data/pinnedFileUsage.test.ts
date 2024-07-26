@@ -1,50 +1,119 @@
 import { pinnedFileCount } from "../../src/core/data/pinnedFileUsage";
-import type { PinataConfig } from "../../src";
+import type { PinataConfig, UserPinnedDataResponse } from "../../src";
+import {
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
+} from "../../src/utils/custom-errors";
 
-describe("pinnedFileCount", () => {
-	const mockConfig: PinataConfig = {
-		pinataJwt: "test-jwt",
-	};
+describe("pinnedFileCount function", () => {
+  let originalFetch: typeof fetch;
 
-	const mockResponse = {
-		pin_count: 100,
-		pin_size_total: 1000000,
-		pin_size_with_replications_total: 2000000,
-	};
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
 
-	let originalFetch: typeof fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
-	beforeEach(() => {
-		originalFetch = global.fetch;
-	});
+  const mockConfig: PinataConfig = {
+    pinataJwt: "test_jwt",
+    pinataGateway: "test.cloud",
+  };
 
-	afterEach(() => {
-		global.fetch = originalFetch;
-	});
+  it("should return pinned file count successfully", async () => {
+    const mockResponse: UserPinnedDataResponse = {
+      pin_count: 100,
+      pin_size_total: 1000000,
+      pin_size_with_replications_total: 2000000,
+    };
 
-	it("should fetch pinned file count", async () => {
-		global.fetch = jest.fn().mockResolvedValue({
-			json: jest.fn().mockResolvedValue(mockResponse),
-		} as unknown as Response);
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockResponse),
+    });
 
-		const result = await pinnedFileCount(mockConfig);
+    const result = await pinnedFileCount(mockConfig);
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/data/userPinnedDataTotal",
-			{
-				method: "GET",
-				headers: {
-					Authorization: "Bearer test-jwt",
-				},
-			},
-		);
-		expect(result).toEqual(mockResponse.pin_count);
-	});
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.pinata.cloud/data/userPinnedDataTotal",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${mockConfig.pinataJwt}`,
+        },
+      },
+    );
+    expect(result).toEqual(mockResponse.pin_count);
+  });
 
-	it("should handle errors", async () => {
-		const error = new Error("API error");
-		global.fetch = jest.fn().mockRejectedValue(error);
+  it("should throw ValidationError if config is missing", async () => {
+    await expect(pinnedFileCount(undefined)).rejects.toThrow(ValidationError);
+  });
 
-		await expect(pinnedFileCount(mockConfig)).rejects.toThrow("API error");
-	});
+  it("should throw AuthenticationError on 401 response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+    });
+
+    await expect(pinnedFileCount(mockConfig)).rejects.toThrow(
+      AuthenticationError,
+    );
+  });
+
+  it("should throw NetworkError on non-401 error response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+    });
+
+    await expect(pinnedFileCount(mockConfig)).rejects.toThrow(NetworkError);
+  });
+
+  it("should throw PinataError on unexpected errors", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("Unexpected error"));
+
+    await expect(pinnedFileCount(mockConfig)).rejects.toThrow(PinataError);
+  });
+
+  it("should handle zero pinned files", async () => {
+    const mockResponse: UserPinnedDataResponse = {
+      pin_count: 0,
+      pin_size_total: 0,
+      pin_size_with_replications_total: 0,
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockResponse),
+    });
+
+    const result = await pinnedFileCount(mockConfig);
+
+    expect(result).toEqual(0);
+  });
+
+  it("should handle large number of pinned files", async () => {
+    const mockResponse: UserPinnedDataResponse = {
+      pin_count: 1000000,
+      pin_size_total: 1000000000000,
+      pin_size_with_replications_total: 2000000000000,
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockResponse),
+    });
+
+    const result = await pinnedFileCount(mockConfig);
+
+    expect(result).toEqual(1000000);
+  });
 });
