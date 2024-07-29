@@ -1,6 +1,6 @@
 {
   "name": "pinata",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "The new Pinata IPFS SDK",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -8,8 +8,15 @@
   "files": [
     "dist"
   ],
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "build": "tsup src/index.ts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external none",
     "test": "jest --watchAll --verbose --coverage"
   },
   "repository": {
