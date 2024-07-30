@@ -1,5 +1,7 @@
 # Pinata
 
+![cover-image](https://docs.mypinata.cloud/ipfs/bafkreidv5iptnieh6eijei7enqc4mdhxpte3ries23heqf7s2hu3gdu6ru)
+
 The new all-in-one Pinata SDK
 
 ## Installation
