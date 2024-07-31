@@ -1,6 +1,36 @@
 /**
- * Uploads multiple file types
- * @returns message
+ * Retrieves a list of API keys associated with the Pinata account.
+ *
+ * This function allows you to fetch and optionally filter the API keys linked to your Pinata account.
+ * It's useful for managing your API keys, checking their status, or auditing key usage.
+ *
+ * @async
+ * @function listKeys
+ * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
+ * @param {KeyListQuery} [options] - Optional query parameters to filter the list of keys.
+ * @param {number} [options.offset] - The number of items to skip before starting to collect the result set.
+ * @param {boolean} [options.revoked] - If true, includes revoked keys in the results.
+ * @param {boolean} [options.limitedUse] - If true, only returns keys with usage limits.
+ * @param {boolean} [options.exhausted] - If true, only returns keys that have reached their usage limit.
+ * @param {string} [options.name] - Filters keys by name (partial match).
+ * @returns {Promise<KeyListItem[]>} A promise that resolves to an array of key objects matching the query.
+ * @throws {ValidationError} If the Pinata configuration or JWT is missing.
+ * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
+ * @throws {NetworkError} If there's a network-related error during the API request.
+ * @throws {PinataError} For any other errors that occur during the key listing process.
+ *
+ * @example
+ * import { PinataSDK } from "pinata";
+ *
+ * const pinata = new PinataSDK({
+ *   pinataJwt: process.env.PINATA_JWT!,
+ *   pinataGateway: "example-gateway.mypinata.cloud",
+ * });
+ *
+ * const keys = await pinata.keys
+ *   .list()
+ *   .name("Admin")
+ *   .revoked(false)
  */
 
 import type {

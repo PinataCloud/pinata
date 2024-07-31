@@ -1,6 +1,32 @@
 /**
- * Revokes multiple API keys
- * @returns Array of responses for each key revocation attempt
+ * Revokes multiple API keys from the Pinata account.
+ *
+ * This function allows you to revoke (invalidate) multiple API keys at once.
+ * It's useful for security purposes, such as when keys may have been compromised
+ * or are no longer needed.
+ *
+ * @async
+ * @function revokeKeys
+ * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
+ * @param {string[]} keys - An array of API key strings to be revoked.
+ * @returns {Promise<RevokeKeyResponse[]>} A promise that resolves to an array of objects,
+ *   each containing the status of the revocation attempt for each key.
+ * @throws {ValidationError} If the Pinata configuration or JWT is missing.
+ * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
+ * @throws {NetworkError} If there's a network-related error during the API request.
+ * @throws {PinataError} For any other errors that occur during the key revocation process.
+ *
+ * @example
+ * import { PinataSDK } from "pinata";
+ *
+ * const pinata = new PinataSDK({
+ *   pinataJwt: process.env.PINATA_JWT!,
+ *   pinataGateway: "example-gateway.mypinata.cloud",
+ * });
+ *
+ * const revoke = await pinata.keys.revoke([
+ *  "94566af5e63833e260be"
+ * ]);
  */
 
 import type { PinataConfig, RevokeKeyResponse } from "../types";

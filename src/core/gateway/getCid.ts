@@ -1,6 +1,30 @@
 /**
- * Description
- * @returns
+ * Retrieves the content of a file from IPFS using its Content Identifier (CID).
+ *
+ * This function fetches the content associated with a given CID from the specified
+ * Pinata gateway. It can handle various content types and returns the data along
+ * with the content type information.
+ *
+ * @async
+ * @function getCid
+ * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT and gateway information.
+ * @param {string} cid - The Content Identifier (CID) of the file to retrieve.
+ * @returns {Promise<GetCIDResponse>} A promise that resolves to an object containing the file data and content type.
+ * @throws {ValidationError} If the Pinata configuration or JWT is missing.
+ * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
+ * @throws {NetworkError} If there's a network-related error during the API request.
+ * @throws {PinataError} For any other errors that occur during the retrieval process.
+ *
+ * @example
+ *  import { PinataSDK } from "pinata";
+ *
+ *  const pinata = new PinataSDK({
+ *    pinataJwt: process.env.PINATA_JWT!,
+ *    pinataGateway: "example-gateway.mypinata.cloud",
+ *  });
+ *
+ *  const upload = await pinata.gateways.get("QmVLwvmGehsrNEvhcCnnsw5RQNseohgEkFNN1848zNzdng"* )
+ *
  */
 
 import { convertToDesiredGateway } from "../../utils/gateway-tools";

@@ -4,16 +4,16 @@ import type { PinataMetadata } from "../src/core/types";
 
 // Utility type that matches the actual structure used in the API
 type PinataMetadataAPI = Omit<PinataMetadata, "keyValues"> & {
-  keyvalues?: Record<string, string | number>;
+	keyvalues?: Record<string, string | number>;
 };
 
 // Utility function to convert PinataMetadata to the format expected by the API
 export function toPinataMetadataAPI(
-  metadata: PinataMetadata,
+	metadata: PinataMetadata,
 ): PinataMetadataAPI {
-  const { keyValues, ...rest } = metadata;
-  return {
-    ...rest,
-    keyvalues: keyValues,
-  };
+	const { keyValues, ...rest } = metadata;
+	return {
+		...rest,
+		keyvalues: keyValues,
+	};
 }

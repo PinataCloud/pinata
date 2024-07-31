@@ -1,6 +1,36 @@
 /**
- * Uploads multiple file types
- * @returns message
+ * Uploads content from a URL to IPFS via Pinata.
+ *
+ * This function allows you to upload content from a specified URL to IPFS and pin it to Pinata.
+ * It's useful for adding remote content to your Pinata account and IPFS network without
+ * first downloading it locally.
+ *
+ * @async
+ * @function uploadUrl
+ * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
+ * @param {string} url - The URL of the content to be uploaded.
+ * @param {UploadOptions} [options] - Optional parameters for the upload.
+ * @param {PinataMetadata} [options.metadata] - Metadata for the uploaded content.
+ * @param {string} [options.metadata.name] - Custom name for the content (defaults to "url_upload" if not provided).
+ * @param {Record<string, string | number>} [options.metadata.keyValues] - Custom key-value pairs for the content metadata.
+ * @param {string} [options.keys] - Custom JWT to use for this specific upload.
+ * @param {string} [options.groupId] - ID of the group to add the uploaded content to.
+ * @param {0 | 1} [options.cidVersion] - Version of CID to use (0 or 1).
+ * @returns {Promise<PinResponse>} A promise that resolves to an object containing the IPFS hash and other upload details.
+ * @throws {ValidationError} If the Pinata configuration or JWT is missing.
+ * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
+ * @throws {NetworkError} If there's a network-related error during the API request or URL fetch.
+ * @throws {PinataError} For any other errors that occur during the upload process.
+ *
+ * @example
+ * import { PinataSDK } from "pinata";
+ *
+ * const pinata = new PinataSDK({
+ *   pinataJwt: process.env.PINATA_JWT!,
+ *   pinataGateway: "example-gateway.mypinata.cloud",
+ * });
+ *
+ * const upload = await pinata.upload.url("https://i.imgur.com/u4mGk5b.gif")
  */
 
 import type { PinataConfig, PinResponse, UploadOptions } from "../types";

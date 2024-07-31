@@ -1,6 +1,33 @@
 /**
- * Uploads multiple file types
- * @returns message
+ * Updates the information of a specified group in Pinata.
+ *
+ * This function allows you to modify the name of an existing group in your Pinata account.
+ * It's useful for renaming groups to better organize your pinned content.
+ *
+ * @async
+ * @function updateGroup
+ * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
+ * @param {UpdateGroupOptions} options - The options for updating a group.
+ * @param {string} options.groupId - The ID of the group to be updated.
+ * @param {string} options.name - The new name for the group.
+ * @returns {Promise<GroupResponseItem>} A promise that resolves to an object containing the updated group's details.
+ * @throws {ValidationError} If the Pinata configuration or JWT is missing.
+ * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
+ * @throws {NetworkError} If there's a network-related error during the API request.
+ * @throws {PinataError} For any other errors that occur during the group update process.
+ *
+ * @example
+ * import { PinataSDK } from "pinata";
+ *
+ * const pinata = new PinataSDK({
+ *   pinataJwt: process.env.PINATA_JWT!,
+ *   pinataGateway: "example-gateway.mypinata.cloud",
+ * });
+ *
+ * const groups = await pinata.groups.update({
+ *	groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0",
+ *	name: "My New Group 2"
+ * });
  */
 
 import type {
