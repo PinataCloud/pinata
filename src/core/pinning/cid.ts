@@ -73,6 +73,7 @@ export const uploadCid = async (
 		const request = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
 			method: "POST",
 			headers: {
+				Source: "sdk/cid",
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${jwt}`,
 			},

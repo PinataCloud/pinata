@@ -127,6 +127,7 @@ export const listFiles = async (
 		const request = await fetch(url, {
 			method: "GET",
 			headers: {
+				Source: "sdk/listFiles",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},
 		});

@@ -58,6 +58,7 @@ export const createKey = async (
 		const request = await fetch("https://api.pinata.cloud/v3/pinata/keys", {
 			method: "POST",
 			headers: {
+				Source: "sdk/createKey",
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},

@@ -69,6 +69,7 @@ export const pinJobs = async (
 		const request = await fetch(url, {
 			method: "GET",
 			headers: {
+				Source: "sdk/pinJobs",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},
 		});

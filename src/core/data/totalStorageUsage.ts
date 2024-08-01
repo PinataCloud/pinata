@@ -46,6 +46,7 @@ export const totalStorageUsage = async (
 		const request = await fetch(url, {
 			method: "GET",
 			headers: {
+				Source: "sdk/totalStorageUsage",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},
 		});

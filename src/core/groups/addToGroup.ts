@@ -56,6 +56,7 @@ export const addToGroup = async (
 			{
 				method: "PUT",
 				headers: {
+					Source: "sdk/addToGroup",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},

@@ -51,6 +51,7 @@ export const createGroup = async (
 		const request = await fetch("https://api.pinata.cloud/groups", {
 			method: "POST",
 			headers: {
+				Source: "sdk/createGroup",
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},

@@ -60,6 +60,7 @@ export const updateMetadata = async (
 			{
 				method: "PUT",
 				headers: {
+					Source: "updateMetadata",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},

@@ -61,6 +61,7 @@ export const updateGroup = async (
 			{
 				method: "PUT",
 				headers: {
+					Source: "updateGroup",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},

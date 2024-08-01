@@ -68,6 +68,7 @@ export const listGroups = async (
 		const request = await fetch(url, {
 			method: "GET",
 			headers: {
+				Source: "sdk/listGroups",
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},

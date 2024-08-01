@@ -58,6 +58,7 @@ export const getCid = async (
 		const request = await fetch(newUrl, {
 			method: "GET",
 			headers: {
+				Source: "sdk/getCid",
 				Authorization: `Bearer ${config?.pinataJwt}`,
 			},
 		});

@@ -52,6 +52,7 @@ export const deleteGroup = async (
 			{
 				method: "DELETE",
 				headers: {
+					Source: "sdk/deleteGroup",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},

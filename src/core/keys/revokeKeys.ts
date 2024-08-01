@@ -60,6 +60,7 @@ export const revokeKeys = async (
 				{
 					method: "PUT",
 					headers: {
+						Source: "sdk/revokeKeys",
 						"Content-Type": "application/json",
 						Authorization: `Bearer ${config.pinataJwt}`,
 					},

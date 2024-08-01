@@ -55,6 +55,7 @@ export const getGroup = async (
 			{
 				method: "GET",
 				headers: {
+					Source: "sdk/getGroup",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},

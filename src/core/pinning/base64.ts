@@ -86,6 +86,7 @@ export const uploadBase64 = async (
 			{
 				method: "POST",
 				headers: {
+					Source: "sdk/base64",
 					Authorization: `Bearer ${jwt}`,
 				},
 				body: data,

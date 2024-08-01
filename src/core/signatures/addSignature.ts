@@ -31,68 +31,79 @@
  * })
  */
 
-import type { SignatureOptions, PinataConfig, SignatureResponse } from "../types";
+import type {
+	SignatureOptions,
+	PinataConfig,
+	SignatureResponse,
+} from "../types";
 
 import {
-  PinataError,
-  NetworkError,
-  AuthenticationError,
-  ValidationError,
+	PinataError,
+	NetworkError,
+	AuthenticationError,
+	ValidationError,
 } from "../../utils/custom-errors";
 
 export const addSignature = async (
-  config: PinataConfig | undefined,
-  options: SignatureOptions,
+	config: PinataConfig | undefined,
+	options: SignatureOptions,
 ): Promise<SignatureResponse> => {
-  if (!config || !config.pinataJwt) {
-    throw new ValidationError("Pinata configuration or JWT is missing");
-  }
+	if (!config || !config.pinataJwt) {
+		throw new ValidationError("Pinata configuration or JWT is missing");
+	}
 
-  const data = JSON.stringify({
-    signature: options.signature,
-  });
+	const data = JSON.stringify({
+		signature: options.signature,
+	});
 
-  try {
-    const request = await fetch(
-      `https://api.pinata.cloud/v3/ipfs/signature/${options.cid}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config?.pinataJwt}`,
-        },
-        body: data,
-      },
-    );
+	try {
+		const request = await fetch(
+			`https://api.pinata.cloud/v3/ipfs/signature/${options.cid}`,
+			{
+				method: "POST",
+				headers: {
+					Source: "sdk/addSignature",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${config?.pinataJwt}`,
+				},
+				body: data,
+			},
+		);
 
-    if (!request.ok) {
-      const errorData = await request.json();
-      if (request.status === 401) {
-        throw new AuthenticationError("Authentication failed", request.status, errorData);
-      }
-      if (request.status === 403) {
-        throw new PinataError(
-          "Unauthorized signing, you must be the original owner of the file and it must not have a signature",
-          request.status,
-          errorData,
-        );
-      }
-      throw new NetworkError(
-        `HTTP error! status: ${request.status}`,
-        request.status,
-        errorData,
-      );
-    }
+		if (!request.ok) {
+			const errorData = await request.json();
+			if (request.status === 401) {
+				throw new AuthenticationError(
+					"Authentication failed",
+					request.status,
+					errorData,
+				);
+			}
+			if (request.status === 403) {
+				throw new PinataError(
+					"Unauthorized signing, you must be the original owner of the file and it must not have a signature",
+					request.status,
+					errorData,
+				);
+			}
+			throw new NetworkError(
+				`HTTP error! status: ${request.status}`,
+				request.status,
+				errorData,
+			);
+		}
 
-    const res = await request.json();
-    return res.data;
-  } catch (error) {
-    if (error instanceof PinataError) {
-      throw error;
-    }
-    if (error instanceof Error) {
-      throw new PinataError(`Error processing addSignature: ${error.message}`);
-    }
-    throw new PinataError("An unknown error occurred while adding signature to CID");
-  }
+		const res = await request.json();
+		return res.data;
+	} catch (error) {
+		if (error instanceof PinataError) {
+			throw error;
+		}
+		if (error instanceof Error) {
+			throw new PinataError(`Error processing addSignature: ${error.message}`);
+		}
+		throw new PinataError(
+			"An unknown error occurred while adding signature to CID",
+		);
+	}
 };

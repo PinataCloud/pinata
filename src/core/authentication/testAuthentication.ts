@@ -42,6 +42,7 @@ export const testAuthentication = async (config: PinataConfig | undefined) => {
 			{
 				method: "GET",
 				headers: {
+					Source: "sdk/testAuthentication",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},
 			},

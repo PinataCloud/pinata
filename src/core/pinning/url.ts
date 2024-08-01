@@ -97,6 +97,7 @@ export const uploadUrl = async (
 			{
 				method: "POST",
 				headers: {
+					Source: "sdk/url",
 					Authorization: `Bearer ${jwt}`,
 				},
 				body: data,

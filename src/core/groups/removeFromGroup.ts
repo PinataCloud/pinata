@@ -57,6 +57,7 @@ export const removeFromGroup = async (
 			{
 				method: "DELETE",
 				headers: {
+					Source: "sdk/removeFromGroup",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${config?.pinataJwt}`,
 				},

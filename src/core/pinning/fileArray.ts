@@ -84,6 +84,7 @@ export const uploadFileArray = async (
 			{
 				method: "POST",
 				headers: {
+					Source: "sdk/fileArray",
 					Authorization: `Bearer ${jwt}`,
 				},
 				body: data,

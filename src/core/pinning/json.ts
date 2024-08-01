@@ -81,6 +81,7 @@ export const uploadJson = async <T extends JsonBody>(
 			{
 				method: "POST",
 				headers: {
+					Source: "sdk/json",
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${jwt}`,
 				},
