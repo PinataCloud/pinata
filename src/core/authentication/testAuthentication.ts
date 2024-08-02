@@ -44,6 +44,7 @@ export const testAuthentication = async (config: PinataConfig | undefined) => {
     Object.assign(headers, config.customHeaders);
   }
 
+  // biome-ignore lint/complexity/useLiteralKeys: non-issue
   headers["Source"] = headers["Source"] || "sdk/testAuthentication";
 
   try {

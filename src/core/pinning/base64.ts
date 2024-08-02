@@ -35,91 +35,88 @@
 import type { PinataConfig, PinResponse, UploadOptions } from "../types";
 
 import {
-	PinataError,
-	NetworkError,
-	AuthenticationError,
-	ValidationError,
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
 } from "../../utils/custom-errors";
 
 export const uploadBase64 = async (
-	config: PinataConfig | undefined,
-	base64String: string,
-	options?: UploadOptions,
+  config: PinataConfig | undefined,
+  base64String: string,
+  options?: UploadOptions,
 ) => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
-	}
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
+  }
 
-	const jwt: string = options?.keys || config?.pinataJwt;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${config?.pinataJwt}`,
+  };
 
-	const name = options?.metadata?.name
-		? options?.metadata?.name
-		: "base64 string";
+  if (config.customHeaders) {
+    Object.assign(headers, config.customHeaders);
+  }
 
-	const buffer = Buffer.from(base64String, "base64");
+  // biome-ignore lint/complexity/useLiteralKeys: non-issue
+  headers["Source"] = headers["Source"] || "sdk/base64";
 
-	const blob = new Blob([buffer]);
+  const jwt: string = options?.keys || config?.pinataJwt;
 
-	const data = new FormData();
+  const name = options?.metadata?.name ? options?.metadata?.name : "base64 string";
 
-	data.append("file", blob, name);
+  const buffer = Buffer.from(base64String, "base64");
 
-	data.append(
-		"pinataOptions",
-		JSON.stringify({
-			cidVersion: options?.cidVersion,
-			groupId: options?.groupId,
-		}),
-	);
+  const blob = new Blob([buffer]);
 
-	data.append(
-		"pinataMetadata",
-		JSON.stringify({
-			name: name,
-			keyvalues: options?.metadata?.keyValues,
-		}),
-	);
+  const data = new FormData();
 
-	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
-			{
-				method: "POST",
-				headers: {
-					Source: "sdk/base64",
-					Authorization: `Bearer ${jwt}`,
-				},
-				body: data,
-			},
-		);
+  data.append("file", blob, name);
 
-		if (!request.ok) {
-			const errorData = await request.json();
-			if (request.status === 401) {
-				throw new AuthenticationError(
-					"Authentication failed",
-					request.status,
-					errorData,
-				);
-			}
-			throw new NetworkError(
-				`HTTP error! status: ${request.status}`,
-				request.status,
-				errorData,
-			);
-		}
+  data.append(
+    "pinataOptions",
+    JSON.stringify({
+      cidVersion: options?.cidVersion,
+      groupId: options?.groupId,
+    }),
+  );
 
-		const res: PinResponse = await request.json();
-		return res;
-	} catch (error) {
-		if (error instanceof PinataError) {
-			throw error;
-		}
-		if (error instanceof Error) {
-			throw new PinataError(`Error processing base64: ${error.message}`);
-		}
-		throw new PinataError(
-			"An unknown error occurred while trying to upload base64",
-		);
-	}
+  data.append(
+    "pinataMetadata",
+    JSON.stringify({
+      name: name,
+      keyvalues: options?.metadata?.keyValues,
+    }),
+  );
+
+  try {
+    const request = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+      method: "POST",
+      headers: headers,
+      body: data,
+    });
+
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError("Authentication failed", request.status, errorData);
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+
+    const res: PinResponse = await request.json();
+    return res;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing base64: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while trying to upload base64");
+  }
 };
