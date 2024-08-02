@@ -31,87 +31,90 @@
 
 import type { PinataConfig, RevokeKeyResponse } from "../types";
 import {
-  PinataError,
-  NetworkError,
-  AuthenticationError,
-  ValidationError,
+	PinataError,
+	NetworkError,
+	AuthenticationError,
+	ValidationError,
 } from "../../utils/custom-errors";
 
 const wait = (milliseconds: number): Promise<void> => {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
+	return new Promise((resolve) => {
+		setTimeout(resolve, milliseconds);
+	});
 };
 
 export const revokeKeys = async (
-  config: PinataConfig | undefined,
-  keys: string[],
+	config: PinataConfig | undefined,
+	keys: string[],
 ): Promise<RevokeKeyResponse[]> => {
-  if (!config || !config.pinataJwt) {
-    throw new ValidationError("Pinata configuration or JWT is missing");
-  }
+	if (!config || !config.pinataJwt) {
+		throw new ValidationError("Pinata configuration or JWT is missing");
+	}
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${config?.pinataJwt}`,
-  };
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		Authorization: `Bearer ${config?.pinataJwt}`,
+	};
 
-  if (config.customHeaders) {
-    Object.assign(headers, config.customHeaders);
-  }
+	if (config.customHeaders) {
+		Object.assign(headers, config.customHeaders);
+	}
 
-  // biome-ignore lint/complexity/useLiteralKeys: non-issue
-  headers["Source"] = headers["Source"] || "sdk/revokeKeys";
+	// biome-ignore lint/complexity/useLiteralKeys: non-issue
+	headers["Source"] = headers["Source"] || "sdk/revokeKeys";
 
-  const responses: RevokeKeyResponse[] = [];
+	const responses: RevokeKeyResponse[] = [];
 
-  for (const key of keys) {
-    try {
-      const request = await fetch(`https://api.pinata.cloud/v3/pinata/keys/${key}`, {
-        method: "PUT",
-        headers: headers,
-      });
+	for (const key of keys) {
+		try {
+			const request = await fetch(
+				`https://api.pinata.cloud/v3/pinata/keys/${key}`,
+				{
+					method: "PUT",
+					headers: headers,
+				},
+			);
 
-      await wait(300);
+			await wait(300);
 
-      if (!request.ok) {
-        const errorData = await request.json();
-        if (request.status === 401) {
-          throw new AuthenticationError(
-            "Authentication failed",
-            request.status,
-            errorData,
-          );
-        }
-        throw new NetworkError(
-          `HTTP error! status: ${request.status}`,
-          request.status,
-          errorData,
-        );
-      }
+			if (!request.ok) {
+				const errorData = await request.json();
+				if (request.status === 401) {
+					throw new AuthenticationError(
+						"Authentication failed",
+						request.status,
+						errorData,
+					);
+				}
+				throw new NetworkError(
+					`HTTP error! status: ${request.status}`,
+					request.status,
+					errorData,
+				);
+			}
 
-      const result: string = await request.json();
-      responses.push({
-        key: key,
-        status: result,
-      });
-    } catch (error) {
-      let errorMessage: string;
+			const result: string = await request.json();
+			responses.push({
+				key: key,
+				status: result,
+			});
+		} catch (error) {
+			let errorMessage: string;
 
-      if (error instanceof PinataError) {
-        errorMessage = error.message;
-      } else if (error instanceof Error) {
-        errorMessage = `Error revoking key ${key}: ${error.message}`;
-      } else {
-        errorMessage = `An unknown error occurred while revoking key ${key}`;
-      }
+			if (error instanceof PinataError) {
+				errorMessage = error.message;
+			} else if (error instanceof Error) {
+				errorMessage = `Error revoking key ${key}: ${error.message}`;
+			} else {
+				errorMessage = `An unknown error occurred while revoking key ${key}`;
+			}
 
-      responses.push({
-        key: key,
-        status: errorMessage,
-      });
-    }
-  }
+			responses.push({
+				key: key,
+				status: errorMessage,
+			});
+		}
+	}
 
-  return responses;
+	return responses;
 };

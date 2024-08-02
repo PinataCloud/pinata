@@ -1,148 +1,158 @@
 import { addToGroup } from "../../src/core/groups/addToGroup";
 import type { PinataConfig, GroupCIDOptions } from "../../src";
 import {
-  PinataError,
-  NetworkError,
-  AuthenticationError,
-  ValidationError,
+	PinataError,
+	NetworkError,
+	AuthenticationError,
+	ValidationError,
 } from "../../src/utils/custom-errors";
 
 describe("addToGroup function", () => {
-  let originalFetch: typeof fetch;
+	let originalFetch: typeof fetch;
 
-  beforeEach(() => {
-    originalFetch = global.fetch;
-  });
+	beforeEach(() => {
+		originalFetch = global.fetch;
+	});
 
-  afterEach(() => {
-    global.fetch = originalFetch;
-    jest.clearAllMocks();
-  });
+	afterEach(() => {
+		global.fetch = originalFetch;
+		jest.clearAllMocks();
+	});
 
-  const mockConfig: PinataConfig = {
-    pinataJwt: "test_jwt",
-    pinataGateway: "https://test.mypinata.cloud",
-  };
+	const mockConfig: PinataConfig = {
+		pinataJwt: "test_jwt",
+		pinataGateway: "https://test.mypinata.cloud",
+	};
 
-  const mockOptions: GroupCIDOptions = {
-    groupId: "test-group-id",
-    cids: ["Qm123...", "Qm456..."],
-  };
+	const mockOptions: GroupCIDOptions = {
+		groupId: "test-group-id",
+		cids: ["Qm123...", "Qm456..."],
+	};
 
-  it("should add CIDs to group successfully", async () => {
-    const mockResponse = "CIDs added to group successfully";
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: true,
-      text: jest.fn().mockResolvedValueOnce(mockResponse),
-    });
+	it("should add CIDs to group successfully", async () => {
+		const mockResponse = "CIDs added to group successfully";
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			text: jest.fn().mockResolvedValueOnce(mockResponse),
+		});
 
-    const result = await addToGroup(mockConfig, mockOptions);
+		const result = await addToGroup(mockConfig, mockOptions);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://api.pinata.cloud/groups/test-group-id/cids",
-      {
-        method: "PUT",
-        headers: {
-          Source: "sdk/addToGroup",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${mockConfig.pinataJwt}`,
-        },
-        body: JSON.stringify({ cids: mockOptions.cids }),
-      },
-    );
-    expect(result).toEqual(mockResponse);
-  });
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/groups/test-group-id/cids",
+			{
+				method: "PUT",
+				headers: {
+					Source: "sdk/addToGroup",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				},
+				body: JSON.stringify({ cids: mockOptions.cids }),
+			},
+		);
+		expect(result).toEqual(mockResponse);
+	});
 
-  it("should throw ValidationError if config is missing", async () => {
-    await expect(addToGroup(undefined, mockOptions)).rejects.toThrow(ValidationError);
-  });
+	it("should throw ValidationError if config is missing", async () => {
+		await expect(addToGroup(undefined, mockOptions)).rejects.toThrow(
+			ValidationError,
+		);
+	});
 
-  it("should throw AuthenticationError on 401 response", async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
-    });
+	it("should throw AuthenticationError on 401 response", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: false,
+			status: 401,
+			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+		});
 
-    await expect(addToGroup(mockConfig, mockOptions)).rejects.toThrow(
-      AuthenticationError,
-    );
-  });
+		await expect(addToGroup(mockConfig, mockOptions)).rejects.toThrow(
+			AuthenticationError,
+		);
+	});
 
-  it("should throw NetworkError on non-401 error response", async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
-    });
+	it("should throw NetworkError on non-401 error response", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: false,
+			status: 500,
+			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+		});
 
-    await expect(addToGroup(mockConfig, mockOptions)).rejects.toThrow(NetworkError);
-  });
+		await expect(addToGroup(mockConfig, mockOptions)).rejects.toThrow(
+			NetworkError,
+		);
+	});
 
-  it("should throw PinataError on unexpected errors", async () => {
-    global.fetch = jest.fn().mockRejectedValueOnce(new Error("Unexpected error"));
+	it("should throw PinataError on unexpected errors", async () => {
+		global.fetch = jest
+			.fn()
+			.mockRejectedValueOnce(new Error("Unexpected error"));
 
-    await expect(addToGroup(mockConfig, mockOptions)).rejects.toThrow(PinataError);
-  });
+		await expect(addToGroup(mockConfig, mockOptions)).rejects.toThrow(
+			PinataError,
+		);
+	});
 
-  it("should handle empty CIDs array", async () => {
-    const emptyOptions: GroupCIDOptions = {
-      groupId: "test-group-id",
-      cids: [],
-    };
+	it("should handle empty CIDs array", async () => {
+		const emptyOptions: GroupCIDOptions = {
+			groupId: "test-group-id",
+			cids: [],
+		};
 
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: true,
-      text: jest.fn().mockResolvedValueOnce("No CIDs added"),
-    });
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			text: jest.fn().mockResolvedValueOnce("No CIDs added"),
+		});
 
-    await addToGroup(mockConfig, emptyOptions);
+		await addToGroup(mockConfig, emptyOptions);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        body: JSON.stringify({ cids: [] }),
-      }),
-    );
-  });
+		expect(global.fetch).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({
+				body: JSON.stringify({ cids: [] }),
+			}),
+		);
+	});
 
-  it("should handle large number of CIDs", async () => {
-    const largeCIDsOptions: GroupCIDOptions = {
-      groupId: "test-group-id",
-      cids: Array(1000).fill("Qm..."),
-    };
+	it("should handle large number of CIDs", async () => {
+		const largeCIDsOptions: GroupCIDOptions = {
+			groupId: "test-group-id",
+			cids: Array(1000).fill("Qm..."),
+		};
 
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: true,
-      text: jest.fn().mockResolvedValueOnce("CIDs added successfully"),
-    });
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			text: jest.fn().mockResolvedValueOnce("CIDs added successfully"),
+		});
 
-    await addToGroup(mockConfig, largeCIDsOptions);
+		await addToGroup(mockConfig, largeCIDsOptions);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        body: expect.stringContaining('"cids":' + JSON.stringify(largeCIDsOptions.cids)),
-      }),
-    );
-  });
+		expect(global.fetch).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({
+				body: expect.stringContaining(
+					'"cids":' + JSON.stringify(largeCIDsOptions.cids),
+				),
+			}),
+		);
+	});
 
-  it("should use correct groupId in URL", async () => {
-    const customGroupIdOptions: GroupCIDOptions = {
-      groupId: "custom-group-123",
-      cids: ["Qm789..."],
-    };
+	it("should use correct groupId in URL", async () => {
+		const customGroupIdOptions: GroupCIDOptions = {
+			groupId: "custom-group-123",
+			cids: ["Qm789..."],
+		};
 
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: true,
-      text: jest.fn().mockResolvedValueOnce("CID added successfully"),
-    });
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			text: jest.fn().mockResolvedValueOnce("CID added successfully"),
+		});
 
-    await addToGroup(mockConfig, customGroupIdOptions);
+		await addToGroup(mockConfig, customGroupIdOptions);
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://api.pinata.cloud/groups/custom-group-123/cids",
-      expect.any(Object),
-    );
-  });
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/groups/custom-group-123/cids",
+			expect.any(Object),
+		);
+	});
 });

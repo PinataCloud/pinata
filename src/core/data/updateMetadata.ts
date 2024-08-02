@@ -36,65 +36,74 @@
 
 import type { PinataConfig, PinataMetadataUpdate } from "../types";
 import {
-  PinataError,
-  NetworkError,
-  AuthenticationError,
-  ValidationError,
+	PinataError,
+	NetworkError,
+	AuthenticationError,
+	ValidationError,
 } from "../../utils/custom-errors";
 
 export const updateMetadata = async (
-  config: PinataConfig | undefined,
-  options: PinataMetadataUpdate,
+	config: PinataConfig | undefined,
+	options: PinataMetadataUpdate,
 ): Promise<string> => {
-  if (!config || !config.pinataJwt) {
-    throw new ValidationError("Pinata configuration or JWT is missing");
-  }
-  const data = {
-    ipfsPinHash: options.cid,
-    name: options.name,
-    keyvalues: options.keyValues,
-  };
+	if (!config || !config.pinataJwt) {
+		throw new ValidationError("Pinata configuration or JWT is missing");
+	}
+	const data = {
+		ipfsPinHash: options.cid,
+		name: options.name,
+		keyvalues: options.keyValues,
+	};
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${config?.pinataJwt}`,
-  };
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		Authorization: `Bearer ${config?.pinataJwt}`,
+	};
 
-  if (config.customHeaders) {
-    Object.assign(headers, config.customHeaders);
-  }
+	if (config.customHeaders) {
+		Object.assign(headers, config.customHeaders);
+	}
 
-  // biome-ignore lint/complexity/useLiteralKeys: non-issue
-  headers["Source"] = headers["Source"] || "sdk/updateMetadata";
+	// biome-ignore lint/complexity/useLiteralKeys: non-issue
+	headers["Source"] = headers["Source"] || "sdk/updateMetadata";
 
-  try {
-    const request = await fetch("https://api.pinata.cloud/pinning/hashMetadata", {
-      method: "PUT",
-      headers: headers,
-      body: JSON.stringify(data),
-    });
+	try {
+		const request = await fetch(
+			"https://api.pinata.cloud/pinning/hashMetadata",
+			{
+				method: "PUT",
+				headers: headers,
+				body: JSON.stringify(data),
+			},
+		);
 
-    if (!request.ok) {
-      const errorData = await request.json();
-      if (request.status === 401) {
-        throw new AuthenticationError("Authentication failed", request.status, errorData);
-      }
-      throw new NetworkError(
-        `HTTP error! status: ${request.status}`,
-        request.status,
-        errorData,
-      );
-    }
+		if (!request.ok) {
+			const errorData = await request.json();
+			if (request.status === 401) {
+				throw new AuthenticationError(
+					"Authentication failed",
+					request.status,
+					errorData,
+				);
+			}
+			throw new NetworkError(
+				`HTTP error! status: ${request.status}`,
+				request.status,
+				errorData,
+			);
+		}
 
-    const res: string = await request.text();
-    return res;
-  } catch (error) {
-    if (error instanceof PinataError) {
-      throw error;
-    }
-    if (error instanceof Error) {
-      throw new PinataError(`Error processing updateMetadata: ${error.message}`);
-    }
-    throw new PinataError("An unknown error occurred while updating metadata");
-  }
+		const res: string = await request.text();
+		return res;
+	} catch (error) {
+		if (error instanceof PinataError) {
+			throw error;
+		}
+		if (error instanceof Error) {
+			throw new PinataError(
+				`Error processing updateMetadata: ${error.message}`,
+			);
+		}
+		throw new PinataError("An unknown error occurred while updating metadata");
+	}
 };
