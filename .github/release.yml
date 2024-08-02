@@ -10,7 +10,7 @@ changelog:
         - breaking-change
     - title: Exciting New Features 🎉
       labels:
-        - enhancement
+        - feat
     - title: Other Changes
       labels:
         - "*"
