@@ -52,7 +52,7 @@ async function main() {
 await main();
 ```
 
-This will return an object like the following
+This will return an object like the following:
 
 ```typescript
 {
