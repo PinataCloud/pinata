@@ -45,6 +45,7 @@ describe("getSignature function", () => {
       {
         method: "GET",
         headers: {
+          Source: "sdk/getSignature",
           "Content-Type": "application/json",
           Authorization: `Bearer ${mockConfig.pinataJwt}`,
         },

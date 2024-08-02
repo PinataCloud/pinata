@@ -61,7 +61,7 @@ export const revokeKeys = async (
   }
 
   // biome-ignore lint/complexity/useLiteralKeys: non-issue
-  headers["Source"] = headers["Source"] || "sdk/revokeKey";
+  headers["Source"] = headers["Source"] || "sdk/revokeKeys";
 
   const responses: RevokeKeyResponse[] = [];
 

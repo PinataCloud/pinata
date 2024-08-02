@@ -39,6 +39,7 @@ describe("removeSignature function", () => {
       {
         method: "DELETE",
         headers: {
+          Source: "sdk/removeSignature",
           "Content-Type": "application/json",
           Authorization: `Bearer ${mockConfig.pinataJwt}`,
         },

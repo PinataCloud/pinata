@@ -51,9 +51,11 @@ export const uploadCid = async (
     throw new ValidationError("Pinata configuration or JWT is missing");
   }
 
+  const jwt: string = options?.keys || config?.pinataJwt;
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${config?.pinataJwt}`,
+    Authorization: `Bearer ${jwt}`,
   };
 
   if (config.customHeaders) {
@@ -62,8 +64,6 @@ export const uploadCid = async (
 
   // biome-ignore lint/complexity/useLiteralKeys: non-issue
   headers["Source"] = headers["Source"] || "sdk/cid";
-
-  const jwt: string = options?.keys || config?.pinataJwt;
 
   const data = JSON.stringify({
     hashToPin: cid,

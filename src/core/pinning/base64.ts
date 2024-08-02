@@ -50,17 +50,6 @@ export const uploadBase64 = async (
     throw new ValidationError("Pinata configuration or JWT is missing");
   }
 
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${config?.pinataJwt}`,
-  };
-
-  if (config.customHeaders) {
-    Object.assign(headers, config.customHeaders);
-  }
-
-  // biome-ignore lint/complexity/useLiteralKeys: non-issue
-  headers["Source"] = headers["Source"] || "sdk/base64";
-
   const jwt: string = options?.keys || config?.pinataJwt;
 
   const name = options?.metadata?.name ? options?.metadata?.name : "base64 string";
@@ -88,6 +77,17 @@ export const uploadBase64 = async (
       keyvalues: options?.metadata?.keyValues,
     }),
   );
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${jwt}`,
+  };
+
+  if (config.customHeaders) {
+    Object.assign(headers, config.customHeaders);
+  }
+
+  // biome-ignore lint/complexity/useLiteralKeys: non-issue
+  headers["Source"] = headers["Source"] || "sdk/base64";
 
   try {
     const request = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {

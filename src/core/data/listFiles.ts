@@ -70,7 +70,6 @@ import {
   AuthenticationError,
   ValidationError,
 } from "../../utils/custom-errors";
-import { getHeaders } from "../../utils/get-headers";
 
 export const listFiles = async (
   config: PinataConfig | undefined,

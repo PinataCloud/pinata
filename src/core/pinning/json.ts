@@ -72,7 +72,7 @@ export const uploadJson = async <T extends JsonBody>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${config?.pinataJwt}`,
+    Authorization: `Bearer ${jwt}`,
   };
 
   if (config.customHeaders) {

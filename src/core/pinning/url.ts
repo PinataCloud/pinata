@@ -92,7 +92,7 @@ export const uploadUrl = async (
   );
 
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${config?.pinataJwt}`,
+    Authorization: `Bearer ${jwt}`,
   };
 
   if (config.customHeaders) {
