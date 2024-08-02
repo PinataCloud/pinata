@@ -30,21 +30,27 @@ import {
   AuthenticationError,
   ValidationError,
 } from "../../utils/custom-errors";
-import { getHeaders } from "../../utils/get-headers";
 
 export const testAuthentication = async (config: PinataConfig | undefined) => {
   if (!config || !config.pinataJwt) {
     throw new ValidationError("Pinata configuration or JWT is missing");
   }
 
-  try {
-    const headers = getHeaders(config, "sdk/testAuthentication");
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${config?.pinataJwt}`,
+  };
 
+  if (config.customHeaders) {
+    Object.assign(headers, config.customHeaders);
+  }
+
+  headers["Source"] = headers["Source"] || "sdk/testAuthentication";
+
+  try {
     const request = await fetch("https://api.pinata.cloud/data/testAuthentication", {
       method: "GET",
       headers: headers,
     });
-    console.log(request.headers);
     if (!request.ok) {
       const errorData = await request.json();
       if (request.status === 401) {
