@@ -33,67 +33,67 @@
 import type { GroupCIDOptions, PinataConfig } from "../types";
 
 import {
-	PinataError,
-	NetworkError,
-	AuthenticationError,
-	ValidationError,
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
 } from "../../utils/custom-errors";
 
 export const removeFromGroup = async (
-	config: PinataConfig | undefined,
-	options: GroupCIDOptions,
+  config: PinataConfig | undefined,
+  options: GroupCIDOptions,
 ): Promise<string> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
-	}
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
+  }
 
-	const data = JSON.stringify({
-		cids: options.cids,
-	});
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${config?.pinataJwt}`,
+  };
 
-	try {
-		const request = await fetch(
-			`https://api.pinata.cloud/groups/${options.groupId}/cids`,
-			{
-				method: "DELETE",
-				headers: {
-					Source: "sdk/removeFromGroup",
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${config?.pinataJwt}`,
-				},
-				body: data,
-			},
-		);
+  if (config.customHeaders) {
+    Object.assign(headers, config.customHeaders);
+  }
 
-		if (!request.ok) {
-			const errorData = await request.json();
-			if (request.status === 401) {
-				throw new AuthenticationError(
-					"Authentication failed",
-					request.status,
-					errorData,
-				);
-			}
-			throw new NetworkError(
-				`HTTP error! status: ${request.status}`,
-				request.status,
-				errorData,
-			);
-		}
+  // biome-ignore lint/complexity/useLiteralKeys: non-issue
+  headers["Source"] = headers["Source"] || "sdk/removeFromGroup";
 
-		const res: string = await request.text();
-		return res;
-	} catch (error) {
-		if (error instanceof PinataError) {
-			throw error;
-		}
-		if (error instanceof Error) {
-			throw new PinataError(
-				`Error processing removeFromGroup: ${error.message}`,
-			);
-		}
-		throw new PinataError(
-			"An unknown error occurred while removing CIDs from a group",
-		);
-	}
+  const data = JSON.stringify({
+    cids: options.cids,
+  });
+
+  try {
+    const request = await fetch(
+      `https://api.pinata.cloud/groups/${options.groupId}/cids`,
+      {
+        method: "DELETE",
+        headers: headers,
+        body: data,
+      },
+    );
+
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError("Authentication failed", request.status, errorData);
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+
+    const res: string = await request.text();
+    return res;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing removeFromGroup: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while removing CIDs from a group");
+  }
 };

@@ -30,75 +30,75 @@
  *   .name("Greetings");
  */
 
-import type {
-	PinataConfig,
-	GroupResponseItem,
-	GroupQueryOptions,
-} from "../types";
+import type { PinataConfig, GroupResponseItem, GroupQueryOptions } from "../types";
 
 import {
-	PinataError,
-	NetworkError,
-	AuthenticationError,
-	ValidationError,
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
 } from "../../utils/custom-errors";
 
 export const listGroups = async (
-	config: PinataConfig | undefined,
-	options?: GroupQueryOptions,
+  config: PinataConfig | undefined,
+  options?: GroupQueryOptions,
 ): Promise<GroupResponseItem[]> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
-	}
+  if (!config || !config.pinataJwt) {
+    throw new ValidationError("Pinata configuration or JWT is missing");
+  }
 
-	const params = new URLSearchParams();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${config?.pinataJwt}`,
+  };
 
-	if (options) {
-		const { offset, nameContains, limit } = options;
+  if (config.customHeaders) {
+    Object.assign(headers, config.customHeaders);
+  }
 
-		if (offset) params.append("offset", offset.toString());
-		if (nameContains !== undefined)
-			params.append("nameContains", nameContains.toString());
-		if (limit !== undefined) params.append("limit", limit.toString());
-	}
+  // biome-ignore lint/complexity/useLiteralKeys: non-issue
+  headers["Source"] = headers["Source"] || "sdk/listGroups";
 
-	const url = `https://api.pinata.cloud/groups?${params.toString()}`;
+  const params = new URLSearchParams();
 
-	try {
-		const request = await fetch(url, {
-			method: "GET",
-			headers: {
-				Source: "sdk/listGroups",
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${config?.pinataJwt}`,
-			},
-		});
+  if (options) {
+    const { offset, nameContains, limit } = options;
 
-		if (!request.ok) {
-			const errorData = await request.json();
-			if (request.status === 401) {
-				throw new AuthenticationError(
-					"Authentication failed",
-					request.status,
-					errorData,
-				);
-			}
-			throw new NetworkError(
-				`HTTP error! status: ${request.status}`,
-				request.status,
-				errorData,
-			);
-		}
+    if (offset) params.append("offset", offset.toString());
+    if (nameContains !== undefined)
+      params.append("nameContains", nameContains.toString());
+    if (limit !== undefined) params.append("limit", limit.toString());
+  }
 
-		const res: GroupResponseItem[] = await request.json();
-		return res;
-	} catch (error) {
-		if (error instanceof PinataError) {
-			throw error;
-		}
-		if (error instanceof Error) {
-			throw new PinataError(`Error processing listGroups: ${error.message}`);
-		}
-		throw new PinataError("An unknown error occurred while listing groups");
-	}
+  const url = `https://api.pinata.cloud/groups?${params.toString()}`;
+
+  try {
+    const request = await fetch(url, {
+      method: "GET",
+      headers: headers,
+    });
+
+    if (!request.ok) {
+      const errorData = await request.json();
+      if (request.status === 401) {
+        throw new AuthenticationError("Authentication failed", request.status, errorData);
+      }
+      throw new NetworkError(
+        `HTTP error! status: ${request.status}`,
+        request.status,
+        errorData,
+      );
+    }
+
+    const res: GroupResponseItem[] = await request.json();
+    return res;
+  } catch (error) {
+    if (error instanceof PinataError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw new PinataError(`Error processing listGroups: ${error.message}`);
+    }
+    throw new PinataError("An unknown error occurred while listing groups");
+  }
 };
