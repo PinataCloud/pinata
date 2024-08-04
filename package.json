@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --external none",
+    "format": "npx @biomejs/biome format --write src tests",
     "test": "jest --watchAll --verbose --coverage"
   },
   "repository": {
