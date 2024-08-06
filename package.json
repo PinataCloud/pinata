@@ -1,6 +1,6 @@
 {
   "name": "pinata",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "The new Pinata IPFS SDK",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
