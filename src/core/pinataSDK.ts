@@ -369,7 +369,7 @@ class Gateways {
 		return getCid(this.config, cid);
 	}
 
-	convert(url: string): string {
+	convert(url: string): Promise<string> {
 		return convertIPFSUrl(this.config, url);
 	}
 }

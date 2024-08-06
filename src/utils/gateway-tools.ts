@@ -1,9 +1,20 @@
-import * as isIPFS from "is-ipfs";
+import type * as IsIPFS from "is-ipfs";
 
-function containsCID(input: string) {
+let isIPFSModule: typeof IsIPFS;
+
+async function getIsIPFS() {
+	if (!isIPFSModule) {
+		isIPFSModule = await import("is-ipfs");
+	}
+	return isIPFSModule;
+}
+
+async function containsCID(input: string) {
 	if (typeof input !== "string") {
 		throw new Error("Input is not a string");
 	}
+
+	const isIPFS = await getIsIPFS();
 
 	// Helper function to check if a string starts with a CID
 	const startsWithCID = (str: string) => {
@@ -71,11 +82,11 @@ function containsCID(input: string) {
 	};
 }
 
-export function convertToDesiredGateway(
+export async function convertToDesiredGateway(
 	sourceUrl: string,
 	desiredGatewayPrefix: string | undefined,
 ) {
-	const results = containsCID(sourceUrl);
+	const results = await containsCID(sourceUrl);
 
 	if (results.containsCid !== true) {
 		throw new Error("url does not contain CID");

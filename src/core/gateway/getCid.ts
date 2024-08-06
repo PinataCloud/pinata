@@ -48,7 +48,7 @@ export const getCid = async (
 	let data: JSON | string | Blob;
 	let newUrl: string;
 
-	newUrl = convertToDesiredGateway(cid, config?.pinataGateway);
+	newUrl = await convertToDesiredGateway(cid, config?.pinataGateway);
 
 	if (config?.pinataGatewayKey) {
 		newUrl = `${newUrl}?pinataGatewayToken=${config?.pinataGatewayKey}`;

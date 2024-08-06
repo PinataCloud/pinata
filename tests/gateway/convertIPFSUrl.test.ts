@@ -3,7 +3,7 @@ import type { PinataConfig } from "../../src";
 
 // Mock the gateway-tools module
 jest.mock("../../src/utils/gateway-tools", () => ({
-	convertToDesiredGateway: jest.fn((url, gateway) => {
+	convertToDesiredGateway: jest.fn(async (url, gateway) => {
 		if (url.includes("Qm")) {
 			return `${gateway}/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG`;
 		}
@@ -18,39 +18,33 @@ describe("convertIPFSUrl", () => {
 		pinataGatewayKey: "my-gateway-key",
 	};
 
-	it("should convert IPFS URL with CID", () => {
+	it("should convert IPFS URL with CID", async () => {
 		const inputUrl = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
 		const expectedUrl =
 			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
-
-		const result = convertIPFSUrl(mockConfig, inputUrl);
-
+		const result = await convertIPFSUrl(mockConfig, inputUrl);
 		expect(result).toEqual(expectedUrl);
 	});
 
-	it("should convert HTTP URL with /ipfs/ path", () => {
+	it("should convert HTTP URL with /ipfs/ path", async () => {
 		const inputUrl =
 			"https://ipfs.io/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
 		const expectedUrl =
 			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
-
-		const result = convertIPFSUrl(mockConfig, inputUrl);
-
+		const result = await convertIPFSUrl(mockConfig, inputUrl);
 		expect(result).toEqual(expectedUrl);
 	});
 
-	it("should convert URL with CID in subdomain", () => {
+	it("should convert URL with CID in subdomain", async () => {
 		const inputUrl =
 			"https://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG.ipfs.dweb.link";
 		const expectedUrl =
 			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
-
-		const result = convertIPFSUrl(mockConfig, inputUrl);
-
+		const result = await convertIPFSUrl(mockConfig, inputUrl);
 		expect(result).toEqual(expectedUrl);
 	});
 
-	it("should handle URLs without a gateway key", () => {
+	it("should handle URLs without a gateway key", async () => {
 		const configWithoutKey: PinataConfig = {
 			pinataJwt: "test-jwt",
 			pinataGateway: "https://mygateway.mypinata.cloud",
@@ -58,27 +52,22 @@ describe("convertIPFSUrl", () => {
 		const inputUrl = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
 		const expectedUrl =
 			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
-
-		const result = convertIPFSUrl(configWithoutKey, inputUrl);
-
+		const result = await convertIPFSUrl(configWithoutKey, inputUrl);
 		expect(result).toEqual(expectedUrl);
 	});
 
-	it("should throw an error for invalid IPFS URLs", () => {
+	it("should throw an error for invalid IPFS URLs", async () => {
 		const invalidUrl = "https://example.com/not-an-ipfs-url";
-
-		expect(() => convertIPFSUrl(mockConfig, invalidUrl)).toThrow(
+		await expect(convertIPFSUrl(mockConfig, invalidUrl)).rejects.toThrow(
 			"url does not contain CID",
 		);
 	});
 
-	it("should not append gateway key to URL", () => {
+	it("should not append gateway key to URL", async () => {
 		const inputUrl = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
 		const expectedUrl =
 			"https://mygateway.mypinata.cloud/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
-
-		const result = convertIPFSUrl(mockConfig, inputUrl);
-
+		const result = await convertIPFSUrl(mockConfig, inputUrl);
 		expect(result).toEqual(expectedUrl);
 		expect(result).not.toContain("pinataGatewayToken");
 	});
