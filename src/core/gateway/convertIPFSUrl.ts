@@ -10,7 +10,7 @@
  * @param {string} config.pinataGateway - The desired gateway URL to use.
  * @param {string} [config.pinataGatewayKey] - Optional Pinata Gateway Key for authenticated access.
  * @param {string} url - The original IPFS URL to convert.
- * @returns {string} The converted URL using the specified gateway.
+ * @returns {Promise<string>} The converted URL using the specified gateway.
  *
  * @example
  * import { PinataSDK } from "pinata";
@@ -20,7 +20,7 @@
  *   pinataGateway: "example-gateway.mypinata.cloud",
  * });
  *
- * const url = pinata.gateways.convert(
+ * const url = await pinata.gateways.convert(
  *   "ipfs://QmVLwvmGehsrNEvhcCnnsw5RQNseohgEkFNN1848zNzdng"
  * );
  */
@@ -28,12 +28,12 @@
 import { convertToDesiredGateway } from "../../utils/gateway-tools";
 import type { PinataConfig } from "../types";
 
-export const convertIPFSUrl = (
+export const convertIPFSUrl = async (
 	config: PinataConfig | undefined,
 	url: string,
-): string => {
+): Promise<string> => {
 	let newUrl: string;
-	newUrl = convertToDesiredGateway(url, config?.pinataGateway);
+	newUrl = await convertToDesiredGateway(url, config?.pinataGateway);
 	if (config?.pinataGatewayKey) {
 		`${newUrl}?pinataGatewayToken=${config?.pinataGatewayKey}`;
 	}
