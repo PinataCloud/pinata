@@ -22,7 +22,7 @@
 		"type": "git",
 		"url": "https://github.com/PinataCloud/pinata.git"
 	},
-	"keywords": ["starter", "library", "universal"],
+	"keywords": ["ipfs", "sdk", "typescript"],
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"bugs": {
