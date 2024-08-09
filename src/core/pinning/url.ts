@@ -91,16 +91,16 @@ export const uploadUrl = async (
 		}),
 	);
 
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${jwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			Source: "sdk/url",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/url";
 
 	try {
 		const request = await fetch(

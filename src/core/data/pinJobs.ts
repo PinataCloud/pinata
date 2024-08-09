@@ -65,16 +65,16 @@ export const pinJobs = async (
 
 	const url = `https://api.pinata.cloud/pinning/pinJobs?${params.toString()}`;
 
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			Source: "sdk/pinJobs",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/pinJobs";
 
 	try {
 		const request = await fetch(url, {

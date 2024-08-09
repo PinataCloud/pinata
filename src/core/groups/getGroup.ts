@@ -49,17 +49,17 @@ export const getGroup = async (
 		throw new ValidationError("Pinata configuration or JWT is missing");
 	}
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			"Content-Type": "application/json",
+			Source: "sdk/getGroup",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/getGroup";
 
 	try {
 		const request = await fetch(

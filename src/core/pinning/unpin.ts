@@ -52,17 +52,16 @@ export const unpinFile = async (
 
 	const responses: UnpinResponse[] = [];
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			Source: "sdk/unpin",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/unpin";
 
 	for (const hash of files) {
 		try {

@@ -42,16 +42,16 @@ export const totalStorageUsage = async (
 
 	const url = "https://api.pinata.cloud/data/userPinnedDataTotal";
 
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			Source: "sdk/totalStorageUsage",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/totalStorageUsage";
 
 	try {
 		const request = await fetch(url, {
