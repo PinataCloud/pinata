@@ -82,15 +82,18 @@ export const uploadFile = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
-			{
-				method: "POST",
-				headers: headers,
-				body: data,
-			},
-		);
+		const request = await fetch(`${endpoint}/pinning/pinFileToIPFS`, {
+			method: "POST",
+			headers: headers,
+			body: data,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.json();

@@ -68,9 +68,15 @@ export const addSignature = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
 		const request = await fetch(
-			`https://api.pinata.cloud/v3/ipfs/signature/${options.cid}`,
+			`${endpoint}/v3/ipfs/signature/${options.cid}`,
 			{
 				method: "POST",
 				headers: headers,

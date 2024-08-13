@@ -121,7 +121,13 @@ export const listFiles = async (
 		}
 	}
 
-	const url = `https://api.pinata.cloud/data/pinList?status=pinned&${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
+	const url = `${endpoint}/data/pinList?status=pinned&${params.toString()}`;
 
 	try {
 		let headers: Record<string, string>;

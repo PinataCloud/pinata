@@ -65,15 +65,18 @@ export const revokeKeys = async (
 
 	const responses: RevokeKeyResponse[] = [];
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	for (const key of keys) {
 		try {
-			const request = await fetch(
-				`https://api.pinata.cloud/v3/pinata/keys/${key}`,
-				{
-					method: "PUT",
-					headers: headers,
-				},
-			);
+			const request = await fetch(`${endpoint}/v3/pinata/keys/${key}`, {
+				method: "PUT",
+				headers: headers,
+			});
 
 			await wait(300);
 

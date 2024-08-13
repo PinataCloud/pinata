@@ -81,8 +81,14 @@ export const uploadCid = async (
 		},
 	});
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
+		const request = await fetch(`${endpoint}/pinning/pinByHash`, {
 			method: "POST",
 			headers: headers,
 			body: data,

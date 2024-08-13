@@ -59,8 +59,14 @@ export const createGroup = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch("https://api.pinata.cloud/groups", {
+		const request = await fetch(`${endpoint}/groups`, {
 			method: "POST",
 			headers: headers,
 			body: data,

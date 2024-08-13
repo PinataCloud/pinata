@@ -40,7 +40,11 @@ export const totalStorageUsage = async (
 		throw new ValidationError("Pinata configuration or JWT is missing");
 	}
 
-	const url = "https://api.pinata.cloud/data/userPinnedDataTotal";
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	let headers: Record<string, string>;
 
@@ -54,7 +58,7 @@ export const totalStorageUsage = async (
 	}
 
 	try {
-		const request = await fetch(url, {
+		const request = await fetch(`${endpoint}/data/userPinnedDataTotal`, {
 			method: "GET",
 			headers: headers,
 		});

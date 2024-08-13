@@ -56,14 +56,17 @@ export const removeSignature = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch(
-			`https://api.pinata.cloud/v3/ipfs/signature/${cid}`,
-			{
-				method: "DELETE",
-				headers: headers,
-			},
-		);
+		const request = await fetch(`${endpoint}/v3/ipfs/signature/${cid}`, {
+			method: "DELETE",
+			headers: headers,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.json();

@@ -74,10 +74,14 @@ export const listGroups = async (
 		if (limit !== undefined) params.append("limit", limit.toString());
 	}
 
-	const url = `https://api.pinata.cloud/groups?${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	try {
-		const request = await fetch(url, {
+		const request = await fetch(`${endpoint}/groups?${params.toString()}`, {
 			method: "GET",
 			headers: headers,
 		});

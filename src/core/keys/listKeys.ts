@@ -81,13 +81,20 @@ export const listKeys = async (
 		if (name) params.append("name", name);
 	}
 
-	const url = `https://api.pinata.cloud/v3/pinata/keys?${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	try {
-		const request = await fetch(url, {
-			method: "GET",
-			headers: headers,
-		});
+		const request = await fetch(
+			`${endpoint}/v3/pinata/keys?${params.toString()}`,
+			{
+				method: "GET",
+				headers: headers,
+			},
+		);
 
 		if (!request.ok) {
 			const errorData = await request.json();

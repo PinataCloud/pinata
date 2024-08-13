@@ -37,6 +37,11 @@ export const testAuthentication = async (config: PinataConfig | undefined) => {
 	}
 
 	let headers: Record<string, string>;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
 		headers = { ...config.customHeaders };
@@ -48,13 +53,10 @@ export const testAuthentication = async (config: PinataConfig | undefined) => {
 	}
 
 	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/data/testAuthentication",
-			{
-				method: "GET",
-				headers: headers,
-			},
-		);
+		const request = await fetch(`${endpoint}/data/testAuthentication`, {
+			method: "GET",
+			headers: headers,
+		});
 		if (!request.ok) {
 			const errorData = await request.json();
 			if (request.status === 401) {

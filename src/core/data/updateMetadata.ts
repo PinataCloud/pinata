@@ -67,15 +67,18 @@ export const updateMetadata = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/pinning/hashMetadata",
-			{
-				method: "PUT",
-				headers: headers,
-				body: JSON.stringify(data),
-			},
-		);
+		const request = await fetch(`${endpoint}/pinning/hashMetadata`, {
+			method: "PUT",
+			headers: headers,
+			body: JSON.stringify(data),
+		});
 
 		if (!request.ok) {
 			const errorData = await request.json();

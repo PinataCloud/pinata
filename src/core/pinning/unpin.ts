@@ -63,15 +63,18 @@ export const unpinFile = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	for (const hash of files) {
 		try {
-			const response = await fetch(
-				`https://api.pinata.cloud/pinning/unpin/${hash}`,
-				{
-					method: "DELETE",
-					headers: headers,
-				},
-			);
+			const response = await fetch(`${endpoint}/pinning/unpin/${hash}`, {
+				method: "DELETE",
+				headers: headers,
+			});
 
 			await wait(300);
 

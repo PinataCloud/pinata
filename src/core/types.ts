@@ -3,6 +3,7 @@ export type PinataConfig = {
 	pinataGateway?: string;
 	pinataGatewayKey?: string;
 	customHeaders?: Record<string, string>;
+	endpointUrl?: string;
 };
 
 export type AuthTestResponse = {

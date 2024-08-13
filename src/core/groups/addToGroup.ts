@@ -62,15 +62,18 @@ export const addToGroup = async (
 		};
 	}
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch(
-			`https://api.pinata.cloud/groups/${options.groupId}/cids`,
-			{
-				method: "PUT",
-				headers: headers,
-				body: data,
-			},
-		);
+		const request = await fetch(`${endpoint}/groups/${options.groupId}/cids`, {
+			method: "PUT",
+			headers: headers,
+			body: data,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.json();

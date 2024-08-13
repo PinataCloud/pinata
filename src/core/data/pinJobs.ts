@@ -63,7 +63,13 @@ export const pinJobs = async (
 		if (offset) params.append("offset", offset.toString());
 	}
 
-	const url = `https://api.pinata.cloud/pinning/pinJobs?${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
+	const url = `${endpoint}/pinning/pinJobs?${params.toString()}`;
 
 	let headers: Record<string, string>;
 
