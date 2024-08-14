@@ -78,26 +78,29 @@ export const uploadFileArray = async (
 		}),
 	);
 
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${jwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			Source: "sdk/fileArray",
+		};
 	}
 
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/fileArray";
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
-			{
-				method: "POST",
-				headers: headers,
-				body: data,
-			},
-		);
+		const request = await fetch(`${endpoint}/pinning/pinFileToIPFS`, {
+			method: "POST",
+			headers: headers,
+			body: data,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.json();

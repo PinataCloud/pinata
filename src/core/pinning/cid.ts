@@ -57,17 +57,17 @@ export const uploadCid = async (
 
 	const jwt: string = options?.keys || config?.pinataJwt;
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-		Authorization: `Bearer ${jwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			"Content-Type": "application/json",
+			Source: "sdk/cid",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/cid";
 
 	const data = JSON.stringify({
 		hashToPin: cid,
@@ -81,8 +81,14 @@ export const uploadCid = async (
 		},
 	});
 
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	try {
-		const request = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
+		const request = await fetch(`${endpoint}/pinning/pinByHash`, {
 			method: "POST",
 			headers: headers,
 			body: data,

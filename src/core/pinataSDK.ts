@@ -87,6 +87,21 @@ export class PinataSDK {
 		this.signatures = new Signatures(this.config);
 	}
 
+	setNewHeaders(headers: Record<string, string>): void {
+		if (!this.config) {
+			this.config = { pinataJwt: "", customHeaders: {} };
+		}
+		this.config.customHeaders = { ...this.config.customHeaders, ...headers };
+
+		// Update headers for all sub-modules
+		this.upload.updateConfig(this.config);
+		this.gateways.updateConfig(this.config);
+		this.usage.updateConfig(this.config);
+		this.keys.updateConfig(this.config);
+		this.groups.updateConfig(this.config);
+		this.signatures.updateConfig(this.config);
+	}
+
 	testAuthentication(): Promise<AuthTestResponse> {
 		return testAuthentication(this.config);
 	}
@@ -199,6 +214,10 @@ class Upload {
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
 	}
 
 	file(file: FileObject, options?: UploadOptions): UploadBuilder<PinResponse> {
@@ -365,6 +384,10 @@ class Gateways {
 		this.config = formatConfig(config);
 	}
 
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
+
 	get(cid: string): Promise<GetCIDResponse> {
 		return getCid(this.config, cid);
 	}
@@ -480,6 +503,10 @@ class Usage {
 		this.config = formatConfig(config);
 	}
 
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
+
 	pinnedFileCount(): Promise<number> {
 		return pinnedFileCount(this.config);
 	}
@@ -494,6 +521,10 @@ class Keys {
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
 	}
 
 	create(options: KeyOptions): Promise<KeyResponse> {
@@ -602,6 +633,10 @@ class Groups {
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
 	}
 
 	create(options: GroupOptions): Promise<GroupResponseItem> {
@@ -722,6 +757,10 @@ class Signatures {
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
 	}
 
 	add(options: SignatureOptions): Promise<SignatureResponse> {

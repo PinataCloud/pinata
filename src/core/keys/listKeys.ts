@@ -55,17 +55,17 @@ export const listKeys = async (
 		throw new ValidationError("Pinata configuration or JWT is missing");
 	}
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			"Content-Type": "application/json",
+			Source: "sdk/listKeys",
+		};
 	}
-
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/listKeys";
 
 	const params = new URLSearchParams();
 
@@ -81,13 +81,20 @@ export const listKeys = async (
 		if (name) params.append("name", name);
 	}
 
-	const url = `https://api.pinata.cloud/v3/pinata/keys?${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	try {
-		const request = await fetch(url, {
-			method: "GET",
-			headers: headers,
-		});
+		const request = await fetch(
+			`${endpoint}/v3/pinata/keys?${params.toString()}`,
+			{
+				method: "GET",
+				headers: headers,
+			},
+		);
 
 		if (!request.ok) {
 			const errorData = await request.json();

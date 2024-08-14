@@ -75,27 +75,30 @@ export const uploadJson = async <T extends JsonBody>(
 		},
 	});
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-		Authorization: `Bearer ${jwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			"Content-Type": "application/json",
+			Source: "sdk/json",
+		};
 	}
 
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/json";
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/pinning/pinJSONToIPFS",
-			{
-				method: "POST",
-				headers: headers,
-				body: data,
-			},
-		);
+		const request = await fetch(`${endpoint}/pinning/pinJSONToIPFS`, {
+			method: "POST",
+			headers: headers,
+			body: data,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.json();

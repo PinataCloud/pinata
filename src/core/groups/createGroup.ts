@@ -47,20 +47,26 @@ export const createGroup = async (
 
 	const data = JSON.stringify(options);
 
-	const headers: Record<string, string> = {
-		"Content-Type": "application/json",
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			"Content-Type": "application/json",
+			Source: "sdk/createGroup",
+		};
 	}
 
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/createGroup";
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
 
 	try {
-		const request = await fetch("https://api.pinata.cloud/groups", {
+		const request = await fetch(`${endpoint}/groups`, {
 			method: "POST",
 			headers: headers,
 			body: data,

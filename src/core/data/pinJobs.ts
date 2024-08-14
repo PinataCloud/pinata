@@ -63,18 +63,24 @@ export const pinJobs = async (
 		if (offset) params.append("offset", offset.toString());
 	}
 
-	const url = `https://api.pinata.cloud/pinning/pinJobs?${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
 
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
-
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
 	}
 
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/pinJobs";
+	const url = `${endpoint}/pinning/pinJobs?${params.toString()}`;
+
+	let headers: Record<string, string>;
+
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			Source: "sdk/pinJobs",
+		};
+	}
 
 	try {
 		const request = await fetch(url, {

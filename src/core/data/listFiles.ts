@@ -121,19 +121,25 @@ export const listFiles = async (
 		}
 	}
 
-	const url = `https://api.pinata.cloud/data/pinList?status=pinned&${params.toString()}`;
+	let endpoint: string = "https://api.pinata.cloud";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
+	const url = `${endpoint}/data/pinList?status=pinned&${params.toString()}`;
 
 	try {
-		const headers: Record<string, string> = {
-			Authorization: `Bearer ${config?.pinataJwt}`,
-		};
+		let headers: Record<string, string>;
 
-		if (config.customHeaders) {
-			Object.assign(headers, config.customHeaders);
+		if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+			headers = { ...config.customHeaders };
+		} else {
+			headers = {
+				Authorization: `Bearer ${config.pinataJwt}`,
+				Source: "sdk/listFiles",
+			};
 		}
-
-		// biome-ignore lint/complexity/useLiteralKeys: non-issue
-		headers["Source"] = headers["Source"] || "sdk/listFiles";
 
 		const request = await fetch(url, {
 			method: "GET",

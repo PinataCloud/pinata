@@ -36,25 +36,27 @@ export const testAuthentication = async (config: PinataConfig | undefined) => {
 		throw new ValidationError("Pinata configuration or JWT is missing");
 	}
 
-	const headers: Record<string, string> = {
-		Authorization: `Bearer ${config?.pinataJwt}`,
-	};
+	let headers: Record<string, string>;
+	let endpoint: string = "https://api.pinata.cloud";
 
-	if (config.customHeaders) {
-		Object.assign(headers, config.customHeaders);
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
 	}
 
-	// biome-ignore lint/complexity/useLiteralKeys: non-issue
-	headers["Source"] = headers["Source"] || "sdk/testAuthentication";
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			Source: "sdk/testAuthentication",
+		};
+	}
 
 	try {
-		const request = await fetch(
-			"https://api.pinata.cloud/data/testAuthentication",
-			{
-				method: "GET",
-				headers: headers,
-			},
-		);
+		const request = await fetch(`${endpoint}/data/testAuthentication`, {
+			method: "GET",
+			headers: headers,
+		});
 		if (!request.ok) {
 			const errorData = await request.json();
 			if (request.status === 401) {
