@@ -66,7 +66,7 @@ export const uploadFile = async (
 	data.append(
 		"pinataMetadata",
 		JSON.stringify({
-			name: options?.metadata ? options.metadata.name : file.name,
+			name: options?.metadata?.name || file.name || "File from SDK",
 			keyvalues: options?.metadata?.keyValues,
 		}),
 	);

@@ -70,7 +70,7 @@ export const uploadJson = async <T extends JsonBody>(
 			groupId: options?.groupId,
 		},
 		pinataMetadata: {
-			name: options?.metadata ? options.metadata.name : "json",
+			name: options?.metadata?.name || "json",
 			keyvalues: options?.metadata?.keyValues,
 		},
 	});
