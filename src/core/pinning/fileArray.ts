@@ -55,7 +55,7 @@ export const uploadFileArray = async (
 
 	const jwt: string = options?.keys || config?.pinataJwt;
 
-	const folder = options?.metadata?.name ?? "folder_from_sdk";
+	const folder = options?.metadata?.name || "folder_from_sdk";
 	const data = new FormData();
 
 	for (const file of Array.from(files)) {
