@@ -64,7 +64,7 @@ describe("analyticsDateInterval function", () => {
 			expect.objectContaining({
 				method: "GET",
 				headers: {
-					Source: "sdk/analyticsTopUsage",
+					Source: "sdk/analyticsDateInterval",
 					Authorization: `Bearer ${mockConfig.pinataJwt}`,
 				},
 			}),
