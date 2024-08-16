@@ -10,7 +10,7 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
-export const analyticsTopUsage = async (
+export const analyticsDateInterval = async (
 	config: PinataConfig | undefined,
 	options?: TimeIntervalGatewayAnalyticsQuery,
 ): Promise<TimeIntervalGatewayAnalyticsResponse> => {
@@ -18,9 +18,7 @@ export const analyticsTopUsage = async (
 		throw new ValidationError("Pinata configuration or JWT is missing");
 	}
 
-	const params = new URLSearchParams({
-		includesCount: "false",
-	});
+	const params = new URLSearchParams();
 
 	if (options) {
 		const {
@@ -60,7 +58,7 @@ export const analyticsTopUsage = async (
 		endpoint = config.endpointUrl;
 	}
 
-	const url = `${endpoint}/v3/ipfs/gateway_analytics_top?${params.toString()}`;
+	const url = `${endpoint}/v3/ipfs/gateway_analytics_time_series?${params.toString()}`;
 
 	try {
 		let headers: Record<string, string>;
@@ -94,8 +92,9 @@ export const analyticsTopUsage = async (
 			);
 		}
 
-		const res: TimeIntervalGatewayAnalyticsResponse = await request.json();
-		return res;
+		const res = await request.json();
+		const resData: TimeIntervalGatewayAnalyticsResponse = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
