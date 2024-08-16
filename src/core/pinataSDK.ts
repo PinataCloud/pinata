@@ -966,11 +966,3 @@ class TimeIntervalGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
 		return this.getAnalytics();
 	}
 }
-
-class GatewayAnalytics {
-	private config: PinataConfig | undefined;
-
-	constructor(config?: PinataConfig) {
-		this.config = config;
-	}
-}
