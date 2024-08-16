@@ -208,7 +208,7 @@ export type TopGatewayAnalyticsQuery = GatewayAnalyticsQuery & {
 };
 
 export type TopGatewayAnalyticsItem = {
-	value: "string";
+	value: string;
 	requests: number;
 	bandwidth: number;
 };

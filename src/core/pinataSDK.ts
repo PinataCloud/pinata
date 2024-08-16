@@ -386,11 +386,9 @@ class FilterFiles {
 
 class Gateways {
 	config: PinataConfig | undefined;
-	analytics: GatewayAnalytics;
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
-		this.analytics = new GatewayAnalytics(config);
 	}
 
 	updateConfig(newConfig: PinataConfig): void {
@@ -403,6 +401,44 @@ class Gateways {
 
 	convert(url: string): Promise<string> {
 		return convertIPFSUrl(this.config, url);
+	}
+
+	topUsageAnalytics(options: {
+		domain: string;
+		start: string;
+		end: string;
+		sortBy: "requests" | "bandwidth";
+		attribute:
+			| "cid"
+			| "country"
+			| "region"
+			| "user_agent"
+			| "referer"
+			| "file_name";
+	}): TopGatewayAnalyticsBuilder {
+		return new TopGatewayAnalyticsBuilder(
+			this.config,
+			options.domain,
+			options.start,
+			options.end,
+			options.sortBy,
+			options.attribute,
+		);
+	}
+
+	dateIntervalAnalytics(options: {
+		domain: string;
+		start: string;
+		end: string;
+		interval: "day" | "week";
+	}): TimeIntervalGatewayAnalyticsBuilder {
+		return new TimeIntervalGatewayAnalyticsBuilder(
+			this.config,
+			options.domain,
+			options.start,
+			options.end,
+			options.interval,
+		);
 	}
 }
 
@@ -936,43 +972,5 @@ class GatewayAnalytics {
 
 	constructor(config?: PinataConfig) {
 		this.config = config;
-	}
-
-	topUsage(options: {
-		domain: string;
-		start: string;
-		end: string;
-		sortBy: "requests" | "bandwidth";
-		attribute:
-			| "cid"
-			| "country"
-			| "region"
-			| "user_agent"
-			| "referer"
-			| "file_name";
-	}): TopGatewayAnalyticsBuilder {
-		return new TopGatewayAnalyticsBuilder(
-			this.config,
-			options.domain,
-			options.start,
-			options.end,
-			options.sortBy,
-			options.attribute,
-		);
-	}
-
-	dateInterval(options: {
-		domain: string;
-		start: string;
-		end: string;
-		dateInterval: "day" | "week";
-	}): TimeIntervalGatewayAnalyticsBuilder {
-		return new TimeIntervalGatewayAnalyticsBuilder(
-			this.config,
-			options.domain,
-			options.start,
-			options.end,
-			options.dateInterval,
-		);
 	}
 }
