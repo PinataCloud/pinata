@@ -27,6 +27,11 @@ import type {
 	RevokeKeyResponse,
 	SignatureOptions,
 	SignatureResponse,
+	TopGatewayAnalyticsQuery,
+	TopGatewayAnalyticsItem,
+	TimeIntervalGatewayAnalyticsQuery,
+	GatewayAnalyticsQuery,
+	TimeIntervalGatewayAnalyticsResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./pinning/file";
@@ -56,6 +61,8 @@ import { deleteGroup } from "./groups/deleteGroup";
 import { addSignature } from "./signatures/addSignature";
 import { getSignature } from "./signatures/getSignature";
 import { removeSignature } from "./signatures/removeSignature";
+import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
+import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -394,6 +401,44 @@ class Gateways {
 
 	convert(url: string): Promise<string> {
 		return convertIPFSUrl(this.config, url);
+	}
+
+	topUsageAnalytics(options: {
+		domain: string;
+		start: string;
+		end: string;
+		sortBy: "requests" | "bandwidth";
+		attribute:
+			| "cid"
+			| "country"
+			| "region"
+			| "user_agent"
+			| "referer"
+			| "file_name";
+	}): TopGatewayAnalyticsBuilder {
+		return new TopGatewayAnalyticsBuilder(
+			this.config,
+			options.domain,
+			options.start,
+			options.end,
+			options.sortBy,
+			options.attribute,
+		);
+	}
+
+	dateIntervalAnalytics(options: {
+		domain: string;
+		start: string;
+		end: string;
+		interval: "day" | "week";
+	}): TimeIntervalGatewayAnalyticsBuilder {
+		return new TimeIntervalGatewayAnalyticsBuilder(
+			this.config,
+			options.domain,
+			options.start,
+			options.end,
+			options.interval,
+		);
 	}
 }
 
@@ -773,5 +818,159 @@ class Signatures {
 
 	delete(cid: string): Promise<string> {
 		return removeSignature(this.config, cid);
+	}
+}
+
+class GatewayAnalyticsBuilder<T extends GatewayAnalyticsQuery, R> {
+	protected config: PinataConfig | undefined;
+	protected query: T;
+	private requestCount = 0;
+	private lastRequestTime = 0;
+	private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	private readonly MINUTE_IN_MS = 60000;
+
+	constructor(config: PinataConfig | undefined, query: T) {
+		this.config = config;
+		this.query = query;
+	}
+
+	cid(cid: string): this {
+		this.query.cid = cid;
+		return this;
+	}
+
+	fileName(fileName: string): this {
+		this.query.file_name = fileName;
+		return this;
+	}
+
+	userAgent(userAgent: string): this {
+		this.query.user_agent = userAgent;
+		return this;
+	}
+
+	country(country: string): this {
+		this.query.country = country;
+		return this;
+	}
+
+	region(region: string): this {
+		this.query.region = region;
+		return this;
+	}
+
+	referer(referer: string): this {
+		this.query.referer = referer;
+		return this;
+	}
+
+	limit(limit: number): this {
+		this.query.limit = limit;
+		return this;
+	}
+
+	sort(order: "asc" | "desc"): this {
+		this.query.sort_order = order;
+		return this;
+	}
+
+	private async rateLimit(): Promise<void> {
+		this.requestCount++;
+		const now = Date.now();
+		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+			const timePassedSinceLastRequest = now - this.lastRequestTime;
+			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+				await new Promise((resolve) => setTimeout(resolve, delayTime));
+			}
+			this.requestCount = 0;
+		}
+		this.lastRequestTime = Date.now();
+	}
+
+	protected async getAnalytics(): Promise<R> {
+		await this.rateLimit();
+		throw new Error("getAnalytics method must be implemented in derived class");
+	}
+
+	then(onfulfilled?: ((value: R) => any) | null): Promise<any> {
+		return this.getAnalytics().then(onfulfilled);
+	}
+}
+
+class TopGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
+	TopGatewayAnalyticsQuery,
+	TopGatewayAnalyticsItem[]
+> {
+	constructor(
+		config: PinataConfig | undefined,
+		domain: string,
+		start: string,
+		end: string,
+		sortBy: "requests" | "bandwidth",
+		attribute:
+			| "cid"
+			| "country"
+			| "region"
+			| "user_agent"
+			| "referer"
+			| "file_name",
+	) {
+		super(config, {
+			gateway_domain: domain,
+			start_date: start,
+			end_date: end,
+			sort_by: sortBy,
+			attribute: attribute,
+		});
+	}
+
+	protected async getAnalytics(): Promise<TopGatewayAnalyticsItem[]> {
+		return analyticsTopUsage(this.config, this.query);
+	}
+
+	async all(): Promise<TopGatewayAnalyticsItem[]> {
+		return this.getAnalytics();
+	}
+}
+
+class TimeIntervalGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
+	TimeIntervalGatewayAnalyticsQuery,
+	TimeIntervalGatewayAnalyticsResponse
+> {
+	constructor(
+		config: PinataConfig | undefined,
+		domain: string,
+		start: string,
+		end: string,
+		dateInterval: "day" | "week",
+	) {
+		super(config, {
+			gateway_domain: domain,
+			start_date: start,
+			end_date: end,
+			date_interval: dateInterval,
+		});
+	}
+
+	sortBy(sortBy: "requests" | "bandwidth"): this {
+		this.query.sort_by = sortBy;
+		return this;
+	}
+
+	protected async getAnalytics(): Promise<TimeIntervalGatewayAnalyticsResponse> {
+		return analyticsDateInterval(this.config, this.query);
+	}
+
+	async all(): Promise<TimeIntervalGatewayAnalyticsResponse> {
+		return this.getAnalytics();
+	}
+}
+
+class GatewayAnalytics {
+	private config: PinataConfig | undefined;
+
+	constructor(config?: PinataConfig) {
+		this.config = config;
 	}
 }
