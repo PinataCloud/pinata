@@ -113,7 +113,7 @@ export const analyticsDateInterval = async (
 		} else {
 			headers = {
 				Authorization: `Bearer ${config.pinataJwt}`,
-				Source: "sdk/analyticsTopUsage",
+				Source: "sdk/analyticsDateInterval",
 			};
 		}
 
