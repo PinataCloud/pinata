@@ -27,6 +27,9 @@ import type {
 	RevokeKeyResponse,
 	SignatureOptions,
 	SignatureResponse,
+	TopGatewayAnalyticsQuery,
+	TopGatewayAnalyticsItem,
+	GatewayAnalyticsQuery,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./pinning/file";
@@ -56,6 +59,7 @@ import { deleteGroup } from "./groups/deleteGroup";
 import { addSignature } from "./signatures/addSignature";
 import { getSignature } from "./signatures/getSignature";
 import { removeSignature } from "./signatures/removeSignature";
+import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -379,9 +383,11 @@ class FilterFiles {
 
 class Gateways {
 	config: PinataConfig | undefined;
+	analytics: GatewayAnalytics;
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+		this.analytics = new GatewayAnalytics(config);
 	}
 
 	updateConfig(newConfig: PinataConfig): void {
@@ -773,5 +779,131 @@ class Signatures {
 
 	delete(cid: string): Promise<string> {
 		return removeSignature(this.config, cid);
+	}
+}
+
+class GatewayAnalyticsBuilder<T extends GatewayAnalyticsQuery> {
+	private config: PinataConfig | undefined;
+	private query: T;
+	// rate limit vars
+	private requestCount = 0;
+	private lastRequestTime = 0;
+	private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	private readonly MINUTE_IN_MS = 60000;
+
+	constructor(
+		config: PinataConfig | undefined,
+		domain: string,
+		start: string,
+		end: string,
+		sortBy: "requests" | "bandwidth",
+		attribute:
+			| "cid"
+			| "country"
+			| "region"
+			| "user_agent"
+			| "referer"
+			| "file_name",
+	) {
+		this.config = config;
+		this.query = {
+			gateway_domain: domain,
+			start_date: start,
+			end_date: end,
+			sort_by: sortBy,
+			attribute: attribute,
+		};
+	}
+
+	cid(cid: string): GatewayAnalyticsBuilder {
+		this.query.cid = cid;
+		return this;
+	}
+
+	fileName(fileName: string): GatewayAnalyticsBuilder {
+		this.query.file_name = fileName;
+		return this;
+	}
+
+	userAgent(userAgent: string): GatewayAnalyticsBuilder {
+		this.query.user_agent = userAgent;
+		return this;
+	}
+
+	country(country: string): GatewayAnalyticsBuilder {
+		this.query.country = country;
+		return this;
+	}
+
+	region(region: string): GatewayAnalyticsBuilder {
+		this.query.region = region;
+		return this;
+	}
+
+	referer(referer: string): GatewayAnalyticsBuilder {
+		this.query.referer = referer;
+		return this;
+	}
+
+	limit(limit: number): GatewayAnalyticsBuilder {
+		this.query.limit = limit;
+		return this;
+	}
+
+	sort(order: "asc" | "desc"): GatewayAnalyticsBuilder {
+		this.query.sort_order = order;
+		return this;
+	}
+
+	then(
+		onfulfilled?: ((value: TopGatewayAnalyticsItem[]) => any) | null,
+	): Promise<any> {
+		return analyticsTopUsage(this.config, this.query).then(onfulfilled);
+	}
+
+	// rate limit, hopefully temporary?
+	private async rateLimit(): Promise<void> {
+		this.requestCount++;
+		const now = Date.now();
+		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+			const timePassedSinceLastRequest = now - this.lastRequestTime;
+			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+				await new Promise((resolve) => setTimeout(resolve, delayTime));
+			}
+			this.requestCount = 0;
+		}
+		this.lastRequestTime = Date.now();
+	}
+}
+
+class GatewayAnalytics {
+	private config: PinataConfig | undefined;
+
+	constructor(config?: PinataConfig) {
+		this.config = config;
+	}
+
+	topUsage(options: {
+		domain: string;
+		start: string;
+		end: string;
+		sortBy: "requests" | "bandwidth";
+		attribute:
+			| "cid"
+			| "country"
+			| "region"
+			| "user_agent"
+			| "referer"
+			| "file_name";
+	}): GatewayAnalyticsBuilder {
+		return new GatewayAnalyticsBuilder(
+			this.config,
+			options.domain,
+			options.start,
+			options.end,
+			options.sortBy,
+			options.attribute,
+		);
 	}
 }
