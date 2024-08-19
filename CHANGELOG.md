@@ -1,3 +1,8 @@
+## [0.3.0](https://github.com/PinataCloud/pinata/compare/v0.2.0...v0.3.0) (2024-08-19)
+
+### Features
+- Feat/hot-swaps by @stevedylandev in [#9](https://github.com/PinataCloud/pinata/pull/9)
+
 ## [0.2.0](https://github.com/PinataCloud/pinata/compare/v0.1.10...v0.2.0) (2024-08-16)
 
 ### Features
