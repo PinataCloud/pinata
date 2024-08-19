@@ -46,11 +46,11 @@ export const uploadFile = async (
 	file: File,
 	options?: UploadOptions,
 ) => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	const jwt: string = options?.keys || config.pinataJwt;
+	const jwt: string | undefined = options?.keys || config.pinataJwt;
 
 	const data = new FormData();
 	data.append("file", file, file.name);

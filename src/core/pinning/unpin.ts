@@ -46,8 +46,8 @@ export const unpinFile = async (
 	config: PinataConfig | undefined,
 	files: string[],
 ): Promise<UnpinResponse[]> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	const responses: UnpinResponse[] = [];

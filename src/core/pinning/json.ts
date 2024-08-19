@@ -57,11 +57,11 @@ export const uploadJson = async <T extends JsonBody>(
 	jsonData: T,
 	options?: UploadOptions,
 ) => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	const jwt: string = options?.keys || config?.pinataJwt;
+	const jwt: string | undefined = options?.keys || config?.pinataJwt;
 
 	const data = JSON.stringify({
 		pinataContent: jsonData,

@@ -48,8 +48,8 @@ export const createKey = async (
 	config: PinataConfig | undefined,
 	options: KeyOptions,
 ): Promise<KeyResponse> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	let headers: Record<string, string>;
