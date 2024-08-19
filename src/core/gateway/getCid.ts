@@ -55,12 +55,7 @@ export const getCid = async (
 	}
 
 	try {
-		const request = await fetch(newUrl, {
-			method: "GET",
-			headers: {
-				Source: "sdk/getCid",
-			},
-		});
+		const request = await fetch(newUrl);
 
 		if (!request.ok) {
 			const errorData = await request.json();

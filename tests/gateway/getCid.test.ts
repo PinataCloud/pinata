@@ -130,7 +130,6 @@ describe("getCid function", () => {
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://test.mypinata.cloud/ipfs/QmTest...?pinataGatewayToken=test_gateway_key",
-			expect.any(Object),
 		);
 	});
 });
