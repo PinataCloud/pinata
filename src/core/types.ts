@@ -357,3 +357,18 @@ export type SignatureResponse = {
 	cid: string;
 	signature: string;
 };
+
+export type SwapCidOptions = {
+	cid: string;
+	swapCid: string;
+};
+
+export type SwapHistoryOptions = {
+	cid: string;
+	domain: string;
+};
+
+export type SwapCidResponse = {
+	mappedCid: string;
+	createdAt: string;
+};
