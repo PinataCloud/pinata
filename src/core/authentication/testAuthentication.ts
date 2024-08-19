@@ -32,8 +32,8 @@ import {
 } from "../../utils/custom-errors";
 
 export const testAuthentication = async (config: PinataConfig | undefined) => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	let headers: Record<string, string>;

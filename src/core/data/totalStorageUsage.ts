@@ -36,8 +36,8 @@ import {
 export const totalStorageUsage = async (
 	config: PinataConfig | undefined,
 ): Promise<number> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	let endpoint: string = "https://api.pinata.cloud";

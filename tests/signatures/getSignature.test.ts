@@ -59,15 +59,6 @@ describe("getSignature function", () => {
 		);
 	});
 
-	it("should throw ValidationError if pinataJwt is missing", async () => {
-		const invalidConfig: Partial<PinataConfig> = {
-			pinataGateway: "test-gateway.pinata.cloud",
-		};
-		await expect(
-			getSignature(invalidConfig as PinataConfig, mockCid),
-		).rejects.toThrow(ValidationError);
-	});
-
 	it("should throw AuthenticationError on 401 response", async () => {
 		(global.fetch as jest.Mock).mockResolvedValueOnce({
 			ok: false,

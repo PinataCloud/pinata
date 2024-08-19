@@ -48,8 +48,8 @@ export const addSignature = async (
 	config: PinataConfig | undefined,
 	options: SignatureOptions,
 ): Promise<SignatureResponse> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	const data = JSON.stringify({

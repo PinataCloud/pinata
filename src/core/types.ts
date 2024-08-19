@@ -1,5 +1,5 @@
 export type PinataConfig = {
-	pinataJwt: string;
+	pinataJwt: string | undefined;
 	pinataGateway?: string;
 	pinataGatewayKey?: string;
 	customHeaders?: Record<string, string>;

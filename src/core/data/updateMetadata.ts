@@ -46,8 +46,8 @@ export const updateMetadata = async (
 	config: PinataConfig | undefined,
 	options: PinataMetadataUpdate,
 ): Promise<string> => {
-	if (!config || !config.pinataJwt) {
-		throw new ValidationError("Pinata configuration or JWT is missing");
+	if (!config) {
+		throw new ValidationError("Pinata configuration is missing");
 	}
 	const data = {
 		ipfsPinHash: options.cid,

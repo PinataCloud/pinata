@@ -102,16 +102,6 @@ describe("listFiles function", () => {
 		await expect(listFiles(undefined)).rejects.toThrow(ValidationError);
 	});
 
-	it("should throw ValidationError if pinataJwt is missing", async () => {
-		const invalidConfig: Partial<PinataConfig> = {
-			pinataGateway: "test.cloud",
-			// pinataJwt is intentionally omitted
-		};
-		await expect(listFiles(invalidConfig as PinataConfig)).rejects.toThrow(
-			ValidationError,
-		);
-	});
-
 	it("should throw AuthenticationError on 401 response", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
