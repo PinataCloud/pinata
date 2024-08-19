@@ -1,8 +1,13 @@
+## [0.3.3](https://github.com/PinataCloud/pinata/compare/v0.3.1...v0.3.2) (2024-08-19)
+
+### Refactors
+
+- chore: Updated all files to allow undefined jwt and adjusted unit tests by @stevedylandev in [#11](https://github.com/PinataCloud/pinata/pull/11)
+
 ## [0.3.2](https://github.com/PinataCloud/pinata/compare/v0.3.1...v0.3.2) (2024-08-19)
 
 ### Fixes
 
-## What's Changed
 - fix: Removed Source header to fix CORS error by @stevedylandev in [#10](https://github.com/PinataCloud/pinata/pull/10)
 
 ## [0.3.1](https://github.com/PinataCloud/pinata/compare/v0.3.0...v0.3.1) (2024-08-19)
