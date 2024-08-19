@@ -32,6 +32,9 @@ import type {
 	TimeIntervalGatewayAnalyticsQuery,
 	GatewayAnalyticsQuery,
 	TimeIntervalGatewayAnalyticsResponse,
+	SwapCidOptions,
+	SwapCidResponse,
+	SwapHistoryOptions,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./pinning/file";
@@ -63,6 +66,9 @@ import { getSignature } from "./signatures/getSignature";
 import { removeSignature } from "./signatures/removeSignature";
 import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
 import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
+import { swapCid } from "./gateway/swapCid";
+import { swapHistory } from "./gateway/swapHistory";
+import { deleteSwap } from "./gateway/deleteSwap";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -439,6 +445,18 @@ class Gateways {
 			options.end,
 			options.interval,
 		);
+	}
+
+	swapCid(options: SwapCidOptions): Promise<SwapCidResponse> {
+		return swapCid(this.config, options);
+	}
+
+	swapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
+		return swapHistory(this.config, options);
+	}
+
+	deleteSwap(cid: string): Promise<string> {
+		return deleteSwap(this.config, cid);
 	}
 }
 
