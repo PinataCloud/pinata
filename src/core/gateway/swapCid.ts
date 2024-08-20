@@ -78,10 +78,10 @@ export const swapCid = async (
 		});
 
 		if (!request.ok) {
-			const errorData = await request.json();
-			if (request.status === 401) {
+			const errorData = await request.text();
+			if (request.status === (401 | 403)) {
 				throw new AuthenticationError(
-					"Authentication failed",
+					`Authentication failed: ${errorData}`,
 					request.status,
 					errorData,
 				);
@@ -101,7 +101,7 @@ export const swapCid = async (
 				);
 			}
 			throw new NetworkError(
-				`HTTP error! status: ${request.status}`,
+				`HTTP error: ${errorData}`,
 				request.status,
 				errorData,
 			);

@@ -57,9 +57,9 @@ export const uploadUrl = async (
 	const stream = await fetch(url);
 
 	if (!stream.ok) {
-		const errorData = await stream.json();
+		const errorData = await stream.text();
 		throw new NetworkError(
-			`HTTP error! status: ${stream.status}`,
+			`HTTP error: ${errorData}`,
 			stream.status,
 			errorData,
 		);
@@ -116,16 +116,16 @@ export const uploadUrl = async (
 		});
 
 		if (!request.ok) {
-			const errorData = await request.json();
-			if (request.status === 401) {
+			const errorData = await request.text();
+			if (request.status === (401 | 403)) {
 				throw new AuthenticationError(
-					"Authentication failed",
+					`Authentication failed: ${errorData}`,
 					request.status,
 					errorData,
 				);
 			}
 			throw new NetworkError(
-				`HTTP error! status: ${request.status}`,
+				`HTTP error: ${errorData}`,
 				request.status,
 				errorData,
 			);
