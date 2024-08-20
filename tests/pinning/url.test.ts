@@ -161,7 +161,7 @@ describe("uploadUrl function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 404,
-			json: jest.fn().mockResolvedValueOnce({ error: "Not Found" }),
+			text: jest.fn().mockResolvedValueOnce("Not Found"),
 		});
 
 		await expect(uploadUrl(mockConfig, mockUrl)).rejects.toThrow(NetworkError);
@@ -177,7 +177,7 @@ describe("uploadUrl function", () => {
 			.mockResolvedValueOnce({
 				ok: false,
 				status: 401,
-				json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+				text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 			});
 
 		await expect(uploadUrl(mockConfig, mockUrl)).rejects.toThrow(
@@ -195,7 +195,7 @@ describe("uploadUrl function", () => {
 			.mockResolvedValueOnce({
 				ok: false,
 				status: 500,
-				json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+				text: jest.fn().mockResolvedValueOnce("Server Error"),
 			});
 
 		await expect(uploadUrl(mockConfig, mockUrl)).rejects.toThrow(NetworkError);

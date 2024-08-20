@@ -68,7 +68,7 @@ describe("revokeKeys function", () => {
 			.mockResolvedValueOnce({
 				ok: false,
 				status: 401,
-				json: jest.fn().mockResolvedValue({ error: "Unauthorized" }),
+				text: jest.fn().mockResolvedValue("Unauthorized"),
 			})
 			.mockResolvedValue({
 				ok: true,
@@ -78,7 +78,7 @@ describe("revokeKeys function", () => {
 		const result = await revokeKeys(mockConfig, mockKeys);
 
 		expect(result).toEqual([
-			{ key: "key1", status: "Authentication failed" },
+			{ key: "key1", status: "Authentication failed: Unauthorized" },
 			{ key: "key2", status: "Key revoked successfully" },
 			{ key: "key3", status: "Key revoked successfully" },
 		]);
@@ -90,7 +90,7 @@ describe("revokeKeys function", () => {
 			.mockResolvedValueOnce({
 				ok: false,
 				status: 500,
-				json: jest.fn().mockResolvedValue({ error: "Server Error" }),
+				text: jest.fn().mockResolvedValue("status: 500"),
 			})
 			.mockResolvedValue({
 				ok: true,
@@ -102,7 +102,7 @@ describe("revokeKeys function", () => {
 		expect(result).toEqual([
 			{
 				key: "key1",
-				status: "HTTP error! status: 500",
+				status: "HTTP error: status: 500",
 			},
 			{ key: "key2", status: "Key revoked successfully" },
 			{ key: "key3", status: "Key revoked successfully" },

@@ -71,7 +71,7 @@ describe("swapCid function", () => {
 		(global.fetch as jest.Mock).mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(swapCid(mockConfig, mockOptions)).rejects.toThrow(
@@ -103,7 +103,7 @@ describe("swapCid function", () => {
 		(global.fetch as jest.Mock).mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(swapCid(mockConfig, mockOptions)).rejects.toThrow(

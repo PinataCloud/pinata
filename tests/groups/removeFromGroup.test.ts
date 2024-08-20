@@ -63,7 +63,7 @@ describe("removeFromGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(removeFromGroup(mockConfig, mockOptions)).rejects.toThrow(
@@ -75,7 +75,7 @@ describe("removeFromGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(removeFromGroup(mockConfig, mockOptions)).rejects.toThrow(

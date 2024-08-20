@@ -69,7 +69,7 @@ export const deleteSwap = async (
 
 		if (!request.ok) {
 			const errorData = await request.text();
-			if (request.status === (401 | 403)) {
+			if (request.status === 401 || request.status === 403) {
 				throw new AuthenticationError(
 					`Authentication failed: ${errorData}`,
 					request.status,
