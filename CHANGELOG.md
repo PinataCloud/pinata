@@ -1,4 +1,11 @@
-## [0.3.3](https://github.com/PinataCloud/pinata/compare/v0.3.1...v0.3.2) (2024-08-19)
+## [0.3.4](https://github.com/PinataCloud/pinata/compare/v0.3.3...v0.3.4) (2024-08-19)
+
+### Refactors
+
+- Chore/refactor error handling by @stevedylandev in [#14](https://github.com/PinataCloud/pinata/pull/14)
+
+
+## [0.3.3](https://github.com/PinataCloud/pinata/compare/v0.3.2...v0.3.3) (2024-08-19)
 
 ### Refactors
 
