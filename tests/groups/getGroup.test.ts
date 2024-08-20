@@ -72,7 +72,7 @@ describe("getGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(getGroup(mockConfig, mockOptions)).rejects.toThrow(
@@ -84,7 +84,7 @@ describe("getGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(getGroup(mockConfig, mockOptions)).rejects.toThrow(
@@ -106,7 +106,7 @@ describe("getGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 404,
-			json: jest.fn().mockResolvedValueOnce({ error: "Group not found" }),
+			text: jest.fn().mockResolvedValueOnce("Group not found"),
 		});
 
 		await expect(

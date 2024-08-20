@@ -111,7 +111,7 @@ describe("uploadCid function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(
@@ -123,7 +123,7 @@ describe("uploadCid function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(NetworkError);

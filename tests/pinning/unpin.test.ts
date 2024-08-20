@@ -50,7 +50,7 @@ describe("unpinFile function", () => {
 			.mockResolvedValueOnce({
 				ok: false,
 				status: 404,
-				json: jest.fn().mockResolvedValueOnce({ error: "Not Found" }),
+				text: jest.fn().mockResolvedValueOnce("Not Found"),
 			});
 
 		const result = await unpinFile(mockConfig, mockHashes);
@@ -59,7 +59,7 @@ describe("unpinFile function", () => {
 			{ hash: "QmTest123", status: "Unpin successful" },
 			{
 				hash: "QmTest456",
-				status: "HTTP error! status: 404",
+				status: "HTTP error: Not Found",
 			},
 		]);
 	});
@@ -74,14 +74,14 @@ describe("unpinFile function", () => {
 		global.fetch = jest.fn().mockResolvedValue({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValue({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValue("Unauthorized"),
 		});
 
 		const result = await unpinFile(mockConfig, mockHashes);
 
 		expect(result).toEqual([
-			{ hash: "QmTest123", status: "Authentication failed" },
-			{ hash: "QmTest456", status: "Authentication failed" },
+			{ hash: "QmTest123", status: "Authentication failed: Unauthorized" },
+			{ hash: "QmTest456", status: "Authentication failed: Unauthorized" },
 		]);
 	});
 
@@ -89,14 +89,14 @@ describe("unpinFile function", () => {
 		global.fetch = jest.fn().mockResolvedValue({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValue({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValue("Server Error"),
 		});
 
 		const result = await unpinFile(mockConfig, mockHashes);
 
 		expect(result).toEqual([
-			{ hash: "QmTest123", status: "HTTP error! status: 500" },
-			{ hash: "QmTest456", status: "HTTP error! status: 500" },
+			{ hash: "QmTest123", status: "HTTP error: Server Error" },
+			{ hash: "QmTest456", status: "HTTP error: Server Error" },
 		]);
 	});
 

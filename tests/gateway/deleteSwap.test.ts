@@ -58,7 +58,7 @@ describe("deleteSwap function", () => {
 		(global.fetch as jest.Mock).mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(deleteSwap(mockConfig, mockCid)).rejects.toThrow(
@@ -90,7 +90,7 @@ describe("deleteSwap function", () => {
 		(global.fetch as jest.Mock).mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(deleteSwap(mockConfig, mockCid)).rejects.toThrow(NetworkError);

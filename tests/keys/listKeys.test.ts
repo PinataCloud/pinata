@@ -130,7 +130,7 @@ describe("listKeys function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(listKeys(mockConfig)).rejects.toThrow(AuthenticationError);
@@ -140,7 +140,7 @@ describe("listKeys function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(listKeys(mockConfig)).rejects.toThrow(NetworkError);

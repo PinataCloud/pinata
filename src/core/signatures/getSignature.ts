@@ -69,16 +69,16 @@ export const getSignature = async (
 		});
 
 		if (!request.ok) {
-			const errorData = await request.json();
-			if (request.status === 401) {
+			const errorData = await request.text();
+			if (request.status === 401 || request.status === 403) {
 				throw new AuthenticationError(
-					"Authentication failed",
+					`Authentication failed: ${errorData}`,
 					request.status,
 					errorData,
 				);
 			}
 			throw new NetworkError(
-				`HTTP error! status: ${request.status}`,
+				`HTTP error: ${errorData}`,
 				request.status,
 				errorData,
 			);

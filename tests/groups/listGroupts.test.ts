@@ -95,7 +95,7 @@ describe("listGroups function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(listGroups(mockConfig)).rejects.toThrow(AuthenticationError);
@@ -105,7 +105,7 @@ describe("listGroups function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
 		await expect(listGroups(mockConfig)).rejects.toThrow(NetworkError);

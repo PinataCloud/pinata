@@ -60,7 +60,7 @@ describe("testAuthentication function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 401,
-			json: jest.fn().mockResolvedValueOnce({ error: "Unauthorized" }),
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
 		await expect(testAuthentication(mockConfig)).rejects.toThrow(
@@ -76,7 +76,7 @@ describe("testAuthentication function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: false,
 			status: 500,
-			json: jest.fn().mockResolvedValueOnce({ error: "Server Error" }),
+			text: jest.fn().mockResolvedValueOnce("server error"),
 		});
 
 		await expect(testAuthentication(mockConfig)).rejects.toThrow(NetworkError);

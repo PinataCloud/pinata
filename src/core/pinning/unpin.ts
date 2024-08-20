@@ -79,16 +79,16 @@ export const unpinFile = async (
 			await wait(300);
 
 			if (!response.ok) {
-				const errorData = await response.json();
+				const errorData = await response.text();
 				if (response.status === 401) {
 					throw new AuthenticationError(
-						"Authentication failed",
+						`Authentication failed: ${errorData}`,
 						response.status,
 						errorData,
 					);
 				}
 				throw new NetworkError(
-					`HTTP error! status: ${response.status}`,
+					`HTTP error: ${errorData}`,
 					response.status,
 					errorData,
 				);
