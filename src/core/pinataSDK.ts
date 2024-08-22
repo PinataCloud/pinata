@@ -407,6 +407,8 @@ class Gateways {
 
 	convert(url: string): Promise<string> {
 		return convertIPFSUrl(this.config, url);
+	convert(url: string, gatewayPrefix?: string): Promise<string> {
+		return convertIPFSUrl(this.config, url, gatewayPrefix);
 	}
 
 	topUsageAnalytics(options: {
