@@ -1,5 +1,6 @@
 import { convertIPFSUrl } from "../../src/core/gateway/convertIPFSUrl";
 import type { PinataConfig } from "../../src";
+import { containsCID } from "../../src/utils/gateway-tools";
 
 // Mock the gateway-tools module
 jest.mock("../../src/utils/gateway-tools", () => ({
@@ -9,9 +10,18 @@ jest.mock("../../src/utils/gateway-tools", () => ({
 		}
 		throw new Error("url does not contain CID");
 	}),
+	containsCID: jest.fn(async (input) => {
+		if (input.includes("Qm")) {
+			return {
+				containsCid: true,
+				cid: "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+			};
+		}
+		return { containsCid: false, cid: null };
+	}),
 }));
 
-describe("convertIPFSUrl", () => {
+describe("convertIPFSUrl and containsCID", () => {
 	const mockConfig: PinataConfig = {
 		pinataJwt: "test-jwt",
 		pinataGateway: "https://mygateway.mypinata.cloud",
@@ -70,5 +80,31 @@ describe("convertIPFSUrl", () => {
 		const result = await convertIPFSUrl(mockConfig, inputUrl);
 		expect(result).toEqual(expectedUrl);
 		expect(result).not.toContain("pinataGatewayToken");
+	});
+
+	// New test for optional gatewayPrefix
+	it("should use optional gatewayPrefix when provided", async () => {
+		const inputUrl = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
+		const gatewayPrefix = "https://custom-gateway.example.com";
+		const expectedUrl =
+			"https://custom-gateway.example.com/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
+		const result = await convertIPFSUrl(mockConfig, inputUrl, gatewayPrefix);
+		expect(result).toEqual(expectedUrl);
+	});
+
+	// Tests for containsCID
+	it("should return true for URL containing CID", async () => {
+		const inputUrl = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
+		const result = await containsCID(inputUrl);
+		expect(result).toEqual({
+			containsCid: true,
+			cid: "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+		});
+	});
+
+	it("should return false for URL not containing CID", async () => {
+		const inputUrl = "https://example.com/not-an-ipfs-url";
+		const result = await containsCID(inputUrl);
+		expect(result).toEqual({ containsCid: false, cid: null });
 	});
 });

@@ -372,3 +372,8 @@ export type SwapCidResponse = {
 	mappedCid: string;
 	createdAt: string;
 };
+
+export type ContainsCIDResponse = {
+	containsCid: boolean;
+	cid: string | null;
+};

@@ -31,9 +31,12 @@ import type { PinataConfig } from "../types";
 export const convertIPFSUrl = async (
 	config: PinataConfig | undefined,
 	url: string,
+	gatewayPrefix?: string,
 ): Promise<string> => {
 	let newUrl: string;
-	newUrl = await convertToDesiredGateway(url, config?.pinataGateway);
+	let prefix: string =
+		gatewayPrefix || config?.pinataGateway || "https://gateway.pinata.cloud";
+	newUrl = await convertToDesiredGateway(url, prefix);
 	if (config?.pinataGatewayKey) {
 		`${newUrl}?pinataGatewayToken=${config?.pinataGatewayKey}`;
 	}
