@@ -182,6 +182,20 @@ export type GetCIDResponse = {
 	contentType: ContentType;
 };
 
+export type OptimizeImageOptions = {
+	width?: number;
+	height?: number;
+	dpr?: number;
+	fit?: "scaleDown" | "contain" | "cover" | "crop" | "pad";
+	gravity?: "auto" | "side" | string;
+	quality?: number;
+	format?: "auto" | "webp";
+	animation?: boolean;
+	sharpen?: number;
+	onError?: boolean;
+	metadata?: "keep" | "copyright" | "none";
+};
+
 export type GatewayAnalyticsQuery = {
 	gateway_domain: string;
 	start_date: string;

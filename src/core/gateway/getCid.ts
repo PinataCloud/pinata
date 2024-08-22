@@ -28,8 +28,11 @@
  */
 
 import { convertToDesiredGateway } from "../../utils/gateway-tools";
-import type { GetCIDResponse, PinataConfig } from "../types";
-
+import type {
+	GetCIDResponse,
+	PinataConfig,
+	OptimizeImageOptions,
+} from "../types";
 import {
 	PinataError,
 	NetworkError,
@@ -40,6 +43,7 @@ import {
 export const getCid = async (
 	config: PinataConfig | undefined,
 	cid: string,
+	options?: OptimizeImageOptions,
 ): Promise<GetCIDResponse> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
@@ -50,8 +54,32 @@ export const getCid = async (
 
 	newUrl = await convertToDesiredGateway(cid, config?.pinataGateway);
 
+	const params = new URLSearchParams();
+
 	if (config?.pinataGatewayKey) {
-		newUrl = `${newUrl}?pinataGatewayToken=${config?.pinataGatewayKey}`;
+		params.append("pinataGatewayToken", config.pinataGatewayKey);
+	}
+
+	if (options) {
+		if (options.width) params.append("img-width", options.width.toString());
+		if (options.height) params.append("img-height", options.height.toString());
+		if (options.dpr) params.append("img-dpr", options.dpr.toString());
+		if (options.fit) params.append("img-fit", options.fit);
+		if (options.gravity) params.append("img-gravity", options.gravity);
+		if (options.quality)
+			params.append("img-quality", options.quality.toString());
+		if (options.format) params.append("img-format", options.format);
+		if (options.animation !== undefined)
+			params.append("img-anim", options.animation.toString());
+		if (options.sharpen)
+			params.append("img-sharpen", options.sharpen.toString());
+		if (options.onError === true) params.append("img-onerror", "redirect");
+		if (options.metadata) params.append("img-metadata", options.metadata);
+	}
+
+	const queryString = params.toString();
+	if (queryString) {
+		newUrl += `?${queryString}`;
 	}
 
 	try {

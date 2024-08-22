@@ -36,6 +36,7 @@ import type {
 	SwapCidResponse,
 	SwapHistoryOptions,
 	ContainsCIDResponse,
+	OptimizeImageOptions,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./pinning/file";
@@ -403,8 +404,8 @@ class Gateways {
 		this.config = newConfig;
 	}
 
-	get(cid: string): Promise<GetCIDResponse> {
-		return getCid(this.config, cid);
+	get(cid: string): OptimizeImage {
+		return new OptimizeImage(this.config, cid);
 	}
 
 	convert(url: string, gatewayPrefix?: string): Promise<string> {
@@ -463,6 +464,26 @@ class Gateways {
 
 	deleteSwap(cid: string): Promise<string> {
 		return deleteSwap(this.config, cid);
+	}
+}
+
+class OptimizeImage {
+	private config: PinataConfig | undefined;
+	private cid: string;
+	private options: OptimizeImageOptions = {};
+
+	constructor(config: PinataConfig | undefined, cid: string) {
+		this.config = config;
+		this.cid = cid;
+	}
+
+	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
+		this.options = { ...this.options, ...options };
+		return this;
+	}
+
+	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
+		return getCid(this.config, this.cid, this.options).then(onfulfilled);
 	}
 }
 
