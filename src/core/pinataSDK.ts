@@ -788,7 +788,7 @@ class FilterGroups {
 
 	then(
 		onfulfilled?: ((value: GroupResponseItem[]) => any) | null,
-	): Promise<any> {
+	): Promise<GroupResponseItem[]> {
 		return listGroups(this.config, this.query).then(onfulfilled);
 	}
 
