@@ -1,3 +1,13 @@
+## [0.4.0](https://github.com/PinataCloud/pinata/compare/v0.3.4...v0.4.0) (2024-08-22)
+
+### Features
+- Feat/upgrade gateway tools by @stevedylandev in [#15](https://github.com/PinataCloud/pinata/pull/15)
+- Feat: Add optmizeImage method to gateways.get by @stevedylandev in [#16](https://github.com/PinataCloud/pinata/pull/16)
+
+### Fixes
+
+- Fix: Updated the response of `groups.list` by @stevedylandev in [#17](https://github.com/PinataCloud/pinata/pull/17)
+
 ## [0.3.4](https://github.com/PinataCloud/pinata/compare/v0.3.3...v0.3.4) (2024-08-19)
 
 ### Refactors
