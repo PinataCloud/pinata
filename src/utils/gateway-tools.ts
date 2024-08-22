@@ -1,4 +1,5 @@
 import type * as IsIPFS from "is-ipfs";
+import { ContainsCIDResponse } from "../core/types";
 
 let isIPFSModule: typeof IsIPFS;
 
@@ -9,7 +10,7 @@ async function getIsIPFS() {
 	return isIPFSModule;
 }
 
-async function containsCID(input: string) {
+export async function containsCID(input: string): Promise<ContainsCIDResponse> {
 	if (typeof input !== "string") {
 		throw new Error("Input is not a string");
 	}

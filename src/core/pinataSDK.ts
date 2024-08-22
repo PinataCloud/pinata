@@ -35,6 +35,7 @@ import type {
 	SwapCidOptions,
 	SwapCidResponse,
 	SwapHistoryOptions,
+	ContainsCIDResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./pinning/file";
@@ -69,6 +70,7 @@ import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
 import { swapCid } from "./gateway/swapCid";
 import { swapHistory } from "./gateway/swapHistory";
 import { deleteSwap } from "./gateway/deleteSwap";
+import { containsCID } from "../utils/gateway-tools";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -405,10 +407,12 @@ class Gateways {
 		return getCid(this.config, cid);
 	}
 
-	convert(url: string): Promise<string> {
-		return convertIPFSUrl(this.config, url);
 	convert(url: string, gatewayPrefix?: string): Promise<string> {
 		return convertIPFSUrl(this.config, url, gatewayPrefix);
+	}
+
+	containsCID(cid: string): Promise<ContainsCIDResponse> {
+		return containsCID(cid);
 	}
 
 	topUsageAnalytics(options: {
