@@ -1,6 +1,6 @@
 {
 	"name": "pinata-web3",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"description": "The new Pinata IPFS SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -20,15 +20,15 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/PinataCloud/pinata.git"
+		"url": "https://github.com/PinataCloud/pinata-web3.git"
 	},
 	"keywords": ["ipfs", "sdk", "typescript"],
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/PinataCloud/pinata/issues"
+		"url": "https://github.com/PinataCloud/pinata-web3/issues"
 	},
-	"homepage": "https://github.com/PinataCloud/pinata",
+	"homepage": "https://github.com/PinataCloud/pinata-web3",
 	"devDependencies": {
 		"@biomejs/biome": "1.8.3",
 		"@types/jest": "^29.5.12",
