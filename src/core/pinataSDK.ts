@@ -45,8 +45,8 @@ import { listFiles } from "./files/list";
 import { updateFile } from "./files/updateFile";
 import { getCid } from "./gateway/getCid";
 import { convertIPFSUrl } from "./gateway/convertIPFSUrl";
-import { pinnedFileCount } from "./files/pinnedFileUsage";
-import { totalStorageUsage } from "./files/totalStorageUsage";
+// import { pinnedFileCount } from "./files/pinnedFileUsage";
+// import { totalStorageUsage } from "./files/totalStorageUsage";
 import { createKey } from "./keys/createKey";
 import { listKeys } from "./keys/listKeys";
 import { revokeKeys } from "./keys/revokeKeys";
@@ -57,9 +57,9 @@ import { addToGroup } from "./groups/addToGroup";
 import { updateGroup } from "./groups/updateGroup";
 import { removeFromGroup } from "./groups/removeFromGroup";
 import { deleteGroup } from "./groups/deleteGroup";
-import { addSignature } from "./signatures/addSignature";
-import { getSignature } from "./signatures/getSignature";
-import { removeSignature } from "./signatures/removeSignature";
+// import { addSignature } from "./signatures/addSignature";
+// import { getSignature } from "./signatures/getSignature";
+// import { removeSignature } from "./signatures/removeSignature";
 import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
 import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
 import { swapCid } from "./gateway/swapCid";
@@ -83,20 +83,20 @@ export class PinataSDK {
 	files: Files;
 	upload: Upload;
 	gateways: Gateways;
-	usage: Usage;
+	//	usage: Usage;
 	keys: Keys;
 	groups: Groups;
-	signatures: Signatures;
+	//signatures: Signatures;
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
 		this.files = new Files(this.config);
 		this.upload = new Upload(this.config);
 		this.gateways = new Gateways(this.config);
-		this.usage = new Usage(this.config);
+		//		this.usage = new Usage(this.config);
 		this.keys = new Keys(this.config);
 		this.groups = new Groups(this.config);
-		this.signatures = new Signatures(this.config);
+		//		this.signatures = new Signatures(this.config);
 	}
 
 	setNewHeaders(headers: Record<string, string>): void {
@@ -109,10 +109,10 @@ export class PinataSDK {
 		this.files.updateConfig(this.config);
 		this.upload.updateConfig(this.config);
 		this.gateways.updateConfig(this.config);
-		this.usage.updateConfig(this.config);
+		//		this.usage.updateConfig(this.config);
 		this.keys.updateConfig(this.config);
 		this.groups.updateConfig(this.config);
-		this.signatures.updateConfig(this.config);
+		//		this.signatures.updateConfig(this.config);
 	}
 
 	testAuthentication(): Promise<AuthTestResponse> {
@@ -429,25 +429,25 @@ class OptimizeImage {
 	}
 }
 
-class Usage {
-	config: PinataConfig | undefined;
+// class Usage {
+// 	config: PinataConfig | undefined;
 
-	constructor(config?: PinataConfig) {
-		this.config = formatConfig(config);
-	}
+// 	constructor(config?: PinataConfig) {
+// 		this.config = formatConfig(config);
+// 	}
 
-	updateConfig(newConfig: PinataConfig): void {
-		this.config = newConfig;
-	}
+// 	updateConfig(newConfig: PinataConfig): void {
+// 		this.config = newConfig;
+// 	}
 
-	pinnedFileCount(): Promise<number> {
-		return pinnedFileCount(this.config);
-	}
+// 	pinnedFileCount(): Promise<number> {
+// 		return pinnedFileCount(this.config);
+// 	}
 
-	totalStorageSize(): Promise<number> {
-		return totalStorageUsage(this.config);
-	}
-}
+// 	totalStorageSize(): Promise<number> {
+// 		return totalStorageUsage(this.config);
+// 	}
+// }
 
 class Keys {
 	config: PinataConfig | undefined;
@@ -584,11 +584,11 @@ class Groups {
 		return getGroup(this.config, options);
 	}
 
-	addCids(options: GroupCIDOptions): Promise<string> {
+	addFiles(options: GroupCIDOptions): Promise<string> {
 		return addToGroup(this.config, options);
 	}
 
-	removeCids(options: GroupCIDOptions): Promise<string> {
+	removeFiles(options: GroupCIDOptions): Promise<string> {
 		return removeFromGroup(this.config, options);
 	}
 
@@ -685,29 +685,29 @@ class FilterGroups {
 	}
 }
 
-class Signatures {
-	config: PinataConfig | undefined;
+// class Signatures {
+// 	config: PinataConfig | undefined;
 
-	constructor(config?: PinataConfig) {
-		this.config = formatConfig(config);
-	}
+// 	constructor(config?: PinataConfig) {
+// 		this.config = formatConfig(config);
+// 	}
 
-	updateConfig(newConfig: PinataConfig): void {
-		this.config = newConfig;
-	}
+// 	updateConfig(newConfig: PinataConfig): void {
+// 		this.config = newConfig;
+// 	}
 
-	add(options: SignatureOptions): Promise<SignatureResponse> {
-		return addSignature(this.config, options);
-	}
+// 	add(options: SignatureOptions): Promise<SignatureResponse> {
+// 		return addSignature(this.config, options);
+// 	}
 
-	get(cid: string): Promise<SignatureResponse> {
-		return getSignature(this.config, cid);
-	}
+// 	get(cid: string): Promise<SignatureResponse> {
+// 		return getSignature(this.config, cid);
+// 	}
 
-	delete(cid: string): Promise<string> {
-		return removeSignature(this.config, cid);
-	}
-}
+// 	delete(cid: string): Promise<string> {
+// 		return removeSignature(this.config, cid);
+// 	}
+// }
 
 class GatewayAnalyticsBuilder<T extends GatewayAnalyticsQuery, R> {
 	protected config: PinataConfig | undefined;
