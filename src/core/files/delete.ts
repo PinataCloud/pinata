@@ -42,7 +42,7 @@ const wait = (milliseconds: number): Promise<void> => {
 	});
 };
 
-export const unpinFile = async (
+export const deleteFile = async (
 	config: PinataConfig | undefined,
 	files: string[],
 ): Promise<UnpinResponse[]> => {

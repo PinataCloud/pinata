@@ -1,17 +1,13 @@
 import type {
 	FileObject,
-	PinByCIDResponse,
 	PinListItem,
 	PinListQuery,
-	PinResponse,
+	UploadResponse,
 	PinataConfig,
 	PinataMetadata,
 	PinataMetadataUpdate,
-	UploadCIDOptions,
 	UploadOptions,
 	GetCIDResponse,
-	PinJobQuery,
-	PinJobItem,
 	KeyOptions,
 	KeyResponse,
 	KeyListQuery,
@@ -39,20 +35,18 @@ import type {
 	OptimizeImageOptions,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
-import { uploadFile } from "./pinning/file";
-import { uploadFileArray } from "./pinning/fileArray";
-import { uploadBase64 } from "./pinning/base64";
-import { uploadUrl } from "./pinning/url";
-import { uploadJson } from "./pinning/json";
-import { uploadCid } from "./pinning/cid";
-import { unpinFile } from "./pinning/unpin";
-import { listFiles } from "./data/listFiles";
-import { updateMetadata } from "./data/updateMetadata";
+import { uploadFile } from "./uploads/file";
+import { uploadFileArray } from "./uploads/fileArray";
+import { uploadBase64 } from "./uploads/base64";
+import { uploadUrl } from "./uploads/url";
+import { uploadJson } from "./uploads/json";
+import { deleteFile } from "./files/delete";
+import { listFiles } from "./files/list";
+import { updateMetadata } from "./files/updateMetadata";
 import { getCid } from "./gateway/getCid";
 import { convertIPFSUrl } from "./gateway/convertIPFSUrl";
-import { pinJobs } from "./data/pinJobs";
-import { pinnedFileCount } from "./data/pinnedFileUsage";
-import { totalStorageUsage } from "./data/totalStorageUsage";
+import { pinnedFileCount } from "./files/pinnedFileUsage";
+import { totalStorageUsage } from "./files/totalStorageUsage";
 import { createKey } from "./keys/createKey";
 import { listKeys } from "./keys/listKeys";
 import { revokeKeys } from "./keys/revokeKeys";
@@ -122,8 +116,8 @@ export class PinataSDK {
 		return testAuthentication(this.config);
 	}
 
-	unpin(files: string[]): Promise<UnpinResponse[]> {
-		return unpinFile(this.config, files);
+	delete(files: string[]): Promise<UnpinResponse[]> {
+		return deleteFile(this.config, files);
 	}
 
 	listFiles(): FilterFiles {
@@ -132,10 +126,6 @@ export class PinataSDK {
 
 	updateMetadata(options: PinataMetadataUpdate): Promise<string> {
 		return updateMetadata(this.config, options);
-	}
-
-	pinJobs(): FilterPinJobs {
-		return new FilterPinJobs(this.config);
 	}
 }
 
@@ -148,7 +138,6 @@ class UploadBuilder<T> {
 	private args: any[];
 	private metadata: PinataMetadata | undefined;
 	private keys: string | undefined;
-	private peerAddresses: string[] | undefined;
 	private version: 0 | 1 | undefined;
 	private groupId: string | undefined;
 
@@ -186,11 +175,6 @@ class UploadBuilder<T> {
 		return this;
 	}
 
-	peerAddress(peerAddresses: string[]): UploadBuilder<T> {
-		this.peerAddresses = peerAddresses;
-		return this;
-	}
-
 	then<TResult1 = T, TResult2 = never>(
 		onfulfilled?:
 			| ((value: T) => TResult1 | PromiseLike<TResult1>)
@@ -214,9 +198,6 @@ class UploadBuilder<T> {
 		if (this.version) {
 			options.cidVersion = this.version;
 		}
-		if (this.peerAddresses && "peerAddresses" in options) {
-			options.peerAddresses = this.peerAddresses;
-		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
 			onfulfilled,
@@ -236,37 +217,33 @@ class Upload {
 		this.config = newConfig;
 	}
 
-	file(file: FileObject, options?: UploadOptions): UploadBuilder<PinResponse> {
+	file(
+		file: FileObject,
+		options?: UploadOptions,
+	): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadFile, file, options);
 	}
 
 	fileArray(
 		files: FileObject[],
 		options?: UploadOptions,
-	): UploadBuilder<PinResponse> {
+	): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadFileArray, files, options);
 	}
 
 	base64(
 		base64String: string,
 		options?: UploadOptions,
-	): UploadBuilder<PinResponse> {
+	): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadBase64, base64String, options);
 	}
 
-	url(url: string, options?: UploadOptions): UploadBuilder<PinResponse> {
+	url(url: string, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadUrl, url, options);
 	}
 
-	json(data: object, options?: UploadOptions): UploadBuilder<PinResponse> {
+	json(data: object, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadJson, data, options);
-	}
-
-	cid(
-		cid: string,
-		options?: UploadCIDOptions,
-	): UploadBuilder<PinByCIDResponse> {
-		return new UploadBuilder(this.config, uploadCid, cid, options);
 	}
 }
 
@@ -484,105 +461,6 @@ class OptimizeImage {
 
 	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
 		return getCid(this.config, this.cid, this.options).then(onfulfilled);
-	}
-}
-
-class FilterPinJobs {
-	private config: PinataConfig | undefined;
-	private query: PinJobQuery = {};
-	// rate limit vars
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
-
-	constructor(config: PinataConfig | undefined) {
-		this.config = config;
-	}
-
-	cid(cid: string): FilterPinJobs {
-		this.query.ipfs_pin_hash = cid;
-		return this;
-	}
-
-	status(
-		status:
-			| "prechecking"
-			| "retrieving"
-			| "expired"
-			| "over_free_limit"
-			| "over_max_size"
-			| "invalid_object"
-			| "bad_host_node",
-	): FilterPinJobs {
-		this.query.status = status;
-		return this;
-	}
-
-	pageLimit(limit: number): FilterPinJobs {
-		this.query.limit = limit;
-		return this;
-	}
-
-	pageOffset(offset: number): FilterPinJobs {
-		this.query.offset = offset;
-		return this;
-	}
-
-	sort(sort: "ASC" | "DSC"): FilterPinJobs {
-		this.query.sort = sort;
-		return this;
-	}
-
-	then(onfulfilled?: ((value: PinJobItem[]) => any) | null): Promise<any> {
-		return pinJobs(this.config, this.query).then(onfulfilled);
-	}
-
-	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
-
-	async *[Symbol.asyncIterator](): AsyncGenerator<PinJobItem, void, unknown> {
-		let hasMore = true;
-		let offset = 0;
-		const limit = this.query.limit || 10;
-
-		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
-			this.query.offset = offset;
-			this.query.limit = limit;
-
-			const items = await pinJobs(this.config, this.query);
-
-			for (const item of items) {
-				yield item;
-			}
-
-			if (items.length === 0) {
-				hasMore = false;
-			} else {
-				offset += items.length;
-			}
-		}
-	}
-
-	async all(): Promise<PinJobItem[]> {
-		const allItems: PinJobItem[] = [];
-		for await (const item of this) {
-			allItems.push(item);
-		}
-		return allItems;
 	}
 }
 

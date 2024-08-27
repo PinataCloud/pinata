@@ -33,7 +33,7 @@
  * const upload = await pinata.upload.file(file)
  */
 
-import type { PinataConfig, PinResponse, UploadOptions } from "../types";
+import type { PinataConfig, UploadResponse, UploadOptions } from "../types";
 import {
 	PinataError,
 	NetworkError,
@@ -55,21 +55,21 @@ export const uploadFile = async (
 	const data = new FormData();
 	data.append("file", file, file.name);
 
-	data.append(
-		"pinataOptions",
-		JSON.stringify({
-			cidVersion: options?.cidVersion,
-			groupId: options?.groupId,
-		}),
-	);
+	// data.append(
+	// 	"pinataOptions",
+	// 	JSON.stringify({
+	// 		cidVersion: options?.cidVersion,
+	// 		groupId: options?.groupId,
+	// 	}),
+	// );
 
-	data.append(
-		"pinataMetadata",
-		JSON.stringify({
-			name: options?.metadata?.name || file.name || "File from SDK",
-			keyvalues: options?.metadata?.keyValues,
-		}),
-	);
+	// data.append(
+	// 	"pinataMetadata",
+	// 	JSON.stringify({
+	// 		name: options?.metadata?.name || file.name || "File from SDK",
+	// 		keyvalues: options?.metadata?.keyValues,
+	// 	}),
+	// );
 
 	let headers: Record<string, string>;
 
@@ -82,14 +82,14 @@ export const uploadFile = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://uploads.devpinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/pinning/pinFileToIPFS`, {
+		const request = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -110,7 +110,7 @@ export const uploadFile = async (
 				errorData,
 			);
 		}
-		const res: PinResponse = await request.json();
+		const res: UploadResponse = await request.json();
 		return res;
 	} catch (error) {
 		if (error instanceof PinataError) {

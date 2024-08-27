@@ -10,19 +10,14 @@ export type AuthTestResponse = {
 	message: string;
 };
 
-export type PinResponse = {
-	IpfsHash: string;
-	PinSize: number;
-	Timestamp: string;
-	isDuplicate?: boolean;
-};
-
-export type PinByCIDResponse = {
+export type UploadResponse = {
 	id: string;
-	ipfsHash: string;
-	status: "prechecking" | "retrieving";
 	name: string;
-	updated?: boolean;
+	cid: string;
+	size: number;
+	number_of_files: number;
+	mime_type: string;
+	user_id: string;
 };
 
 export type FileObject = {
