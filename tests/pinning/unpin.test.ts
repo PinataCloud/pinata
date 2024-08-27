@@ -1,5 +1,5 @@
 import { unpinFile } from "../../src/core/pinning/unpin";
-import type { PinataConfig, UnpinResponse } from "../../src";
+import type { PinataConfig, DeleteResponse } from "../../src";
 import {
 	PinataError,
 	NetworkError,

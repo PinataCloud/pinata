@@ -49,15 +49,8 @@ export type UploadOptions = {
 	cidVersion?: 0 | 1;
 };
 
-export type UploadCIDOptions = {
-	metadata?: PinataMetadata;
-	peerAddresses?: string[];
-	keys?: string;
-	groupId?: string;
-};
-
-export type UnpinResponse = {
-	hash: string;
+export type DeleteResponse = {
+	id: string;
 	status: string;
 };
 

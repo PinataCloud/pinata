@@ -9,7 +9,7 @@
  * @function unpinFile
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
  * @param {string[]} files - An array of IPFS hashes (CIDs) of the files to unpin.
- * @returns {Promise<UnpinResponse[]>} A promise that resolves to an array of objects, each containing the status of the unpin operation for each file.
+ * @returns {Promise<DeleteResponse[]>} A promise that resolves to an array of objects, each containing the status of the unpin operation for each file.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
  * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
  * @throws {NetworkError} If there's a network-related error during the API request.
@@ -28,7 +28,7 @@
  * ])
  */
 
-import type { PinataConfig, UnpinResponse } from "../types";
+import type { PinataConfig, DeleteResponse } from "../types";
 import {
 	PinataError,
 	NetworkError,
@@ -45,12 +45,12 @@ const wait = (milliseconds: number): Promise<void> => {
 export const deleteFile = async (
 	config: PinataConfig | undefined,
 	files: string[],
-): Promise<UnpinResponse[]> => {
+): Promise<DeleteResponse[]> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	const responses: UnpinResponse[] = [];
+	const responses: DeleteResponse[] = [];
 
 	let headers: Record<string, string>;
 
@@ -63,15 +63,15 @@ export const deleteFile = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.devpinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
-	for (const hash of files) {
+	for (const id of files) {
 		try {
-			const response = await fetch(`${endpoint}/pinning/unpin/${hash}`, {
+			const response = await fetch(`${endpoint}/files/${id}`, {
 				method: "DELETE",
 				headers: headers,
 			});
@@ -94,10 +94,9 @@ export const deleteFile = async (
 				);
 			}
 
-			const result = await response.text();
 			responses.push({
-				hash: hash,
-				status: result,
+				id: id,
+				status: response.statusText,
 			});
 		} catch (error) {
 			let errorMessage: string;
@@ -105,13 +104,13 @@ export const deleteFile = async (
 			if (error instanceof PinataError) {
 				errorMessage = error.message;
 			} else if (error instanceof Error) {
-				errorMessage = `Error unpinning file ${hash}: ${error.message}`;
+				errorMessage = `Error deleting file ${id}: ${error.message}`;
 			} else {
-				errorMessage = `An unknown error occurred while unpinning file ${hash}`;
+				errorMessage = `An unknown error occurred while deleting file ${id}`;
 			}
 
 			responses.push({
-				hash: hash,
+				id: id,
 				status: errorMessage,
 			});
 		}

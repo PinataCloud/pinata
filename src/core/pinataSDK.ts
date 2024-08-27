@@ -19,7 +19,7 @@ import type {
 	GroupQueryOptions,
 	GetGroupOptions,
 	AuthTestResponse,
-	UnpinResponse,
+	DeleteResponse,
 	RevokeKeyResponse,
 	SignatureOptions,
 	SignatureResponse,
@@ -80,6 +80,7 @@ const formatConfig = (config: PinataConfig | undefined) => {
 
 export class PinataSDK {
 	config: PinataConfig | undefined;
+	files: Files;
 	upload: Upload;
 	gateways: Gateways;
 	usage: Usage;
@@ -89,6 +90,7 @@ export class PinataSDK {
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+		this.files = new Files(this.config);
 		this.upload = new Upload(this.config);
 		this.gateways = new Gateways(this.config);
 		this.usage = new Usage(this.config);
@@ -104,6 +106,7 @@ export class PinataSDK {
 		this.config.customHeaders = { ...this.config.customHeaders, ...headers };
 
 		// Update headers for all sub-modules
+		this.files.updateConfig(this.config);
 		this.upload.updateConfig(this.config);
 		this.gateways.updateConfig(this.config);
 		this.usage.updateConfig(this.config);
@@ -115,16 +118,28 @@ export class PinataSDK {
 	testAuthentication(): Promise<AuthTestResponse> {
 		return testAuthentication(this.config);
 	}
+}
 
-	delete(files: string[]): Promise<UnpinResponse[]> {
-		return deleteFile(this.config, files);
+class Files {
+	config: PinataConfig | undefined;
+
+	constructor(config?: PinataConfig) {
+		this.config = formatConfig(config);
 	}
 
-	listFiles(): FilterFiles {
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
+
+	list(): FilterFiles {
 		return new FilterFiles(this.config);
 	}
 
-	updateMetadata(options: PinataMetadataUpdate): Promise<string> {
+	delete(files: string[]): Promise<DeleteResponse[]> {
+		return deleteFile(this.config, files);
+	}
+
+	update(options: PinataMetadataUpdate): Promise<string> {
 		return updateMetadata(this.config, options);
 	}
 }
