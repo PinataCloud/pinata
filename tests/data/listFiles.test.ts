@@ -1,5 +1,5 @@
 import { listFiles } from "../../src/core/data/listFiles";
-import type { PinataConfig, PinListItem, PinListQuery } from "../../src";
+import type { PinataConfig, FileListItem, FileListQuery } from "../../src";
 import {
 	PinataError,
 	NetworkError,
@@ -23,7 +23,7 @@ describe("listFiles function", () => {
 		pinataGateway: "test.cloud",
 	};
 
-	const mockPinListItem: PinListItem = {
+	const mockPinListItem: FileListItem = {
 		id: "test-id",
 		ipfs_pin_hash: "Qm...",
 		size: 1234,
@@ -68,7 +68,7 @@ describe("listFiles function", () => {
 	});
 
 	it("should handle all query parameters correctly", async () => {
-		const mockQuery: PinListQuery = {
+		const mockQuery: FileListQuery = {
 			cid: "test-cid",
 			pinStart: "2023-01-01",
 			pinEnd: "2023-12-31",

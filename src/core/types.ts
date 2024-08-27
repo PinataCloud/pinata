@@ -54,59 +54,27 @@ export type DeleteResponse = {
 	status: string;
 };
 
-export type PinListItem = {
+export type FileListItem = {
 	id: string;
-	ipfs_pin_hash: string;
+	name: string | null;
+	cid: "pending" | string;
 	size: number;
-	user_id: string;
-	date_pinned: string;
-	date_unpinned: string | null;
-	metadata: {
-		name: string | null;
-		keyvalues: {
-			[key: string]: any;
-		} | null;
-	};
-	regions: {
-		regionId: string;
-		currentReplicationCount: number;
-		desiredReplicationCount: number;
-	}[];
-	mime_type: string;
-	number_of_files: number;
+	numberOfFiles: number;
+	mimeType: string;
+	groupId: string;
+	updatedAt: string;
+	createdAt: string;
 };
 
-export type PinListResponse = {
-	rows: PinListItem[];
+export type FileListResponse = {
+	files: FileListItem[];
+	nextPageToken: string;
 };
 
-export type PinListQuery = {
-	cid?: string;
-	pinStart?: string;
-	pinEnd?: string;
-	pinSizeMin?: number;
-	pinSizeMax?: number;
-	pageLimit?: number;
-	pageOffset?: number;
-	name?: string;
-	groupId?: string;
-	key?: string;
-	value?: string | number;
-	operator?:
-		| "gt"
-		| "gte"
-		| "lt"
-		| "lte"
-		| "ne"
-		| "eq"
-		| "between"
-		| "notBetween"
-		| "like"
-		| "notLike"
-		| "iLike"
-		| "notILike"
-		| "regexp"
-		| "iRegexp";
+export type FileListQuery = {
+	limit?: number;
+	pageToken?: string;
+	cidPending?: boolean;
 };
 
 export type PinJobQuery = {

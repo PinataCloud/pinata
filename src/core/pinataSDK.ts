@@ -1,7 +1,7 @@
 import type {
 	FileObject,
-	PinListItem,
-	PinListQuery,
+	FileListItem,
+	FileListQuery,
 	UploadResponse,
 	PinataConfig,
 	PinataMetadata,
@@ -264,7 +264,8 @@ class Upload {
 
 class FilterFiles {
 	private config: PinataConfig | undefined;
-	private query: PinListQuery = {};
+	private query: FileListQuery = {};
+	private currentPageToken: string | undefined;
 	// rate limit vars
 	private requestCount = 0;
 	private lastRequestTime = 0;
@@ -275,109 +276,58 @@ class FilterFiles {
 		this.config = config;
 	}
 
-	cid(cid: string): FilterFiles {
-		this.query.cid = cid;
+	limit(limit: number): FilterFiles {
+		this.query.limit = limit;
 		return this;
 	}
 
-	pinStart(date: string): FilterFiles {
-		this.query.pinStart = date;
+	cidPending(cidPending: boolean): FilterFiles {
+		this.query.cidPending = cidPending;
 		return this;
 	}
 
-	pinEnd(date: string): FilterFiles {
-		this.query.pinEnd = date;
-		return this;
+	then(onfulfilled?: ((value: FileListItem[]) => any) | null): Promise<any> {
+		return this.fetchPage().then(onfulfilled);
 	}
 
-	pinSizeMin(size: number): FilterFiles {
-		this.query.pinSizeMin = size;
-		return this;
-	}
-
-	pinSizeMax(size: number): FilterFiles {
-		this.query.pinSizeMax = size;
-		return this;
-	}
-
-	pageLimit(limit: number): FilterFiles {
-		this.query.pageLimit = limit;
-		return this;
-	}
-
-	pageOffset(offset: number): FilterFiles {
-		this.query.pageOffset = offset;
-		return this;
-	}
-
-	name(name: string): FilterFiles {
-		this.query.name = name;
-		return this;
-	}
-
-	group(groupId: string): FilterFiles {
-		this.query.groupId = groupId;
-		return this;
-	}
-
-	keyValue(
-		key: string,
-		value: string | number,
-		operator?: PinListQuery["operator"],
-	): FilterFiles {
-		this.query.key = key;
-		this.query.value = value;
-		if (operator) {
-			this.query.operator = operator;
+	private async fetchPage(): Promise<FileListItem[]> {
+		if (this.currentPageToken) {
+			this.query.pageToken = this.currentPageToken;
 		}
-		return this;
+		const response = await listFiles(this.config, this.query);
+		this.currentPageToken = response.nextPageToken;
+		return response.files;
 	}
 
-	then(onfulfilled?: ((value: PinListItem[]) => any) | null): Promise<any> {
-		return listFiles(this.config, this.query).then(onfulfilled);
-	}
+	// // rate limit, hopefully temporary?
+	// private async rateLimit(): Promise<void> {
+	// 	this.requestCount++;
+	// 	const now = Date.now();
+	// 	if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+	// 		const timePassedSinceLastRequest = now - this.lastRequestTime;
+	// 		if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+	// 			const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+	// 			await new Promise((resolve) => setTimeout(resolve, delayTime));
+	// 		}
+	// 		this.requestCount = 0;
+	// 	}
+	// 	this.lastRequestTime = Date.now();
+	// }
 
-	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
-
-	async *[Symbol.asyncIterator](): AsyncGenerator<PinListItem, void, unknown> {
-		let hasMore = true;
-		let offset = 0;
-		const limit = this.query.pageLimit || 10;
-
-		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
-			this.query.pageOffset = offset;
-			this.query.pageLimit = limit;
-
-			const items = await listFiles(this.config, this.query);
-
+	async *[Symbol.asyncIterator](): AsyncGenerator<FileListItem, void, unknown> {
+		while (true) {
+			const items = await this.fetchPage();
 			for (const item of items) {
 				yield item;
 			}
-
-			if (items.length === 0) {
-				hasMore = false;
-			} else {
-				offset += items.length;
+			if (!this.currentPageToken) {
+				break;
 			}
 		}
 	}
 
-	async all(): Promise<PinListItem[]> {
-		const allItems: PinListItem[] = [];
+	async all(): Promise<FileListItem[]> {
+		const allItems: FileListItem[] = [];
 		for await (const item of this) {
 			allItems.push(item);
 		}

@@ -7,7 +7,7 @@
  * @async
  * @function listFiles
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {PinListQuery} [options] - Optional query parameters to filter and paginate the results.
+ * @param {FileListQuery} [options] - Optional query parameters to filter and paginate the results.
  * @param {string} [options.cid] - Filter by the CID of the file.
  * @param {string} [options.pinStart] - Filter by the start date of pinning (ISO 8601 format).
  * @param {string} [options.pinEnd] - Filter by the end date of pinning (ISO 8601 format).
@@ -20,7 +20,7 @@
  * @param {string | number} [options.value] - Metadata value to filter by (used with key and operator).
  * @param {string} [options.operator] - Comparison operator for metadata filtering.
  * @param {string} [options.groupId] - Filter by group ID.
- * @returns {Promise<PinListItem[]>} A promise that resolves to an array of PinListItem objects.
+ * @returns {Promise<FileListItem[]>} A promise that resolves to an array of FileListItem objects.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
  * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
  * @throws {NetworkError} If there's a network-related error during the API request.
@@ -34,7 +34,7 @@
  * @async
  * @function listFiles
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {PinListQuery} [options] - Optional query parameters to filter and paginate the results.
+ * @param {FileListQuery} [options] - Optional query parameters to filter and paginate the results.
  * @param {string} [options.cid] - Filter by the CID of the file.
  * @param {string} [options.pinStart] - Filter by the start date of pinning (ISO 8601 format).
  * @param {string} [options.pinEnd] - Filter by the end date of pinning (ISO 8601 format).
@@ -47,7 +47,7 @@
  * @param {string | number} [options.value] - Metadata value to filter by (used with key and operator).
  * @param {string} [options.operator] - Comparison operator for metadata filtering.
  * @param {string} [options.groupId] - Filter by group ID.
- * @returns {Promise<PinListItem[]>} A promise that resolves to an array of PinListItem objects.
+ * @returns {Promise<FileListItem[]>} A promise that resolves to an array of FileListItem objects.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
  * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
  * @throws {NetworkError} If there's a network-related error during the API request.
@@ -64,9 +64,9 @@
  */
 
 import type {
-	PinListItem,
-	PinListQuery,
-	PinListResponse,
+	FileListItem,
+	FileListQuery,
+	FileListResponse,
 	PinataConfig,
 } from "../types";
 import {
@@ -78,8 +78,8 @@ import {
 
 export const listFiles = async (
 	config: PinataConfig | undefined,
-	options?: PinListQuery,
-): Promise<PinListItem[]> => {
+	options?: FileListQuery,
+): Promise<FileListResponse> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
@@ -89,45 +89,20 @@ export const listFiles = async (
 	});
 
 	if (options) {
-		const {
-			cid,
-			pinStart,
-			pinEnd,
-			pinSizeMin,
-			pinSizeMax,
-			pageLimit,
-			pageOffset,
-			name,
-			key,
-			value,
-			operator,
-			groupId,
-		} = options;
+		const { limit, pageToken, cidPending } = options;
 
-		if (cid) params.append("cid", cid);
-		if (pinStart) params.append("pinStart", pinStart);
-		if (pinEnd) params.append("pinEnd", pinEnd);
-		if (pinSizeMin) params.append("pinSizeMin", pinSizeMin.toString());
-		if (pinSizeMax) params.append("pinSizeMax", pinSizeMax.toString());
-		if (pageLimit) params.append("pageLimit", pageLimit.toString());
-		if (pageOffset) params.append("pageOffset", pageOffset.toString());
-		if (groupId) params.append("groupId", groupId);
-		if (name) params.append("metadata[name]", name);
-		if (key && value) {
-			const keyValueParam = JSON.stringify({
-				[key]: { value, op: operator || "eq" },
-			});
-			params.append("metadata[keyvalues]", keyValueParam);
-		}
+		if (limit) params.append("limit", limit.toString());
+		if (pageToken) params.append("pageToken", pageToken);
+		if (cidPending) params.append("cidPending", "true");
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.devpinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
-	const url = `${endpoint}/data/pinList?status=pinned&${params.toString()}`;
+	const url = `${endpoint}/files?${params.toString()}`;
 
 	try {
 		let headers: Record<string, string>;
@@ -161,8 +136,9 @@ export const listFiles = async (
 			);
 		}
 
-		const res: PinListResponse = await request.json();
-		return res.rows;
+		const res = await request.json();
+		const resData: FileListResponse = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
