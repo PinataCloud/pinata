@@ -5,7 +5,7 @@ import type {
 	UploadResponse,
 	PinataConfig,
 	PinataMetadata,
-	PinataMetadataUpdate,
+	UpdateFileOptions,
 	UploadOptions,
 	GetCIDResponse,
 	KeyOptions,
@@ -42,7 +42,7 @@ import { uploadUrl } from "./uploads/url";
 import { uploadJson } from "./uploads/json";
 import { deleteFile } from "./files/delete";
 import { listFiles } from "./files/list";
-import { updateMetadata } from "./files/updateMetadata";
+import { updateFile } from "./files/updateFile";
 import { getCid } from "./gateway/getCid";
 import { convertIPFSUrl } from "./gateway/convertIPFSUrl";
 import { pinnedFileCount } from "./files/pinnedFileUsage";
@@ -139,8 +139,8 @@ class Files {
 		return deleteFile(this.config, files);
 	}
 
-	update(options: PinataMetadataUpdate): Promise<string> {
-		return updateMetadata(this.config, options);
+	update(options: UpdateFileOptions): Promise<FileListItem> {
+		return updateFile(this.config, options);
 	}
 }
 

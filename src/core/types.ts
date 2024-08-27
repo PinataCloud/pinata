@@ -35,10 +35,10 @@ export type PinataMetadata = {
 	keyValues?: Record<string, string | number>;
 };
 
-export type PinataMetadataUpdate = {
-	cid: string;
+export type UpdateFileOptions = {
+	id: string;
 	name?: string;
-	keyValues?: Record<string, string | number>;
+	groupId?: string;
 };
 
 export type UploadOptions = {
