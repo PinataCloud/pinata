@@ -84,9 +84,7 @@ export const listFiles = async (
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	const params = new URLSearchParams({
-		includesCount: "false",
-	});
+	const params = new URLSearchParams();
 
 	if (options) {
 		const { limit, pageToken, cidPending } = options;
