@@ -62,7 +62,7 @@ export const addToGroup = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.devpinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;

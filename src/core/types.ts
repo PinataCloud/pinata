@@ -299,9 +299,14 @@ export type GetGroupOptions = {
 	groupId: string;
 };
 
+export type GroupListResponse = {
+	groups: GroupResponseItem[];
+	next_page_token: string;
+};
+
 export type GroupResponseItem = {
 	id: string;
-	user_id: string;
+	public: boolean;
 	name: string;
 	updatedAt: string;
 	createdAt: string;
@@ -309,8 +314,8 @@ export type GroupResponseItem = {
 
 export type GroupQueryOptions = {
 	nameContains?: string;
-	offset?: number;
 	limit?: number;
+	pageToken?: string;
 };
 
 export type GroupCIDOptions = {

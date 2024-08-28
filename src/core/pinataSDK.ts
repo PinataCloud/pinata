@@ -33,6 +33,7 @@ import type {
 	SwapHistoryOptions,
 	ContainsCIDResponse,
 	OptimizeImageOptions,
+	GroupListResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -605,18 +606,14 @@ class FilterGroups {
 	private config: PinataConfig | undefined;
 	private query: GroupQueryOptions = {};
 	// rate limit vars
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
+	// private requestCount = 0;
+	// private lastRequestTime = 0;
+	// private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	// private readonly MINUTE_IN_MS = 60000;
+	private nextPageToken: string | undefined;
 
 	constructor(config: PinataConfig | undefined) {
 		this.config = config;
-	}
-
-	offset(offset: number): FilterGroups {
-		this.query.offset = offset;
-		return this;
 	}
 
 	name(nameContains: string): FilterGroups {
@@ -632,47 +629,50 @@ class FilterGroups {
 	then(
 		onfulfilled?: ((value: GroupResponseItem[]) => any) | null,
 	): Promise<GroupResponseItem[]> {
-		return listGroups(this.config, this.query).then(onfulfilled);
+		return this.fetchPage()
+			.then((response) => {
+				this.nextPageToken = response.next_page_token;
+				return response.groups;
+			})
+			.then(onfulfilled);
+	}
+
+	private async fetchPage(): Promise<GroupListResponse> {
+		if (this.nextPageToken) {
+			this.query.pageToken = this.nextPageToken;
+		}
+		return listGroups(this.config, this.query);
 	}
 
 	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
+	// private async rateLimit(): Promise<void> {
+	// 	this.requestCount++;
+	// 	const now = Date.now();
+	// 	if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+	// 		const timePassedSinceLastRequest = now - this.lastRequestTime;
+	// 		if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+	// 			const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+	// 			await new Promise((resolve) => setTimeout(resolve, delayTime));
+	// 		}
+	// 		this.requestCount = 0;
+	// 	}
+	// 	this.lastRequestTime = Date.now();
+	// }
 
 	async *[Symbol.asyncIterator](): AsyncGenerator<
 		GroupResponseItem,
 		void,
 		unknown
 	> {
-		let hasMore = true;
-		let offset = 0;
-
-		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
-			this.query.offset = offset;
-
-			const items = await listGroups(this.config, this.query);
-
-			for (const item of items) {
+		while (true) {
+			const response = await this.fetchPage();
+			for (const item of response.groups) {
 				yield item;
 			}
-
-			if (items.length === 0) {
-				hasMore = false;
-			} else {
-				offset += items.length;
+			if (!response.next_page_token) {
+				break;
 			}
+			this.nextPageToken = response.next_page_token;
 		}
 	}
 
