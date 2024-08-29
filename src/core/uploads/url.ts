@@ -74,6 +74,10 @@ export const uploadUrl = async (
 	const file = new File([blob], name);
 
 	data.append("file", file, name);
+	data.append("name", name);
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
 
 	// data.append(
 	// 	"pinataOptions",

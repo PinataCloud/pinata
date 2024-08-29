@@ -63,6 +63,10 @@ export const uploadBase64 = async (
 	const data = new FormData();
 
 	data.append("file", blob, name);
+	data.append("name", name);
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
 
 	// data.append(
 	// 	"pinataOptions",

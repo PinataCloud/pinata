@@ -183,10 +183,10 @@ class UploadBuilder<T> {
 		return this;
 	}
 
-	cidVersion(v: 0 | 1): UploadBuilder<T> {
-		this.version = v;
-		return this;
-	}
+	// cidVersion(v: 0 | 1): UploadBuilder<T> {
+	// 	this.version = v;
+	// 	return this;
+	// }
 
 	group(groupId: string): UploadBuilder<T> {
 		this.groupId = groupId;

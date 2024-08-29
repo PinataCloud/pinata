@@ -61,6 +61,10 @@ export const uploadFileArray = async (
 	for (const file of Array.from(files)) {
 		data.append("file", file, `${folder}/${file.name}`);
 	}
+	data.append("name", folder);
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
 
 	// data.append(
 	// 	"pinataMetadata",
