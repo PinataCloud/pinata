@@ -49,10 +49,10 @@ export const updateFile = async (
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
-	const data = {
+	const data = JSON.stringify({
 		name: options.name,
-		groupId: options.groupId,
-	};
+		group_id: options.groupId,
+	});
 
 	let headers: Record<string, string>;
 
@@ -76,7 +76,7 @@ export const updateFile = async (
 		const request = await fetch(`${endpoint}/files/${options.id}`, {
 			method: "PUT",
 			headers: headers,
-			body: JSON.stringify(data),
+			body: data,
 		});
 
 		if (!request.ok) {
