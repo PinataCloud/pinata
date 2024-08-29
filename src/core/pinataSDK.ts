@@ -156,7 +156,6 @@ class UploadBuilder<T> {
 	private args: any[];
 	private metadata: PinataMetadata | undefined;
 	private keys: string | undefined;
-	private version: 0 | 1 | undefined;
 	private groupId: string | undefined;
 
 	constructor(
@@ -170,7 +169,6 @@ class UploadBuilder<T> {
 		this.config = config;
 		this.uploadFunction = uploadFunction;
 		this.args = args;
-		this.version = 1;
 	}
 
 	addMetadata(metadata: PinataMetadata): UploadBuilder<T> {
@@ -212,9 +210,6 @@ class UploadBuilder<T> {
 		}
 		if (this.groupId) {
 			options.groupId = this.groupId;
-		}
-		if (this.version) {
-			options.cidVersion = this.version;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
@@ -595,13 +590,13 @@ class Groups {
 		return getGroup(this.config, options);
 	}
 
-	addFiles(options: GroupCIDOptions): Promise<string> {
-		return addToGroup(this.config, options);
-	}
+	// addFiles(options: GroupCIDOptions): Promise<string> {
+	// 	return addToGroup(this.config, options);
+	// }
 
-	removeFiles(options: GroupCIDOptions): Promise<string> {
-		return removeFromGroup(this.config, options);
-	}
+	// removeFiles(options: GroupCIDOptions): Promise<string> {
+	// 	return removeFromGroup(this.config, options);
+	// }
 
 	update(options: UpdateGroupOptions): Promise<GroupResponseItem> {
 		return updateGroup(this.config, options);

@@ -63,12 +63,7 @@
  *  const files = await pinata.listFiles().name("pinnie")
  */
 
-import type {
-	FileListItem,
-	FileListQuery,
-	FileListResponse,
-	PinataConfig,
-} from "../types";
+import type { FileListQuery, FileListResponse, PinataConfig } from "../types";
 import {
 	PinataError,
 	NetworkError,

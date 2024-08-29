@@ -51,7 +51,6 @@ export const updateFile = async (
 	}
 	const data = JSON.stringify({
 		name: options.name,
-		group_id: options.groupId,
 	});
 
 	let headers: Record<string, string>;

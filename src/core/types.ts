@@ -38,15 +38,14 @@ export type PinataMetadata = {
 export type UpdateFileOptions = {
 	id: string;
 	name?: string;
-	groupId?: string;
 };
 
 export type UploadOptions = {
 	metadata?: PinataMetadata;
-	pinType?: "async" | "sync" | "cidOnly";
+	//pinType?: "async" | "sync" | "cidOnly";
 	keys?: string;
 	groupId?: string;
-	cidVersion?: 0 | 1;
+	//cidVersion?: 0 | 1;
 };
 
 export type DeleteResponse = {
@@ -293,13 +292,13 @@ export type RevokeKeyResponse = {
 
 export type GroupOptions = {
 	name: string;
-	isPublic: boolean;
+	isPublic?: boolean;
 };
 
 export type UpdateGroupOptions = {
-	name?: string;
 	groupId: string;
-	isPublic: boolean;
+	name?: string;
+	isPublic?: boolean;
 };
 
 export type GetGroupOptions = {
