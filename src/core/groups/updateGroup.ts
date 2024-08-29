@@ -53,7 +53,7 @@ export const updateGroup = async (
 
 	const data = JSON.stringify({
 		name: options.name,
-		is_public: options.public,
+		is_public: options.isPublic,
 	});
 
 	let headers: Record<string, string>;

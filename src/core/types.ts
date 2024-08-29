@@ -299,7 +299,7 @@ export type GroupOptions = {
 export type UpdateGroupOptions = {
 	name?: string;
 	groupId: string;
-	public: boolean;
+	isPublic: boolean;
 };
 
 export type GetGroupOptions = {
