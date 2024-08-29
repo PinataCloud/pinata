@@ -34,6 +34,7 @@ import type {
 	ContainsCIDResponse,
 	OptimizeImageOptions,
 	GroupListResponse,
+	SignedUrlOptions,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -67,6 +68,7 @@ import { swapCid } from "./gateway/swapCid";
 import { swapHistory } from "./gateway/swapHistory";
 import { deleteSwap } from "./gateway/deleteSwap";
 import { containsCID } from "../utils/gateway-tools";
+import { createSignedURL } from "./gateway/createSignedURL";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -347,9 +349,17 @@ class Gateways {
 		this.config = newConfig;
 	}
 
-	get(cid: string): OptimizeImage {
-		return new OptimizeImage(this.config, cid);
+	get(cid: string): Promise<GetCIDResponse> {
+		return getCid(this.config, cid);
 	}
+
+	createSignedURL(options: SignedUrlOptions): Promise<string> {
+		return createSignedURL(this.config, options);
+	}
+
+	// get(cid: string): OptimizeImage {
+	// 	return new OptimizeImage(this.config, cid);
+	// }
 
 	convert(url: string, gatewayPrefix?: string): Promise<string> {
 		return convertIPFSUrl(this.config, url, gatewayPrefix);
@@ -410,25 +420,25 @@ class Gateways {
 	}
 }
 
-class OptimizeImage {
-	private config: PinataConfig | undefined;
-	private cid: string;
-	private options: OptimizeImageOptions = {};
+// class OptimizeImage {
+// 	private config: PinataConfig | undefined;
+// 	private cid: string;
+// 	private options: OptimizeImageOptions = {};
 
-	constructor(config: PinataConfig | undefined, cid: string) {
-		this.config = config;
-		this.cid = cid;
-	}
+// 	constructor(config: PinataConfig | undefined, cid: string) {
+// 		this.config = config;
+// 		this.cid = cid;
+// 	}
 
-	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
-		this.options = { ...this.options, ...options };
-		return this;
-	}
+// 	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
+// 		this.options = { ...this.options, ...options };
+// 		return this;
+// 	}
 
-	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
-		return getCid(this.config, this.cid, this.options).then(onfulfilled);
-	}
-}
+// 	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
+// 		return getCid(this.config, this.cid, this.options).then(onfulfilled);
+// 	}
+// }
 
 // class Usage {
 // 	config: PinataConfig | undefined;

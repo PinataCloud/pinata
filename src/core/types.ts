@@ -152,6 +152,12 @@ export type OptimizeImageOptions = {
 	metadata?: "keep" | "copyright" | "none";
 };
 
+export type SignedUrlOptions = {
+	cid: string;
+	date?: number;
+	expires: number;
+};
+
 export type GatewayAnalyticsQuery = {
 	gateway_domain: string;
 	start_date: string;

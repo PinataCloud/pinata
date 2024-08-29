@@ -16,7 +16,7 @@ export default function Home() {
 			const keyRequest = await fetch("/api/key");
 			const keyData = await keyRequest.json();
 			const upload = await pinata.upload.file(file).key(keyData.JWT);
-			setCid(upload.IpfsHash);
+			setCid(upload.cid);
 			setUploading(false);
 		} catch (e) {
 			console.log(e);
