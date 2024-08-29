@@ -58,14 +58,14 @@ export const deleteGroup = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.devpinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/groups/${options.groupId}`, {
+		const request = await fetch(`${endpoint}/files/groups/${options.groupId}`, {
 			method: "DELETE",
 			headers: headers,
 		});

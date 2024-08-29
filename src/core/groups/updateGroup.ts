@@ -53,6 +53,7 @@ export const updateGroup = async (
 
 	const data = JSON.stringify({
 		name: options.name,
+		is_public: options.public,
 	});
 
 	let headers: Record<string, string>;
@@ -67,14 +68,14 @@ export const updateGroup = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.devpinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/groups/${options.groupId}`, {
+		const request = await fetch(`${endpoint}/files/groups/${options.groupId}`, {
 			method: "PUT",
 			headers: headers,
 			body: data,
