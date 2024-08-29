@@ -67,9 +67,10 @@ export const listGroups = async (
 	const params = new URLSearchParams();
 
 	if (options) {
-		const { pageToken, nameContains, limit } = options;
+		const { pageToken, nameContains, limit, isPublic } = options;
 
 		if (pageToken) params.append("pageToken", pageToken.toString());
+		if (isPublic) params.append("isPublic", isPublic.toString());
 		if (nameContains !== undefined)
 			params.append("nameContains", nameContains.toString());
 		if (limit !== undefined) params.append("limit", limit.toString());

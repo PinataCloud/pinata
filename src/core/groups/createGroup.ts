@@ -45,7 +45,10 @@ export const createGroup = async (
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	const data = JSON.stringify(options);
+	const data = JSON.stringify({
+		name: options.name,
+		is_public: options.isPublic,
+	});
 
 	let headers: Record<string, string>;
 

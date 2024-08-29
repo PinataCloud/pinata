@@ -298,7 +298,7 @@ class FilterFiles {
 			this.query.pageToken = this.currentPageToken;
 		}
 		const response = await listFiles(this.config, this.query);
-		this.currentPageToken = response.nextPageToken;
+		this.currentPageToken = response.next_page_token;
 		return response.files;
 	}
 
@@ -626,13 +626,18 @@ class FilterGroups {
 		this.config = config;
 	}
 
-	name(nameContains: string): FilterGroups {
-		this.query.nameContains = nameContains;
-		return this;
-	}
+	// name(nameContains: string): FilterGroups {
+	// 	this.query.nameContains = nameContains;
+	// 	return this;
+	// }
 
 	limit(limit: number): FilterGroups {
 		this.query.limit = limit;
+		return this;
+	}
+
+	isPublic(isPublic: boolean): FilterGroups {
+		this.query.isPublic = isPublic;
 		return this;
 	}
 

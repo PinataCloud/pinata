@@ -59,16 +59,15 @@ export type FileListItem = {
 	name: string | null;
 	cid: "pending" | string;
 	size: number;
-	numberOfFiles: number;
-	mimeType: string;
-	groupId: string;
-	updatedAt: string;
-	createdAt: string;
+	number_of_files: number;
+	mime_type: string;
+	group_id: string;
+	created_at: string;
 };
 
 export type FileListResponse = {
 	files: FileListItem[];
-	nextPageToken: string;
+	next_page_token: string;
 };
 
 export type FileListQuery = {
@@ -294,6 +293,7 @@ export type RevokeKeyResponse = {
 
 export type GroupOptions = {
 	name: string;
+	isPublic: boolean;
 };
 
 export type UpdateGroupOptions = {
@@ -313,9 +313,8 @@ export type GroupListResponse = {
 
 export type GroupResponseItem = {
 	id: string;
-	public: boolean;
+	is_public: boolean;
 	name: string;
-	updatedAt: string;
 	createdAt: string;
 };
 
@@ -323,6 +322,7 @@ export type GroupQueryOptions = {
 	nameContains?: string;
 	limit?: number;
 	pageToken?: string;
+	isPublic?: boolean;
 };
 
 export type GroupCIDOptions = {
