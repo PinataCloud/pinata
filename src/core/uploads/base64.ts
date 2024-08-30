@@ -95,7 +95,7 @@ export const uploadBase64 = async (
 		};
 	}
 
-	let endpoint: string = "https://uploads.devpinata.cloud/v3";
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;

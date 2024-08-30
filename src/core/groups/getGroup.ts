@@ -61,7 +61,7 @@ export const getGroup = async (
 		};
 	}
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
@@ -89,8 +89,9 @@ export const getGroup = async (
 			);
 		}
 
-		const res: GroupResponseItem = await request.json();
-		return res;
+		const res = await request.json();
+		const resData: GroupResponseItem = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;

@@ -89,7 +89,7 @@ export const listFiles = async (
 		if (cidPending) params.append("cidPending", "true");
 	}
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;

@@ -76,7 +76,7 @@ export const listGroups = async (
 		if (limit !== undefined) params.append("limit", limit.toString());
 	}
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;

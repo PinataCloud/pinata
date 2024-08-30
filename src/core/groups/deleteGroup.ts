@@ -58,7 +58,7 @@ export const deleteGroup = async (
 		};
 	}
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
@@ -86,7 +86,7 @@ export const deleteGroup = async (
 			);
 		}
 
-		const res: string = await request.text();
+		const res: string = request.statusText;
 		return res;
 	} catch (error) {
 		if (error instanceof PinataError) {

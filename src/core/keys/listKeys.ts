@@ -81,7 +81,7 @@ export const listKeys = async (
 		if (name) params.append("name", name);
 	}
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;

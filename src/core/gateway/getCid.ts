@@ -63,7 +63,7 @@ export const getCid = async (
 	});
 
 	const signedUrlRequest = await fetch(
-		"https://api.devpinata.cloud/v3/files/sign",
+		"https://api.pinata.cloud/v3/files/sign",
 		{
 			method: "POST",
 			headers: {

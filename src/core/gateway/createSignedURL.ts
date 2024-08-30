@@ -57,7 +57,7 @@ export const createSignedURL = async (
 	// }
 
 	try {
-		const request = await fetch("https://api.devpinata.cloud/v3/files/sign", {
+		const request = await fetch("https://api.pinata.cloud/v3/files/sign", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",

@@ -65,7 +65,7 @@ export const revokeKeys = async (
 
 	const responses: RevokeKeyResponse[] = [];
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;

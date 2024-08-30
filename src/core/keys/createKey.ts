@@ -66,7 +66,7 @@ export const createKey = async (
 
 	const data = JSON.stringify(options);
 
-	let endpoint: string = "https://api.devpinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
