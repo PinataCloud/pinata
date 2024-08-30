@@ -18,7 +18,15 @@ export default function Home() {
 			});
 			const keyData = await keyRequest.json();
 			const upload = await pinata.upload.file(file).key(keyData.JWT);
-			setUrl(upload.cid);
+			const urlReuest = await fetch("/api/sign", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ cid: upload.cid }),
+			});
+			const url = await urlReuest.json();
+			setUrl(url);
 			setUploading(false);
 		} catch (e) {
 			console.log(e);
