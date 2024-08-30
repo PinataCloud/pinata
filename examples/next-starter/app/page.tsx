@@ -10,43 +10,25 @@ export default function Home() {
 
 	const inputFile = useRef(null);
 
-	const uploadFile = async () => {
-		try {
-			setUploading(true);
-			const keyRequest = await fetch("/api/key", {
-				method: "GET",
-			});
-			const keyData = await keyRequest.json();
-			const upload = await pinata.upload.file(file).key(keyData.JWT);
-			const urlReuest = await fetch("/api/sign", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ cid: upload.cid }),
-			});
-			const url = await urlReuest.json();
-			setUrl(url);
-			setUploading(false);
-		} catch (e) {
-			console.log(e);
-			setUploading(false);
-			alert("Trouble uploading file");
-		}
-	};
-
+	// Client side upload
+	//
 	// const uploadFile = async () => {
 	// 	try {
 	// 		setUploading(true);
-	// 		const data = new FormData();
-	// 		data.set("file", file);
-	// 		const uploadRequest = await fetch("/api/files", {
-	// 			method: "POST",
-	// 			body: data,
+	// 		const keyRequest = await fetch("/api/key", {
+	// 			method: "GET",
 	// 		});
-	// 		const signedUrl = await uploadRequest.json();
-	// 		console.log(signedUrl);
-	// 		setUrl(signedUrl);
+	// 		const keyData = await keyRequest.json();
+	// 		const upload = await pinata.upload.file(file).key(keyData.JWT);
+	// 		const urlReuest = await fetch("/api/sign", {
+	// 			method: "POST",
+	// 			headers: {
+	// 				"Content-Type": "application/json",
+	// 			},
+	// 			body: JSON.stringify({ cid: upload.cid }),
+	// 		});
+	// 		const url = await urlReuest.json();
+	// 		setUrl(url);
 	// 		setUploading(false);
 	// 	} catch (e) {
 	// 		console.log(e);
@@ -55,7 +37,29 @@ export default function Home() {
 	// 	}
 	// };
 
-	const handleChange = (e) => {
+	// Server side Upload
+
+	const uploadFile = async () => {
+		try {
+			setUploading(true);
+			const data = new FormData();
+			data.set("file", file);
+			const uploadRequest = await fetch("/api/files", {
+				method: "POST",
+				body: data,
+			});
+			const signedUrl = await uploadRequest.json();
+			console.log(signedUrl);
+			setUrl(signedUrl);
+			setUploading(false);
+		} catch (e) {
+			console.log(e);
+			setUploading(false);
+			alert("Trouble uploading file");
+		}
+	};
+
+	const handleChange = (e: any) => {
 		setFile(e.target.files[0]);
 	};
 
