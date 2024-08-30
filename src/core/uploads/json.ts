@@ -1,20 +1,21 @@
 /**
- * Uploads multiple files to IPFS via Pinata as a single directory.
+ * Uploads JSON data to IPFS via Pinata.
  *
- * This function allows you to upload multiple files to IPFS and pin them to Pinata
- * as a single directory. It's useful for adding collections of related files or
- * entire directories to your Pinata account and IPFS network.
+ * This function allows you to upload JSON data directly to IPFS and pin it to Pinata.
+ * It's useful for adding structured data, configurations, or any JSON-serializable content
+ * to your Pinata account and IPFS network.
  *
  * @async
- * @function uploadFileArray
+ * @function uploadJson
+ * @template T
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {File[]} files - An array of File objects to be uploaded.
+ * @param {T} jsonData - The JSON data to be uploaded. Must be a valid JavaScript object that can be JSON-stringified.
  * @param {UploadOptions} [options] - Optional parameters for the upload.
- * @param {PinataMetadata} [options.metadata] - Metadata for the uploaded directory.
- * @param {string} [options.metadata.name] - Name for the directory (defaults to "folder_from_sdk" if not provided).
- * @param {Record<string, string | number>} [options.metadata.keyValues] - Custom key-value pairs for the directory metadata.
+ * @param {PinataMetadata} [options.metadata] - Metadata for the uploaded JSON.
+ * @param {string} [options.metadata.name] - Custom name for the JSON content (defaults to "json" if not provided).
+ * @param {Record<string, string | number>} [options.metadata.keyValues] - Custom key-value pairs for the JSON metadata.
  * @param {string} [options.keys] - Custom JWT to use for this specific upload.
- * @param {string} [options.groupId] - ID of the group to add the uploaded directory to.
+ * @param {string} [options.groupId] - ID of the group to add the uploaded JSON to.
  * @param {0 | 1} [options.cidVersion] - Version of CID to use (0 or 1).
  * @returns {Promise<PinResponse>} A promise that resolves to an object containing the IPFS hash and other upload details.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
@@ -30,12 +31,19 @@
  *   pinataGateway: "example-gateway.mypinata.cloud",
  * });
  *
- * const file1 = new File(["hello world!"], "hello.txt", { type: "text/plain" })
- * const file2 = new File(["hello world again!"], "hello2.txt", { type: "text/plain" })
- * const upload = await pinata.upload.fileArray([file1, file2])
+ * const upload = await pinata.upload.json({
+ *   name: "Pinnie NFT",
+ *   description: "A Pinnie NFT from Pinata",
+ *   image: "ipfs://bafkreih5aznjvttude6c3wbvqeebb6rlx5wkbzyppv7garjiubll2ceym4"
+ * })
  */
 
-import type { PinataConfig, PinResponse, UploadOptions } from "../types";
+import type {
+	PinataConfig,
+	UploadResponse,
+	UploadOptions,
+	JsonBody,
+} from "../types";
 
 import {
 	PinataError,
@@ -44,9 +52,9 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
-export const uploadFileArray = async (
+export const uploadJson = async <T extends JsonBody>(
 	config: PinataConfig | undefined,
-	files: File[],
+	jsonData: T,
 	options?: UploadOptions,
 ) => {
 	if (!config) {
@@ -55,28 +63,16 @@ export const uploadFileArray = async (
 
 	const jwt: string | undefined = options?.keys || config?.pinataJwt;
 
-	const folder = options?.metadata?.name || "folder_from_sdk";
+	const json = JSON.stringify(jsonData);
+	const blob = new Blob([json]);
+	const file = new File([blob], "data.json", { type: "application/json" });
+
 	const data = new FormData();
-
-	for (const file of Array.from(files)) {
-		data.append("file", file, `${folder}/${file.name}`);
+	data.append("file", file, file.name);
+	data.append("name", options?.metadata?.name || file.name || "File from SDK");
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
 	}
-
-	data.append(
-		"pinataMetadata",
-		JSON.stringify({
-			name: folder,
-			keyvalues: options?.metadata?.keyValues,
-		}),
-	);
-
-	data.append(
-		"pinataOptions",
-		JSON.stringify({
-			cidVersion: options?.cidVersion,
-			groupId: options?.groupId,
-		}),
-	);
 
 	let headers: Record<string, string>;
 
@@ -85,18 +81,18 @@ export const uploadFileArray = async (
 	} else {
 		headers = {
 			Authorization: `Bearer ${jwt}`,
-			Source: "sdk/fileArray",
+			Source: "sdk/json",
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/pinning/pinFileToIPFS`, {
+		const request = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -118,17 +114,15 @@ export const uploadFileArray = async (
 			);
 		}
 
-		const res: PinResponse = await request.json();
+		const res: UploadResponse = await request.json();
 		return res;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing fileArray: ${error.message}`);
+			throw new PinataError(`Error processing json: ${error.message}`);
 		}
-		throw new PinataError(
-			"An unknown error occurred while uploading an array of files",
-		);
+		throw new PinataError("An unknown error occurred while uploading json");
 	}
 };

@@ -16,7 +16,8 @@
 	"scripts": {
 		"build": "tsup src/index.ts --format cjs,esm --dts --external none",
 		"format": "npx @biomejs/biome format --write src tests",
-		"test": "jest --watchAll --verbose --coverage"
+		"test": "jest --watchAll --verbose --coverage",
+		"postinstall": "npx ts-node postinstall.ts"
 	},
 	"repository": {
 		"type": "git",

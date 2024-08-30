@@ -1,17 +1,13 @@
 import type {
 	FileObject,
-	PinByCIDResponse,
-	PinListItem,
-	PinListQuery,
-	PinResponse,
+	FileListItem,
+	FileListQuery,
+	UploadResponse,
 	PinataConfig,
 	PinataMetadata,
-	PinataMetadataUpdate,
-	UploadCIDOptions,
+	UpdateFileOptions,
 	UploadOptions,
 	GetCIDResponse,
-	PinJobQuery,
-	PinJobItem,
 	KeyOptions,
 	KeyResponse,
 	KeyListQuery,
@@ -23,7 +19,7 @@ import type {
 	GroupQueryOptions,
 	GetGroupOptions,
 	AuthTestResponse,
-	UnpinResponse,
+	DeleteResponse,
 	RevokeKeyResponse,
 	SignatureOptions,
 	SignatureResponse,
@@ -37,22 +33,22 @@ import type {
 	SwapHistoryOptions,
 	ContainsCIDResponse,
 	OptimizeImageOptions,
+	GroupListResponse,
+	SignedUrlOptions,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
-import { uploadFile } from "./pinning/file";
-import { uploadFileArray } from "./pinning/fileArray";
-import { uploadBase64 } from "./pinning/base64";
-import { uploadUrl } from "./pinning/url";
-import { uploadJson } from "./pinning/json";
-import { uploadCid } from "./pinning/cid";
-import { unpinFile } from "./pinning/unpin";
-import { listFiles } from "./data/listFiles";
-import { updateMetadata } from "./data/updateMetadata";
+import { uploadFile } from "./uploads/file";
+import { uploadFileArray } from "./uploads/fileArray";
+import { uploadBase64 } from "./uploads/base64";
+import { uploadUrl } from "./uploads/url";
+import { uploadJson } from "./uploads/json";
+import { deleteFile } from "./files/delete";
+import { listFiles } from "./files/list";
+import { updateFile } from "./files/updateFile";
 import { getCid } from "./gateway/getCid";
 import { convertIPFSUrl } from "./gateway/convertIPFSUrl";
-import { pinJobs } from "./data/pinJobs";
-import { pinnedFileCount } from "./data/pinnedFileUsage";
-import { totalStorageUsage } from "./data/totalStorageUsage";
+// import { pinnedFileCount } from "./files/pinnedFileUsage";
+// import { totalStorageUsage } from "./files/totalStorageUsage";
 import { createKey } from "./keys/createKey";
 import { listKeys } from "./keys/listKeys";
 import { revokeKeys } from "./keys/revokeKeys";
@@ -63,15 +59,16 @@ import { addToGroup } from "./groups/addToGroup";
 import { updateGroup } from "./groups/updateGroup";
 import { removeFromGroup } from "./groups/removeFromGroup";
 import { deleteGroup } from "./groups/deleteGroup";
-import { addSignature } from "./signatures/addSignature";
-import { getSignature } from "./signatures/getSignature";
-import { removeSignature } from "./signatures/removeSignature";
+// import { addSignature } from "./signatures/addSignature";
+// import { getSignature } from "./signatures/getSignature";
+// import { removeSignature } from "./signatures/removeSignature";
 import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
 import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
 import { swapCid } from "./gateway/swapCid";
 import { swapHistory } from "./gateway/swapHistory";
 import { deleteSwap } from "./gateway/deleteSwap";
 import { containsCID } from "../utils/gateway-tools";
+import { createSignedURL } from "./gateway/createSignedURL";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -86,21 +83,23 @@ const formatConfig = (config: PinataConfig | undefined) => {
 
 export class PinataSDK {
 	config: PinataConfig | undefined;
+	files: Files;
 	upload: Upload;
 	gateways: Gateways;
-	usage: Usage;
+	//	usage: Usage;
 	keys: Keys;
 	groups: Groups;
-	signatures: Signatures;
+	//signatures: Signatures;
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+		this.files = new Files(this.config);
 		this.upload = new Upload(this.config);
 		this.gateways = new Gateways(this.config);
-		this.usage = new Usage(this.config);
+		//		this.usage = new Usage(this.config);
 		this.keys = new Keys(this.config);
 		this.groups = new Groups(this.config);
-		this.signatures = new Signatures(this.config);
+		//		this.signatures = new Signatures(this.config);
 	}
 
 	setNewHeaders(headers: Record<string, string>): void {
@@ -110,32 +109,41 @@ export class PinataSDK {
 		this.config.customHeaders = { ...this.config.customHeaders, ...headers };
 
 		// Update headers for all sub-modules
+		this.files.updateConfig(this.config);
 		this.upload.updateConfig(this.config);
 		this.gateways.updateConfig(this.config);
-		this.usage.updateConfig(this.config);
+		//		this.usage.updateConfig(this.config);
 		this.keys.updateConfig(this.config);
 		this.groups.updateConfig(this.config);
-		this.signatures.updateConfig(this.config);
+		//		this.signatures.updateConfig(this.config);
 	}
 
 	testAuthentication(): Promise<AuthTestResponse> {
 		return testAuthentication(this.config);
 	}
+}
 
-	unpin(files: string[]): Promise<UnpinResponse[]> {
-		return unpinFile(this.config, files);
+class Files {
+	config: PinataConfig | undefined;
+
+	constructor(config?: PinataConfig) {
+		this.config = formatConfig(config);
 	}
 
-	listFiles(): FilterFiles {
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
+
+	list(): FilterFiles {
 		return new FilterFiles(this.config);
 	}
 
-	updateMetadata(options: PinataMetadataUpdate): Promise<string> {
-		return updateMetadata(this.config, options);
+	delete(files: string[]): Promise<DeleteResponse[]> {
+		return deleteFile(this.config, files);
 	}
 
-	pinJobs(): FilterPinJobs {
-		return new FilterPinJobs(this.config);
+	update(options: UpdateFileOptions): Promise<FileListItem> {
+		return updateFile(this.config, options);
 	}
 }
 
@@ -148,8 +156,6 @@ class UploadBuilder<T> {
 	private args: any[];
 	private metadata: PinataMetadata | undefined;
 	private keys: string | undefined;
-	private peerAddresses: string[] | undefined;
-	private version: 0 | 1 | undefined;
 	private groupId: string | undefined;
 
 	constructor(
@@ -163,7 +169,6 @@ class UploadBuilder<T> {
 		this.config = config;
 		this.uploadFunction = uploadFunction;
 		this.args = args;
-		this.version = 1;
 	}
 
 	addMetadata(metadata: PinataMetadata): UploadBuilder<T> {
@@ -176,18 +181,13 @@ class UploadBuilder<T> {
 		return this;
 	}
 
-	cidVersion(v: 0 | 1): UploadBuilder<T> {
-		this.version = v;
-		return this;
-	}
+	// cidVersion(v: 0 | 1): UploadBuilder<T> {
+	// 	this.version = v;
+	// 	return this;
+	// }
 
 	group(groupId: string): UploadBuilder<T> {
 		this.groupId = groupId;
-		return this;
-	}
-
-	peerAddress(peerAddresses: string[]): UploadBuilder<T> {
-		this.peerAddresses = peerAddresses;
 		return this;
 	}
 
@@ -211,12 +211,6 @@ class UploadBuilder<T> {
 		if (this.groupId) {
 			options.groupId = this.groupId;
 		}
-		if (this.version) {
-			options.cidVersion = this.version;
-		}
-		if (this.peerAddresses && "peerAddresses" in options) {
-			options.peerAddresses = this.peerAddresses;
-		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
 			onfulfilled,
@@ -236,156 +230,102 @@ class Upload {
 		this.config = newConfig;
 	}
 
-	file(file: FileObject, options?: UploadOptions): UploadBuilder<PinResponse> {
+	file(
+		file: FileObject,
+		options?: UploadOptions,
+	): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadFile, file, options);
 	}
 
-	fileArray(
-		files: FileObject[],
-		options?: UploadOptions,
-	): UploadBuilder<PinResponse> {
-		return new UploadBuilder(this.config, uploadFileArray, files, options);
-	}
+	// fileArray(
+	// 	files: FileObject[],
+	// 	options?: UploadOptions,
+	// ): UploadBuilder<UploadResponse> {
+	// 	return new UploadBuilder(this.config, uploadFileArray, files, options);
+	// }
 
 	base64(
 		base64String: string,
 		options?: UploadOptions,
-	): UploadBuilder<PinResponse> {
+	): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadBase64, base64String, options);
 	}
 
-	url(url: string, options?: UploadOptions): UploadBuilder<PinResponse> {
+	url(url: string, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadUrl, url, options);
 	}
 
-	json(data: object, options?: UploadOptions): UploadBuilder<PinResponse> {
+	json(data: object, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadJson, data, options);
-	}
-
-	cid(
-		cid: string,
-		options?: UploadCIDOptions,
-	): UploadBuilder<PinByCIDResponse> {
-		return new UploadBuilder(this.config, uploadCid, cid, options);
 	}
 }
 
 class FilterFiles {
 	private config: PinataConfig | undefined;
-	private query: PinListQuery = {};
+	private query: FileListQuery = {};
+	private currentPageToken: string | undefined;
 	// rate limit vars
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
+	// private requestCount = 0;
+	// private lastRequestTime = 0;
+	// private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	// private readonly MINUTE_IN_MS = 60000;
 
 	constructor(config: PinataConfig | undefined) {
 		this.config = config;
 	}
 
-	cid(cid: string): FilterFiles {
-		this.query.cid = cid;
+	limit(limit: number): FilterFiles {
+		this.query.limit = limit;
 		return this;
 	}
 
-	pinStart(date: string): FilterFiles {
-		this.query.pinStart = date;
+	cidPending(cidPending: boolean): FilterFiles {
+		this.query.cidPending = cidPending;
 		return this;
 	}
 
-	pinEnd(date: string): FilterFiles {
-		this.query.pinEnd = date;
-		return this;
+	then(onfulfilled?: ((value: FileListItem[]) => any) | null): Promise<any> {
+		return this.fetchPage().then(onfulfilled);
 	}
 
-	pinSizeMin(size: number): FilterFiles {
-		this.query.pinSizeMin = size;
-		return this;
-	}
-
-	pinSizeMax(size: number): FilterFiles {
-		this.query.pinSizeMax = size;
-		return this;
-	}
-
-	pageLimit(limit: number): FilterFiles {
-		this.query.pageLimit = limit;
-		return this;
-	}
-
-	pageOffset(offset: number): FilterFiles {
-		this.query.pageOffset = offset;
-		return this;
-	}
-
-	name(name: string): FilterFiles {
-		this.query.name = name;
-		return this;
-	}
-
-	group(groupId: string): FilterFiles {
-		this.query.groupId = groupId;
-		return this;
-	}
-
-	keyValue(
-		key: string,
-		value: string | number,
-		operator?: PinListQuery["operator"],
-	): FilterFiles {
-		this.query.key = key;
-		this.query.value = value;
-		if (operator) {
-			this.query.operator = operator;
+	private async fetchPage(): Promise<FileListItem[]> {
+		if (this.currentPageToken) {
+			this.query.pageToken = this.currentPageToken;
 		}
-		return this;
+		const response = await listFiles(this.config, this.query);
+		this.currentPageToken = response.next_page_token;
+		return response.files;
 	}
 
-	then(onfulfilled?: ((value: PinListItem[]) => any) | null): Promise<any> {
-		return listFiles(this.config, this.query).then(onfulfilled);
-	}
+	// // rate limit, hopefully temporary?
+	// private async rateLimit(): Promise<void> {
+	// 	this.requestCount++;
+	// 	const now = Date.now();
+	// 	if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+	// 		const timePassedSinceLastRequest = now - this.lastRequestTime;
+	// 		if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+	// 			const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+	// 			await new Promise((resolve) => setTimeout(resolve, delayTime));
+	// 		}
+	// 		this.requestCount = 0;
+	// 	}
+	// 	this.lastRequestTime = Date.now();
+	// }
 
-	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
-
-	async *[Symbol.asyncIterator](): AsyncGenerator<PinListItem, void, unknown> {
-		let hasMore = true;
-		let offset = 0;
-		const limit = this.query.pageLimit || 10;
-
-		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
-			this.query.pageOffset = offset;
-			this.query.pageLimit = limit;
-
-			const items = await listFiles(this.config, this.query);
-
+	async *[Symbol.asyncIterator](): AsyncGenerator<FileListItem, void, unknown> {
+		while (true) {
+			const items = await this.fetchPage();
 			for (const item of items) {
 				yield item;
 			}
-
-			if (items.length === 0) {
-				hasMore = false;
-			} else {
-				offset += items.length;
+			if (!this.currentPageToken) {
+				break;
 			}
 		}
 	}
 
-	async all(): Promise<PinListItem[]> {
-		const allItems: PinListItem[] = [];
+	async all(): Promise<FileListItem[]> {
+		const allItems: FileListItem[] = [];
 		for await (const item of this) {
 			allItems.push(item);
 		}
@@ -404,207 +344,116 @@ class Gateways {
 		this.config = newConfig;
 	}
 
-	get(cid: string): OptimizeImage {
-		return new OptimizeImage(this.config, cid);
+	get(cid: string): Promise<GetCIDResponse> {
+		return getCid(this.config, cid);
 	}
 
-	convert(url: string, gatewayPrefix?: string): Promise<string> {
-		return convertIPFSUrl(this.config, url, gatewayPrefix);
+	createSignedURL(options: SignedUrlOptions): Promise<string> {
+		return createSignedURL(this.config, options);
 	}
 
-	containsCID(cid: string): Promise<ContainsCIDResponse> {
-		return containsCID(cid);
-	}
+	// get(cid: string): OptimizeImage {
+	// 	return new OptimizeImage(this.config, cid);
+	// }
 
-	topUsageAnalytics(options: {
-		domain: string;
-		start: string;
-		end: string;
-		sortBy: "requests" | "bandwidth";
-		attribute:
-			| "cid"
-			| "country"
-			| "region"
-			| "user_agent"
-			| "referer"
-			| "file_name";
-	}): TopGatewayAnalyticsBuilder {
-		return new TopGatewayAnalyticsBuilder(
-			this.config,
-			options.domain,
-			options.start,
-			options.end,
-			options.sortBy,
-			options.attribute,
-		);
-	}
+	// convert(url: string, gatewayPrefix?: string): Promise<string> {
+	// 	return convertIPFSUrl(this.config, url, gatewayPrefix);
+	// }
 
-	dateIntervalAnalytics(options: {
-		domain: string;
-		start: string;
-		end: string;
-		interval: "day" | "week";
-	}): TimeIntervalGatewayAnalyticsBuilder {
-		return new TimeIntervalGatewayAnalyticsBuilder(
-			this.config,
-			options.domain,
-			options.start,
-			options.end,
-			options.interval,
-		);
-	}
+	// containsCID(cid: string): Promise<ContainsCIDResponse> {
+	// 	return containsCID(cid);
+	// }
 
-	swapCid(options: SwapCidOptions): Promise<SwapCidResponse> {
-		return swapCid(this.config, options);
-	}
+	// topUsageAnalytics(options: {
+	// 	domain: string;
+	// 	start: string;
+	// 	end: string;
+	// 	sortBy: "requests" | "bandwidth";
+	// 	attribute:
+	// 		| "cid"
+	// 		| "country"
+	// 		| "region"
+	// 		| "user_agent"
+	// 		| "referer"
+	// 		| "file_name";
+	// }): TopGatewayAnalyticsBuilder {
+	// 	return new TopGatewayAnalyticsBuilder(
+	// 		this.config,
+	// 		options.domain,
+	// 		options.start,
+	// 		options.end,
+	// 		options.sortBy,
+	// 		options.attribute,
+	// 	);
+	// }
 
-	swapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
-		return swapHistory(this.config, options);
-	}
+	// dateIntervalAnalytics(options: {
+	// 	domain: string;
+	// 	start: string;
+	// 	end: string;
+	// 	interval: "day" | "week";
+	// }): TimeIntervalGatewayAnalyticsBuilder {
+	// 	return new TimeIntervalGatewayAnalyticsBuilder(
+	// 		this.config,
+	// 		options.domain,
+	// 		options.start,
+	// 		options.end,
+	// 		options.interval,
+	// 	);
+	// }
 
-	deleteSwap(cid: string): Promise<string> {
-		return deleteSwap(this.config, cid);
-	}
+	// swapCid(options: SwapCidOptions): Promise<SwapCidResponse> {
+	// 	return swapCid(this.config, options);
+	// }
+
+	// swapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
+	// 	return swapHistory(this.config, options);
+	// }
+
+	// deleteSwap(cid: string): Promise<string> {
+	// 	return deleteSwap(this.config, cid);
+	// }
 }
 
-class OptimizeImage {
-	private config: PinataConfig | undefined;
-	private cid: string;
-	private options: OptimizeImageOptions = {};
+// class OptimizeImage {
+// 	private config: PinataConfig | undefined;
+// 	private cid: string;
+// 	private options: OptimizeImageOptions = {};
 
-	constructor(config: PinataConfig | undefined, cid: string) {
-		this.config = config;
-		this.cid = cid;
-	}
+// 	constructor(config: PinataConfig | undefined, cid: string) {
+// 		this.config = config;
+// 		this.cid = cid;
+// 	}
 
-	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
-		this.options = { ...this.options, ...options };
-		return this;
-	}
+// 	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
+// 		this.options = { ...this.options, ...options };
+// 		return this;
+// 	}
 
-	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
-		return getCid(this.config, this.cid, this.options).then(onfulfilled);
-	}
-}
+// 	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
+// 		return getCid(this.config, this.cid, this.options).then(onfulfilled);
+// 	}
+// }
 
-class FilterPinJobs {
-	private config: PinataConfig | undefined;
-	private query: PinJobQuery = {};
-	// rate limit vars
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
+// class Usage {
+// 	config: PinataConfig | undefined;
 
-	constructor(config: PinataConfig | undefined) {
-		this.config = config;
-	}
+// 	constructor(config?: PinataConfig) {
+// 		this.config = formatConfig(config);
+// 	}
 
-	cid(cid: string): FilterPinJobs {
-		this.query.ipfs_pin_hash = cid;
-		return this;
-	}
+// 	updateConfig(newConfig: PinataConfig): void {
+// 		this.config = newConfig;
+// 	}
 
-	status(
-		status:
-			| "prechecking"
-			| "retrieving"
-			| "expired"
-			| "over_free_limit"
-			| "over_max_size"
-			| "invalid_object"
-			| "bad_host_node",
-	): FilterPinJobs {
-		this.query.status = status;
-		return this;
-	}
+// 	pinnedFileCount(): Promise<number> {
+// 		return pinnedFileCount(this.config);
+// 	}
 
-	pageLimit(limit: number): FilterPinJobs {
-		this.query.limit = limit;
-		return this;
-	}
-
-	pageOffset(offset: number): FilterPinJobs {
-		this.query.offset = offset;
-		return this;
-	}
-
-	sort(sort: "ASC" | "DSC"): FilterPinJobs {
-		this.query.sort = sort;
-		return this;
-	}
-
-	then(onfulfilled?: ((value: PinJobItem[]) => any) | null): Promise<any> {
-		return pinJobs(this.config, this.query).then(onfulfilled);
-	}
-
-	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
-
-	async *[Symbol.asyncIterator](): AsyncGenerator<PinJobItem, void, unknown> {
-		let hasMore = true;
-		let offset = 0;
-		const limit = this.query.limit || 10;
-
-		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
-			this.query.offset = offset;
-			this.query.limit = limit;
-
-			const items = await pinJobs(this.config, this.query);
-
-			for (const item of items) {
-				yield item;
-			}
-
-			if (items.length === 0) {
-				hasMore = false;
-			} else {
-				offset += items.length;
-			}
-		}
-	}
-
-	async all(): Promise<PinJobItem[]> {
-		const allItems: PinJobItem[] = [];
-		for await (const item of this) {
-			allItems.push(item);
-		}
-		return allItems;
-	}
-}
-
-class Usage {
-	config: PinataConfig | undefined;
-
-	constructor(config?: PinataConfig) {
-		this.config = formatConfig(config);
-	}
-
-	updateConfig(newConfig: PinataConfig): void {
-		this.config = newConfig;
-	}
-
-	pinnedFileCount(): Promise<number> {
-		return pinnedFileCount(this.config);
-	}
-
-	totalStorageSize(): Promise<number> {
-		return totalStorageUsage(this.config);
-	}
-}
+// 	totalStorageSize(): Promise<number> {
+// 		return totalStorageUsage(this.config);
+// 	}
+// }
 
 class Keys {
 	config: PinataConfig | undefined;
@@ -634,10 +483,10 @@ class FilterKeys {
 	private config: PinataConfig | undefined;
 	private query: KeyListQuery = {};
 	// rate limit vars
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
+	// private requestCount = 0;
+	// private lastRequestTime = 0;
+	// private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	// private readonly MINUTE_IN_MS = 60000;
 
 	constructor(config: PinataConfig | undefined) {
 		this.config = config;
@@ -672,27 +521,26 @@ class FilterKeys {
 		return listKeys(this.config, this.query).then(onfulfilled);
 	}
 
-	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
+	// private async rateLimit(): Promise<void> {
+	// 	this.requestCount++;
+	// 	const now = Date.now();
+	// 	if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+	// 		const timePassedSinceLastRequest = now - this.lastRequestTime;
+	// 		if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+	// 			const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+	// 			await new Promise((resolve) => setTimeout(resolve, delayTime));
+	// 		}
+	// 		this.requestCount = 0;
+	// 	}
+	// 	this.lastRequestTime = Date.now();
+	// }
 
 	async *[Symbol.asyncIterator](): AsyncGenerator<KeyListItem, void, unknown> {
 		let hasMore = true;
 		let offset = 0;
 
 		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
+			//await this.rateLimit(); // applying rate limit
 			this.query.offset = offset;
 
 			const items = await listKeys(this.config, this.query);
@@ -741,13 +589,13 @@ class Groups {
 		return getGroup(this.config, options);
 	}
 
-	addCids(options: GroupCIDOptions): Promise<string> {
-		return addToGroup(this.config, options);
-	}
+	// addFiles(options: GroupCIDOptions): Promise<string> {
+	// 	return addToGroup(this.config, options);
+	// }
 
-	removeCids(options: GroupCIDOptions): Promise<string> {
-		return removeFromGroup(this.config, options);
-	}
+	// removeFiles(options: GroupCIDOptions): Promise<string> {
+	// 	return removeFromGroup(this.config, options);
+	// }
 
 	update(options: UpdateGroupOptions): Promise<GroupResponseItem> {
 		return updateGroup(this.config, options);
@@ -762,74 +610,78 @@ class FilterGroups {
 	private config: PinataConfig | undefined;
 	private query: GroupQueryOptions = {};
 	// rate limit vars
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
+	// private requestCount = 0;
+	// private lastRequestTime = 0;
+	// private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	// private readonly MINUTE_IN_MS = 60000;
+	private nextPageToken: string | undefined;
 
 	constructor(config: PinataConfig | undefined) {
 		this.config = config;
 	}
 
-	offset(offset: number): FilterGroups {
-		this.query.offset = offset;
-		return this;
-	}
-
-	name(nameContains: string): FilterGroups {
-		this.query.nameContains = nameContains;
-		return this;
-	}
+	// name(nameContains: string): FilterGroups {
+	// 	this.query.nameContains = nameContains;
+	// 	return this;
+	// }
 
 	limit(limit: number): FilterGroups {
 		this.query.limit = limit;
 		return this;
 	}
 
+	isPublic(isPublic: boolean): FilterGroups {
+		this.query.isPublic = isPublic;
+		return this;
+	}
+
 	then(
 		onfulfilled?: ((value: GroupResponseItem[]) => any) | null,
 	): Promise<GroupResponseItem[]> {
-		return listGroups(this.config, this.query).then(onfulfilled);
+		return this.fetchPage()
+			.then((response) => {
+				this.nextPageToken = response.next_page_token;
+				return response.groups;
+			})
+			.then(onfulfilled);
+	}
+
+	private async fetchPage(): Promise<GroupListResponse> {
+		if (this.nextPageToken) {
+			this.query.pageToken = this.nextPageToken;
+		}
+		return listGroups(this.config, this.query);
 	}
 
 	// rate limit, hopefully temporary?
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
+	// private async rateLimit(): Promise<void> {
+	// 	this.requestCount++;
+	// 	const now = Date.now();
+	// 	if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+	// 		const timePassedSinceLastRequest = now - this.lastRequestTime;
+	// 		if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+	// 			const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+	// 			await new Promise((resolve) => setTimeout(resolve, delayTime));
+	// 		}
+	// 		this.requestCount = 0;
+	// 	}
+	// 	this.lastRequestTime = Date.now();
+	// }
 
 	async *[Symbol.asyncIterator](): AsyncGenerator<
 		GroupResponseItem,
 		void,
 		unknown
 	> {
-		let hasMore = true;
-		let offset = 0;
-
-		while (hasMore) {
-			await this.rateLimit(); // applying rate limit
-			this.query.offset = offset;
-
-			const items = await listGroups(this.config, this.query);
-
-			for (const item of items) {
+		while (true) {
+			const response = await this.fetchPage();
+			for (const item of response.groups) {
 				yield item;
 			}
-
-			if (items.length === 0) {
-				hasMore = false;
-			} else {
-				offset += items.length;
+			if (!response.next_page_token) {
+				break;
 			}
+			this.nextPageToken = response.next_page_token;
 		}
 	}
 
@@ -842,172 +694,172 @@ class FilterGroups {
 	}
 }
 
-class Signatures {
-	config: PinataConfig | undefined;
+// class Signatures {
+// 	config: PinataConfig | undefined;
 
-	constructor(config?: PinataConfig) {
-		this.config = formatConfig(config);
-	}
+// 	constructor(config?: PinataConfig) {
+// 		this.config = formatConfig(config);
+// 	}
 
-	updateConfig(newConfig: PinataConfig): void {
-		this.config = newConfig;
-	}
+// 	updateConfig(newConfig: PinataConfig): void {
+// 		this.config = newConfig;
+// 	}
 
-	add(options: SignatureOptions): Promise<SignatureResponse> {
-		return addSignature(this.config, options);
-	}
+// 	add(options: SignatureOptions): Promise<SignatureResponse> {
+// 		return addSignature(this.config, options);
+// 	}
 
-	get(cid: string): Promise<SignatureResponse> {
-		return getSignature(this.config, cid);
-	}
+// 	get(cid: string): Promise<SignatureResponse> {
+// 		return getSignature(this.config, cid);
+// 	}
 
-	delete(cid: string): Promise<string> {
-		return removeSignature(this.config, cid);
-	}
-}
+// 	delete(cid: string): Promise<string> {
+// 		return removeSignature(this.config, cid);
+// 	}
+// }
 
-class GatewayAnalyticsBuilder<T extends GatewayAnalyticsQuery, R> {
-	protected config: PinataConfig | undefined;
-	protected query: T;
-	private requestCount = 0;
-	private lastRequestTime = 0;
-	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-	private readonly MINUTE_IN_MS = 60000;
+// class GatewayAnalyticsBuilder<T extends GatewayAnalyticsQuery, R> {
+// 	protected config: PinataConfig | undefined;
+// 	protected query: T;
+// 	private requestCount = 0;
+// 	private lastRequestTime = 0;
+// 	private readonly MAX_REQUESTS_PER_MINUTE = 30;
+// 	private readonly MINUTE_IN_MS = 60000;
 
-	constructor(config: PinataConfig | undefined, query: T) {
-		this.config = config;
-		this.query = query;
-	}
+// 	constructor(config: PinataConfig | undefined, query: T) {
+// 		this.config = config;
+// 		this.query = query;
+// 	}
 
-	cid(cid: string): this {
-		this.query.cid = cid;
-		return this;
-	}
+// 	cid(cid: string): this {
+// 		this.query.cid = cid;
+// 		return this;
+// 	}
 
-	fileName(fileName: string): this {
-		this.query.file_name = fileName;
-		return this;
-	}
+// 	fileName(fileName: string): this {
+// 		this.query.file_name = fileName;
+// 		return this;
+// 	}
 
-	userAgent(userAgent: string): this {
-		this.query.user_agent = userAgent;
-		return this;
-	}
+// 	userAgent(userAgent: string): this {
+// 		this.query.user_agent = userAgent;
+// 		return this;
+// 	}
 
-	country(country: string): this {
-		this.query.country = country;
-		return this;
-	}
+// 	country(country: string): this {
+// 		this.query.country = country;
+// 		return this;
+// 	}
 
-	region(region: string): this {
-		this.query.region = region;
-		return this;
-	}
+// 	region(region: string): this {
+// 		this.query.region = region;
+// 		return this;
+// 	}
 
-	referer(referer: string): this {
-		this.query.referer = referer;
-		return this;
-	}
+// 	referer(referer: string): this {
+// 		this.query.referer = referer;
+// 		return this;
+// 	}
 
-	limit(limit: number): this {
-		this.query.limit = limit;
-		return this;
-	}
+// 	limit(limit: number): this {
+// 		this.query.limit = limit;
+// 		return this;
+// 	}
 
-	sort(order: "asc" | "desc"): this {
-		this.query.sort_order = order;
-		return this;
-	}
+// 	sort(order: "asc" | "desc"): this {
+// 		this.query.sort_order = order;
+// 		return this;
+// 	}
 
-	private async rateLimit(): Promise<void> {
-		this.requestCount++;
-		const now = Date.now();
-		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-			const timePassedSinceLastRequest = now - this.lastRequestTime;
-			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-				await new Promise((resolve) => setTimeout(resolve, delayTime));
-			}
-			this.requestCount = 0;
-		}
-		this.lastRequestTime = Date.now();
-	}
+// 	private async rateLimit(): Promise<void> {
+// 		this.requestCount++;
+// 		const now = Date.now();
+// 		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+// 			const timePassedSinceLastRequest = now - this.lastRequestTime;
+// 			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+// 				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+// 				await new Promise((resolve) => setTimeout(resolve, delayTime));
+// 			}
+// 			this.requestCount = 0;
+// 		}
+// 		this.lastRequestTime = Date.now();
+// 	}
 
-	protected async getAnalytics(): Promise<R> {
-		await this.rateLimit();
-		throw new Error("getAnalytics method must be implemented in derived class");
-	}
+// 	protected async getAnalytics(): Promise<R> {
+// 		await this.rateLimit();
+// 		throw new Error("getAnalytics method must be implemented in derived class");
+// 	}
 
-	then(onfulfilled?: ((value: R) => any) | null): Promise<any> {
-		return this.getAnalytics().then(onfulfilled);
-	}
-}
+// 	then(onfulfilled?: ((value: R) => any) | null): Promise<any> {
+// 		return this.getAnalytics().then(onfulfilled);
+// 	}
+// }
 
-class TopGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
-	TopGatewayAnalyticsQuery,
-	TopGatewayAnalyticsItem[]
-> {
-	constructor(
-		config: PinataConfig | undefined,
-		domain: string,
-		start: string,
-		end: string,
-		sortBy: "requests" | "bandwidth",
-		attribute:
-			| "cid"
-			| "country"
-			| "region"
-			| "user_agent"
-			| "referer"
-			| "file_name",
-	) {
-		super(config, {
-			gateway_domain: domain,
-			start_date: start,
-			end_date: end,
-			sort_by: sortBy,
-			attribute: attribute,
-		});
-	}
+// class TopGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
+// 	TopGatewayAnalyticsQuery,
+// 	TopGatewayAnalyticsItem[]
+// > {
+// 	constructor(
+// 		config: PinataConfig | undefined,
+// 		domain: string,
+// 		start: string,
+// 		end: string,
+// 		sortBy: "requests" | "bandwidth",
+// 		attribute:
+// 			| "cid"
+// 			| "country"
+// 			| "region"
+// 			| "user_agent"
+// 			| "referer"
+// 			| "file_name",
+// 	) {
+// 		super(config, {
+// 			gateway_domain: domain,
+// 			start_date: start,
+// 			end_date: end,
+// 			sort_by: sortBy,
+// 			attribute: attribute,
+// 		});
+// 	}
 
-	protected async getAnalytics(): Promise<TopGatewayAnalyticsItem[]> {
-		return analyticsTopUsage(this.config, this.query);
-	}
+// 	protected async getAnalytics(): Promise<TopGatewayAnalyticsItem[]> {
+// 		return analyticsTopUsage(this.config, this.query);
+// 	}
 
-	async all(): Promise<TopGatewayAnalyticsItem[]> {
-		return this.getAnalytics();
-	}
-}
+// 	async all(): Promise<TopGatewayAnalyticsItem[]> {
+// 		return this.getAnalytics();
+// 	}
+// }
 
-class TimeIntervalGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
-	TimeIntervalGatewayAnalyticsQuery,
-	TimeIntervalGatewayAnalyticsResponse
-> {
-	constructor(
-		config: PinataConfig | undefined,
-		domain: string,
-		start: string,
-		end: string,
-		dateInterval: "day" | "week",
-	) {
-		super(config, {
-			gateway_domain: domain,
-			start_date: start,
-			end_date: end,
-			date_interval: dateInterval,
-		});
-	}
+// class TimeIntervalGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
+// 	TimeIntervalGatewayAnalyticsQuery,
+// 	TimeIntervalGatewayAnalyticsResponse
+// > {
+// 	constructor(
+// 		config: PinataConfig | undefined,
+// 		domain: string,
+// 		start: string,
+// 		end: string,
+// 		dateInterval: "day" | "week",
+// 	) {
+// 		super(config, {
+// 			gateway_domain: domain,
+// 			start_date: start,
+// 			end_date: end,
+// 			date_interval: dateInterval,
+// 		});
+// 	}
 
-	sortBy(sortBy: "requests" | "bandwidth"): this {
-		this.query.sort_by = sortBy;
-		return this;
-	}
+// 	sortBy(sortBy: "requests" | "bandwidth"): this {
+// 		this.query.sort_by = sortBy;
+// 		return this;
+// 	}
 
-	protected async getAnalytics(): Promise<TimeIntervalGatewayAnalyticsResponse> {
-		return analyticsDateInterval(this.config, this.query);
-	}
+// 	protected async getAnalytics(): Promise<TimeIntervalGatewayAnalyticsResponse> {
+// 		return analyticsDateInterval(this.config, this.query);
+// 	}
 
-	async all(): Promise<TimeIntervalGatewayAnalyticsResponse> {
-		return this.getAnalytics();
-	}
-}
+// 	async all(): Promise<TimeIntervalGatewayAnalyticsResponse> {
+// 		return this.getAnalytics();
+// 	}
+// }

@@ -8,7 +8,7 @@
  * @async
  * @function updateMetadata
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {PinataMetadataUpdate} options - The options for updating the metadata.
+ * @param {UpdateFileOptions} options - The options for updating the metadata.
  * @param {string} options.cid - The Content Identifier (CID) of the pinned file to update.
  * @param {string} [options.name] - The new name to assign to the pinned file (optional).
  * @param {Record<string, string | number>} [options.keyValues] - Key-value pairs to associate with the pinned file (optional).
@@ -34,7 +34,7 @@
  * })
  */
 
-import type { PinataConfig, PinataMetadataUpdate } from "../types";
+import type { FileListItem, PinataConfig, UpdateFileOptions } from "../types";
 import {
 	PinataError,
 	NetworkError,
@@ -42,18 +42,16 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
-export const updateMetadata = async (
+export const updateFile = async (
 	config: PinataConfig | undefined,
-	options: PinataMetadataUpdate,
-): Promise<string> => {
+	options: UpdateFileOptions,
+): Promise<FileListItem> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
-	const data = {
-		ipfsPinHash: options.cid,
+	const data = JSON.stringify({
 		name: options.name,
-		keyvalues: options.keyValues,
-	};
+	});
 
 	let headers: Record<string, string>;
 
@@ -67,17 +65,17 @@ export const updateMetadata = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/pinning/hashMetadata`, {
+		const request = await fetch(`${endpoint}/files/${options.id}`, {
 			method: "PUT",
 			headers: headers,
-			body: JSON.stringify(data),
+			body: data,
 		});
 
 		if (!request.ok) {
@@ -96,17 +94,16 @@ export const updateMetadata = async (
 			);
 		}
 
-		const res: string = await request.text();
-		return res;
+		const res = await request.json();
+		const resData: FileListItem = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(
-				`Error processing updateMetadata: ${error.message}`,
-			);
+			throw new PinataError(`Error processing updateFile: ${error.message}`);
 		}
-		throw new PinataError("An unknown error occurred while updating metadata");
+		throw new PinataError("An unknown error occurred while updating file");
 	}
 };

@@ -34,6 +34,7 @@ import type {
 	PinataConfig,
 	GroupResponseItem,
 	GroupQueryOptions,
+	GroupListResponse,
 } from "../types";
 
 import {
@@ -46,7 +47,7 @@ import {
 export const listGroups = async (
 	config: PinataConfig | undefined,
 	options?: GroupQueryOptions,
-): Promise<GroupResponseItem[]> => {
+): Promise<GroupListResponse> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
@@ -66,25 +67,29 @@ export const listGroups = async (
 	const params = new URLSearchParams();
 
 	if (options) {
-		const { offset, nameContains, limit } = options;
+		const { pageToken, nameContains, limit, isPublic } = options;
 
-		if (offset) params.append("offset", offset.toString());
+		if (pageToken) params.append("pageToken", pageToken.toString());
+		if (isPublic) params.append("isPublic", isPublic.toString());
 		if (nameContains !== undefined)
 			params.append("nameContains", nameContains.toString());
 		if (limit !== undefined) params.append("limit", limit.toString());
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/groups?${params.toString()}`, {
-			method: "GET",
-			headers: headers,
-		});
+		const request = await fetch(
+			`${endpoint}/files/groups?${params.toString()}`,
+			{
+				method: "GET",
+				headers: headers,
+			},
+		);
 
 		if (!request.ok) {
 			const errorData = await request.text();
@@ -102,8 +107,9 @@ export const listGroups = async (
 			);
 		}
 
-		const res: GroupResponseItem[] = await request.json();
-		return res;
+		const res = await request.json();
+		const resData: GroupListResponse = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;

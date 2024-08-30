@@ -81,7 +81,7 @@ export const listKeys = async (
 		if (name) params.append("name", name);
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
@@ -89,7 +89,7 @@ export const listKeys = async (
 
 	try {
 		const request = await fetch(
-			`${endpoint}/v3/pinata/keys?${params.toString()}`,
+			`${endpoint}/pinata/keys?${params.toString()}`,
 			{
 				method: "GET",
 				headers: headers,

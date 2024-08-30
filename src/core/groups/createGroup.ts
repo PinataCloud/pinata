@@ -45,7 +45,10 @@ export const createGroup = async (
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	const data = JSON.stringify(options);
+	const data = JSON.stringify({
+		name: options.name,
+		is_public: options.isPublic,
+	});
 
 	let headers: Record<string, string>;
 
@@ -59,14 +62,14 @@ export const createGroup = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/groups`, {
+		const request = await fetch(`${endpoint}/files/groups`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -88,8 +91,9 @@ export const createGroup = async (
 			);
 		}
 
-		const res: GroupResponseItem = await request.json();
-		return res;
+		const res = await request.json();
+		const resData: GroupResponseItem = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;

@@ -1,5 +1,5 @@
 import { updateMetadata } from "../../src/core/data/updateMetadata";
-import type { PinataConfig, PinataMetadataUpdate } from "../../src";
+import type { PinataConfig, UpdateFileOptions } from "../../src";
 import {
 	PinataError,
 	NetworkError,
@@ -23,7 +23,7 @@ describe("updateMetadata function", () => {
 		pinataGateway: "test.cloud",
 	};
 
-	const mockOptions: PinataMetadataUpdate = {
+	const mockOptions: UpdateFileOptions = {
 		cid: "QmTest...",
 		name: "Updated File Name",
 		keyValues: {
@@ -102,7 +102,7 @@ describe("updateMetadata function", () => {
 	});
 
 	it("should handle updating only name", async () => {
-		const nameOnlyOptions: PinataMetadataUpdate = {
+		const nameOnlyOptions: UpdateFileOptions = {
 			cid: "QmTest...",
 			name: "New Name Only",
 		};
@@ -127,7 +127,7 @@ describe("updateMetadata function", () => {
 	});
 
 	it("should handle updating only keyValues", async () => {
-		const keyValuesOnlyOptions: PinataMetadataUpdate = {
+		const keyValuesOnlyOptions: UpdateFileOptions = {
 			cid: "QmTest...",
 			keyValues: {
 				newKey: "newValue",
@@ -154,7 +154,7 @@ describe("updateMetadata function", () => {
 	});
 
 	it("should handle empty keyValues object", async () => {
-		const emptyKeyValuesOptions: PinataMetadataUpdate = {
+		const emptyKeyValuesOptions: UpdateFileOptions = {
 			cid: "QmTest...",
 			name: "Test Name",
 			keyValues: {},

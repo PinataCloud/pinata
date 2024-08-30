@@ -39,4 +39,3 @@ node_modules
 .next/
 issues/
 test/
-postinstall.ts

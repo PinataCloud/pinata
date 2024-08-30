@@ -10,19 +10,14 @@ export type AuthTestResponse = {
 	message: string;
 };
 
-export type PinResponse = {
-	IpfsHash: string;
-	PinSize: number;
-	Timestamp: string;
-	isDuplicate?: boolean;
-};
-
-export type PinByCIDResponse = {
+export type UploadResponse = {
 	id: string;
-	ipfsHash: string;
-	status: "prechecking" | "retrieving";
 	name: string;
-	updated?: boolean;
+	cid: string;
+	size: number;
+	number_of_files: number;
+	mime_type: string;
+	user_id: string;
 };
 
 export type FileObject = {
@@ -37,88 +32,47 @@ export type JsonBody = Record<string, unknown>;
 
 export type PinataMetadata = {
 	name?: string;
-	keyValues?: Record<string, string | number>;
+	//keyValues?: Record<string, string | number>;
 };
 
-export type PinataMetadataUpdate = {
-	cid: string;
+export type UpdateFileOptions = {
+	id: string;
 	name?: string;
-	keyValues?: Record<string, string | number>;
 };
 
 export type UploadOptions = {
 	metadata?: PinataMetadata;
-	pinType?: "async" | "sync" | "cidOnly";
+	//pinType?: "async" | "sync" | "cidOnly";
 	keys?: string;
 	groupId?: string;
-	cidVersion?: 0 | 1;
+	//cidVersion?: 0 | 1;
 };
 
-export type UploadCIDOptions = {
-	metadata?: PinataMetadata;
-	peerAddresses?: string[];
-	keys?: string;
-	groupId?: string;
-};
-
-export type UnpinResponse = {
-	hash: string;
+export type DeleteResponse = {
+	id: string;
 	status: string;
 };
 
-export type PinListItem = {
+export type FileListItem = {
 	id: string;
-	ipfs_pin_hash: string;
+	name: string | null;
+	cid: "pending" | string;
 	size: number;
-	user_id: string;
-	date_pinned: string;
-	date_unpinned: string | null;
-	metadata: {
-		name: string | null;
-		keyvalues: {
-			[key: string]: any;
-		} | null;
-	};
-	regions: {
-		regionId: string;
-		currentReplicationCount: number;
-		desiredReplicationCount: number;
-	}[];
-	mime_type: string;
 	number_of_files: number;
+	mime_type: string;
+	group_id: string;
+	created_at: string;
 };
 
-export type PinListResponse = {
-	rows: PinListItem[];
+export type FileListResponse = {
+	files: FileListItem[];
+	next_page_token: string;
 };
 
-export type PinListQuery = {
-	cid?: string;
-	pinStart?: string;
-	pinEnd?: string;
-	pinSizeMin?: number;
-	pinSizeMax?: number;
-	pageLimit?: number;
-	pageOffset?: number;
-	name?: string;
-	groupId?: string;
-	key?: string;
-	value?: string | number;
-	operator?:
-		| "gt"
-		| "gte"
-		| "lt"
-		| "lte"
-		| "ne"
-		| "eq"
-		| "between"
-		| "notBetween"
-		| "like"
-		| "notLike"
-		| "iLike"
-		| "notILike"
-		| "regexp"
-		| "iRegexp";
+export type FileListQuery = {
+	limit?: number;
+	pageToken?: string;
+	cidPending?: boolean;
 };
 
 export type PinJobQuery = {
@@ -194,6 +148,12 @@ export type OptimizeImageOptions = {
 	sharpen?: number;
 	onError?: boolean;
 	metadata?: "keep" | "copyright" | "none";
+};
+
+export type SignedUrlOptions = {
+	cid: string;
+	date?: number;
+	expires: number;
 };
 
 export type GatewayAnalyticsQuery = {
@@ -332,29 +292,36 @@ export type RevokeKeyResponse = {
 
 export type GroupOptions = {
 	name: string;
+	isPublic?: boolean;
 };
 
 export type UpdateGroupOptions = {
-	name: string;
 	groupId: string;
+	name?: string;
+	isPublic?: boolean;
 };
 
 export type GetGroupOptions = {
 	groupId: string;
 };
 
+export type GroupListResponse = {
+	groups: GroupResponseItem[];
+	next_page_token: string;
+};
+
 export type GroupResponseItem = {
 	id: string;
-	user_id: string;
+	is_public: boolean;
 	name: string;
-	updatedAt: string;
 	createdAt: string;
 };
 
 export type GroupQueryOptions = {
 	nameContains?: string;
-	offset?: number;
 	limit?: number;
+	pageToken?: string;
+	isPublic?: boolean;
 };
 
 export type GroupCIDOptions = {

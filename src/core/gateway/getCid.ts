@@ -27,7 +27,6 @@
  *
  */
 
-import { convertToDesiredGateway } from "../../utils/gateway-tools";
 import type {
 	GetCIDResponse,
 	PinataConfig,
@@ -43,47 +42,68 @@ import {
 export const getCid = async (
 	config: PinataConfig | undefined,
 	cid: string,
-	options?: OptimizeImageOptions,
+	// options?: OptimizeImageOptions,
 ): Promise<GetCIDResponse> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	let data: JSON | string | Blob;
-	let newUrl: string;
-
-	newUrl = await convertToDesiredGateway(cid, config?.pinataGateway);
+	let newUrl: string = `${config?.pinataGateway}/files/${cid}`;
 
 	const params = new URLSearchParams();
 
-	if (config?.pinataGatewayKey) {
-		params.append("pinataGatewayToken", config.pinataGatewayKey);
-	}
+	const date = Math.floor(new Date().getTime() / 1000);
 
-	if (options) {
-		if (options.width) params.append("img-width", options.width.toString());
-		if (options.height) params.append("img-height", options.height.toString());
-		if (options.dpr) params.append("img-dpr", options.dpr.toString());
-		if (options.fit) params.append("img-fit", options.fit);
-		if (options.gravity) params.append("img-gravity", options.gravity);
-		if (options.quality)
-			params.append("img-quality", options.quality.toString());
-		if (options.format) params.append("img-format", options.format);
-		if (options.animation !== undefined)
-			params.append("img-anim", options.animation.toString());
-		if (options.sharpen)
-			params.append("img-sharpen", options.sharpen.toString());
-		if (options.onError === true) params.append("img-onerror", "redirect");
-		if (options.metadata) params.append("img-metadata", options.metadata);
-	}
+	const payload = JSON.stringify({
+		url: newUrl,
+		date: date,
+		expires: 30,
+		method: "GET",
+	});
 
-	const queryString = params.toString();
-	if (queryString) {
-		newUrl += `?${queryString}`;
-	}
+	const signedUrlRequest = await fetch(
+		"https://api.pinata.cloud/v3/files/sign",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${config?.pinataJwt}`,
+			},
+			body: payload,
+		},
+	);
+
+	const signedUrl = await signedUrlRequest.json();
+
+	// if (config?.pinataGatewayKey) {
+	// 	params.append("pinataGatewayToken", config.pinataGatewayKey);
+	// }
+
+	// if (options) {
+	// 	if (options.width) params.append("img-width", options.width.toString());
+	// 	if (options.height) params.append("img-height", options.height.toString());
+	// 	if (options.dpr) params.append("img-dpr", options.dpr.toString());
+	// 	if (options.fit) params.append("img-fit", options.fit);
+	// 	if (options.gravity) params.append("img-gravity", options.gravity);
+	// 	if (options.quality)
+	// 		params.append("img-quality", options.quality.toString());
+	// 	if (options.format) params.append("img-format", options.format);
+	// 	if (options.animation !== undefined)
+	// 		params.append("img-anim", options.animation.toString());
+	// 	if (options.sharpen)
+	// 		params.append("img-sharpen", options.sharpen.toString());
+	// 	if (options.onError === true) params.append("img-onerror", "redirect");
+	// 	if (options.metadata) params.append("img-metadata", options.metadata);
+	// }
+
+	// const queryString = params.toString();
+	// if (queryString) {
+	// 	newUrl += `?${queryString}`;
+	// }
 
 	try {
-		const request = await fetch(newUrl);
+		const request = await fetch(signedUrl.data);
 
 		if (!request.ok) {
 			const errorData = await request.text();

@@ -1,25 +1,24 @@
 /**
- * Uploads content from a URL to IPFS via Pinata.
+ * Uploads a base64-encoded string to IPFS via Pinata.
  *
- * This function allows you to upload content from a specified URL to IPFS and pin it to Pinata.
- * It's useful for adding remote content to your Pinata account and IPFS network without
- * first downloading it locally.
+ * This function allows you to upload content to IPFS that is encoded as a base64 string.
+ * It's particularly useful for uploading binary data or files that have been converted to base64.
  *
  * @async
- * @function uploadUrl
+ * @function uploadBase64
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {string} url - The URL of the content to be uploaded.
+ * @param {string} base64String - The base64-encoded string to be uploaded.
  * @param {UploadOptions} [options] - Optional parameters for the upload.
- * @param {PinataMetadata} [options.metadata] - Metadata for the uploaded content.
- * @param {string} [options.metadata.name] - Custom name for the content (defaults to "url_upload" if not provided).
- * @param {Record<string, string | number>} [options.metadata.keyValues] - Custom key-value pairs for the content metadata.
+ * @param {PinataMetadata} [options.metadata] - Metadata for the uploaded file.
+ * @param {string} [options.metadata.name] - Name for the uploaded file (default is "base64 string").
+ * @param {Record<string, string | number>} [options.metadata.keyvalues] - Custom key-value pairs for the file metadata.
  * @param {string} [options.keys] - Custom JWT to use for this specific upload.
- * @param {string} [options.groupId] - ID of the group to add the uploaded content to.
+ * @param {string} [options.groupId] - ID of the group to add the uploaded file to.
  * @param {0 | 1} [options.cidVersion] - Version of CID to use (0 or 1).
  * @returns {Promise<PinResponse>} A promise that resolves to an object containing the IPFS hash and other upload details.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
  * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request or URL fetch.
+ * @throws {NetworkError} If there's a network-related error during the API request.
  * @throws {PinataError} For any other errors that occur during the upload process.
  *
  * @example
@@ -30,10 +29,10 @@
  *   pinataGateway: "example-gateway.mypinata.cloud",
  * });
  *
- * const upload = await pinata.upload.url("https://i.imgur.com/u4mGk5b.gif")
+ * const upload = await pinata.upload.base64("SGVsbG8gV29ybGQh")
  */
 
-import type { PinataConfig, PinResponse, UploadOptions } from "../types";
+import type { PinataConfig, UploadResponse, UploadOptions } from "../types";
 
 import {
 	PinataError,
@@ -42,9 +41,9 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
-export const uploadUrl = async (
+export const uploadBase64 = async (
 	config: PinataConfig | undefined,
-	url: string,
+	base64String: string,
 	options?: UploadOptions,
 ) => {
 	if (!config) {
@@ -52,44 +51,38 @@ export const uploadUrl = async (
 	}
 
 	const jwt: string | undefined = options?.keys || config?.pinataJwt;
+
+	const name = options?.metadata?.name
+		? options?.metadata?.name
+		: "base64 string";
+
+	const buffer = Buffer.from(base64String, "base64");
+
+	const blob = new Blob([buffer]);
+
 	const data = new FormData();
 
-	const stream = await fetch(url);
-
-	if (!stream.ok) {
-		const errorData = await stream.text();
-		throw new NetworkError(
-			`HTTP error: ${errorData}`,
-			stream.status,
-			errorData,
-		);
+	data.append("file", blob, name);
+	data.append("name", name);
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
 	}
 
-	const arrayBuffer = await stream.arrayBuffer();
+	// data.append(
+	// 	"pinataOptions",
+	// 	JSON.stringify({
+	// 		cidVersion: options?.cidVersion,
+	// 		groupId: options?.groupId,
+	// 	}),
+	// );
 
-	const blob = new Blob([arrayBuffer]);
-
-	const name = options?.metadata?.name ?? "url_upload";
-
-	const file = new File([blob], name);
-
-	data.append("file", file, name);
-
-	data.append(
-		"pinataOptions",
-		JSON.stringify({
-			cidVersion: options?.cidVersion,
-			groupId: options?.groupId,
-		}),
-	);
-
-	data.append(
-		"pinataMetadata",
-		JSON.stringify({
-			name: name,
-			keyvalues: options?.metadata?.keyValues,
-		}),
-	);
+	// data.append(
+	// 	"pinataMetadata",
+	// 	JSON.stringify({
+	// 		name: name,
+	// 		keyvalues: options?.metadata?.keyValues,
+	// 	}),
+	// );
 
 	let headers: Record<string, string>;
 
@@ -98,18 +91,18 @@ export const uploadUrl = async (
 	} else {
 		headers = {
 			Authorization: `Bearer ${jwt}`,
-			Source: "sdk/url",
+			Source: "sdk/base64",
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/pinning/pinFileToIPFS`, {
+		const request = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -131,15 +124,17 @@ export const uploadUrl = async (
 			);
 		}
 
-		const res: PinResponse = await request.json();
+		const res: UploadResponse = await request.json();
 		return res;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing url: ${error.message}`);
+			throw new PinataError(`Error processing base64: ${error.message}`);
 		}
-		throw new PinataError("An unknown error occurred while uploading by url");
+		throw new PinataError(
+			"An unknown error occurred while trying to upload base64",
+		);
 	}
 };

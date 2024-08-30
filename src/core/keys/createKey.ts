@@ -66,14 +66,14 @@ export const createKey = async (
 
 	const data = JSON.stringify(options);
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/v3/pinata/keys`, {
+		const request = await fetch(`${endpoint}/pinata/keys`, {
 			method: "POST",
 			headers: headers,
 			body: data,
