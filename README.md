@@ -1,6 +1,6 @@
 # Pinata
 
-![cover-image](https://docs.mypinata.cloud/ipfs/bafkreidv5iptnieh6eijei7enqc4mdhxpte3ries23heqf7s2hu3gdu6ru?img-format=webp)
+![cover-image](https://docs.mypinata.cloud/ipfs/QmQi9QEuMfsoxVPqhDQdppdyD6HSrUDsaKK5hdTvT1nikw?img-format=webp)
 
 The new all-in-one Pinata SDK
 
