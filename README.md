@@ -16,7 +16,7 @@ npm i pinata
 
 Import and initialize the SDK in your codebase with the following variables
 - [Pinata API Key JWT](https://docs.pinata.cloud/account-management/api-keys)
-- [Pinata Dedicated Gateway Domain](https://docs.pinata.cloud/gateways/dedicated-ipfs-gateways)
+- [Pinata Gateway Domain](https://docs.pinata.cloud/gateways/dedicated-ipfs-gateways)
 
 ```typescript
 import { PinataSDK } from "pinata";
@@ -56,15 +56,20 @@ This will return an object like the following:
 
 ```typescript
 {
-  IpfsHash: "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
-  PinSize: 5,
-  Timestamp: "2024-07-11T23:33:27.665Z",
+    id: "349f1bb2-5d59-4cab-9966-e94c028a05b7",
+    name: "file.txt",
+    cid: "bafybeihgxdzljxb26q6nf3r3eifqeedsvt2eubqtskghpme66cgjyw4fra",
+    size: 4682779,
+    number_of_files: 1,
+    mime_type: "text/plain",
+    user_id: "7a484d2c-4219-4f80-9d9d-86b42461e71a",
+    group_id: null
 }
 ```
 
 ### 3. Retrieve a File
 
-Use the CID or `IpfsHash` from the upload to fetch a file
+Use the `cid` or from the upload to fetch a file
 
 ```typescript
 import { PinataSDK } from "pinata";
@@ -86,7 +91,7 @@ async function main() {
 main();
 ```
 
-[View the full documentation here](https://docs.pinata.cloud/sdk-beta/getting-started)
+[View the full documentation here](https://docs.pinata.cloud/sdk/getting-started)
 
 ## Developing
 
