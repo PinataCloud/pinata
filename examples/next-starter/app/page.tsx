@@ -5,7 +5,7 @@ import { pinata } from "@/utils/config";
 
 export default function Home() {
 	const [file, setFile]: any = useState();
-	const [cid, setCid] = useState("");
+	const [url, setUrl] = useState("");
 	const [uploading, setUploading] = useState(false);
 
 	const inputFile = useRef(null);
@@ -13,10 +13,12 @@ export default function Home() {
 	const uploadFile = async () => {
 		try {
 			setUploading(true);
-			const keyRequest = await fetch("/api/key");
+			const keyRequest = await fetch("/api/key", {
+				method: "GET",
+			});
 			const keyData = await keyRequest.json();
 			const upload = await pinata.upload.file(file).key(keyData.JWT);
-			setCid(upload.cid);
+			setUrl(upload.cid);
 			setUploading(false);
 		} catch (e) {
 			console.log(e);
@@ -24,6 +26,26 @@ export default function Home() {
 			alert("Trouble uploading file");
 		}
 	};
+
+	// const uploadFile = async () => {
+	// 	try {
+	// 		setUploading(true);
+	// 		const data = new FormData();
+	// 		data.set("file", file);
+	// 		const uploadRequest = await fetch("/api/files", {
+	// 			method: "POST",
+	// 			body: data,
+	// 		});
+	// 		const signedUrl = await uploadRequest.json();
+	// 		console.log(signedUrl);
+	// 		setUrl(signedUrl);
+	// 		setUploading(false);
+	// 	} catch (e) {
+	// 		console.log(e);
+	// 		setUploading(false);
+	// 		alert("Trouble uploading file");
+	// 	}
+	// };
 
 	const handleChange = (e) => {
 		setFile(e.target.files[0]);
@@ -35,12 +57,7 @@ export default function Home() {
 			<button disabled={uploading} onClick={uploadFile}>
 				{uploading ? "Uploading..." : "Upload"}
 			</button>
-			{cid && (
-				<img
-					src={`https://${process.env.NEXT_PUBLIC_GATEWAY_URL}/ipfs/${cid}`}
-					alt="Image from IPFS"
-				/>
-			)}
+			{url && <img src={url} alt="Image from Pinata" />}
 		</main>
 	);
 }
