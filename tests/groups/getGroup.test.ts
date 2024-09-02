@@ -36,20 +36,19 @@ describe("getGroup function", () => {
 		const mockResponse: GroupResponseItem = {
 			id: "test-group-id",
 			name: "Test Group",
-			user_id: "test-user-id",
+			is_public: false,
 			createdAt: "2023-07-26T12:00:00Z",
-			updatedAt: "2023-07-26T12:00:00Z",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await getGroup(mockConfig, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups/test-group-id",
+			"https://api.pinata.cloud/v3/files/groups/test-group-id",
 			{
 				method: "GET",
 				headers: {
@@ -122,15 +121,19 @@ describe("getGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({
-				id: specialIdOptions.groupId,
-				name: "Special Group",
+				data: {
+					id: specialIdOptions.groupId,
+					name: "Special Group",
+					is_public: false,
+					createdAt: "2023-07-26T12:00:00Z",
+				},
 			}),
 		});
 
 		await getGroup(mockConfig, specialIdOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			`https://api.pinata.cloud/groups/${specialIdOptions.groupId}`,
+			`https://api.pinata.cloud/v3/files/groups/${specialIdOptions.groupId}`,
 			expect.any(Object),
 		);
 	});
@@ -149,14 +152,13 @@ describe("getGroup function", () => {
 		const mockResponseNoName: GroupResponseItem = {
 			id: "test-group-id",
 			name: "",
-			user_id: "test-user-id",
+			is_public: false,
 			createdAt: "2023-07-26T12:00:00Z",
-			updatedAt: "2023-07-26T12:00:00Z",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponseNoName),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponseNoName }),
 		});
 
 		const result = await getGroup(mockConfig, mockOptions);

@@ -66,8 +66,6 @@ export const createSignedURL = async (
 			body: payload,
 		});
 
-		const res = await request.json();
-
 		if (!request.ok) {
 			const errorData = await request.text();
 			if (request.status === 401 || request.status === 403) {
@@ -84,6 +82,7 @@ export const createSignedURL = async (
 			);
 		}
 
+		const res = await request.json();
 		return res.data;
 	} catch (error) {
 		if (error instanceof PinataError) {

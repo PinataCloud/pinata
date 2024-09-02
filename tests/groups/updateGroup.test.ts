@@ -36,21 +36,20 @@ describe("updateGroup function", () => {
 	const mockResponse: GroupResponseItem = {
 		id: "test-group-id",
 		name: "Updated Group Name",
-		user_id: "test-user-id",
+		is_public: false,
 		createdAt: "2023-07-26T12:00:00Z",
-		updatedAt: "2023-07-26T13:00:00Z",
 	};
 
 	it("should update group successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await updateGroup(mockConfig, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups/test-group-id",
+			"https://api.pinata.cloud/v3/files/groups/test-group-id",
 			{
 				method: "PUT",
 				headers: {
@@ -58,7 +57,7 @@ describe("updateGroup function", () => {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${mockConfig.pinataJwt}`,
 				},
-				body: JSON.stringify({ name: mockOptions.name }),
+				body: JSON.stringify({ name: mockOptions.name, is_public: undefined }),
 			},
 		);
 		expect(result).toEqual(mockResponse);
@@ -117,7 +116,7 @@ describe("updateGroup function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(emptyNameResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: emptyNameResponse }),
 		});
 
 		const result = await updateGroup(mockConfig, emptyNameOptions);
@@ -139,7 +138,7 @@ describe("updateGroup function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(longNameResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: longNameResponse }),
 		});
 
 		const result = await updateGroup(mockConfig, longNameOptions);
@@ -168,37 +167,45 @@ describe("updateGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({
-				...mockResponse,
-				id: customGroupIdOptions.groupId,
+				data: {
+					...mockResponse,
+					id: customGroupIdOptions.groupId,
+				},
 			}),
 		});
 
 		await updateGroup(mockConfig, customGroupIdOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups/custom-group-123",
+			"https://api.pinata.cloud/v3/files/groups/custom-group-123",
 			expect.any(Object),
 		);
 	});
 
-	it("should handle updating with special characters in name", async () => {
-		const specialNameOptions: UpdateGroupOptions = {
+	it("should handle updating isPublic flag", async () => {
+		const publicGroupOptions: UpdateGroupOptions = {
 			groupId: "test-group-id",
-			name: "Special @#$%^&*() Group",
+			isPublic: true,
 		};
 
-		const specialNameResponse: GroupResponseItem = {
+		const publicGroupResponse: GroupResponseItem = {
 			...mockResponse,
-			name: specialNameOptions.name,
+			is_public: true,
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(specialNameResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: publicGroupResponse }),
 		});
 
-		const result = await updateGroup(mockConfig, specialNameOptions);
+		const result = await updateGroup(mockConfig, publicGroupOptions);
 
-		expect(result.name).toBe(specialNameOptions.name);
+		expect(result.is_public).toBe(true);
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/files/groups/test-group-id",
+			expect.objectContaining({
+				body: JSON.stringify({ name: undefined, is_public: true }),
+			}),
+		);
 	});
 });

@@ -31,21 +31,20 @@ describe("createGroup function", () => {
 	it("should create a group successfully", async () => {
 		const mockResponse: GroupResponseItem = {
 			id: "group-123",
-			user_id: "user-456",
+			is_public: false,
 			name: "Test Group",
-			updatedAt: "2023-07-26T12:00:00Z",
 			createdAt: "2023-07-26T12:00:00Z",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await createGroup(mockConfig, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups",
+			"https://api.pinata.cloud/v3/files/groups",
 			{
 				method: "POST",
 				headers: {
@@ -53,7 +52,10 @@ describe("createGroup function", () => {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${mockConfig.pinataJwt}`,
 				},
-				body: JSON.stringify(mockOptions),
+				body: JSON.stringify({
+					name: mockOptions.name,
+					is_public: undefined,
+				}),
 			},
 		);
 		expect(result).toEqual(mockResponse);
@@ -106,9 +108,14 @@ describe("createGroup function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest
-				.fn()
-				.mockResolvedValueOnce({ id: "group-123", name: longNameOptions.name }),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					id: "group-123",
+					name: longNameOptions.name,
+					is_public: false,
+					createdAt: "2023-07-26T12:00:00Z",
+				},
+			}),
 		});
 
 		const result = await createGroup(mockConfig, longNameOptions);
@@ -124,8 +131,12 @@ describe("createGroup function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({
-				id: "group-123",
-				name: specialNameOptions.name,
+				data: {
+					id: "group-123",
+					name: specialNameOptions.name,
+					is_public: false,
+					createdAt: "2023-07-26T12:00:00Z",
+				},
 			}),
 		});
 
@@ -141,11 +152,56 @@ describe("createGroup function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ id: "group-123", name: "" }),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					id: "group-123",
+					name: "",
+					is_public: false,
+					createdAt: "2023-07-26T12:00:00Z",
+				},
+			}),
 		});
 
 		const result = await createGroup(mockConfig, emptyNameOptions);
 
 		expect(result.name).toEqual("");
+	});
+
+	it("should handle public group creation", async () => {
+		const publicGroupOptions: GroupOptions = {
+			name: "Public Group",
+			isPublic: true,
+		};
+
+		const mockResponse: GroupResponseItem = {
+			id: "group-123",
+			is_public: true,
+			name: "Public Group",
+			createdAt: "2023-07-26T12:00:00Z",
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await createGroup(mockConfig, publicGroupOptions);
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/files/groups",
+			{
+				method: "POST",
+				headers: {
+					Source: "sdk/createGroup",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				},
+				body: JSON.stringify({
+					name: publicGroupOptions.name,
+					is_public: publicGroupOptions.isPublic,
+				}),
+			},
+		);
+		expect(result).toEqual(mockResponse);
 	});
 });

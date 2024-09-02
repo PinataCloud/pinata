@@ -29,17 +29,18 @@ describe("deleteGroup function", () => {
 	};
 
 	it("should delete a group successfully", async () => {
-		const mockResponse = "Group deleted successfully";
+		const mockStatusText = "OK";
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			text: jest.fn().mockResolvedValueOnce(mockResponse),
+			statusText: mockStatusText,
+			text: jest.fn().mockResolvedValueOnce("Group deleted successfully"),
 		});
 
 		const result = await deleteGroup(mockConfig, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups/test-group-id",
+			"https://api.pinata.cloud/v3/files/groups/test-group-id",
 			{
 				method: "DELETE",
 				headers: {
@@ -49,7 +50,7 @@ describe("deleteGroup function", () => {
 				},
 			},
 		);
-		expect(result).toEqual(mockResponse);
+		expect(result).toEqual(mockStatusText);
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
@@ -93,8 +94,11 @@ describe("deleteGroup function", () => {
 	});
 
 	it("should handle deletion of non-existent group", async () => {
+		const mockStatusText = "OK";
+
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
+			statusText: mockStatusText,
 			text: jest.fn().mockResolvedValueOnce("Group not found"),
 		});
 
@@ -102,7 +106,7 @@ describe("deleteGroup function", () => {
 			groupId: "non-existent-id",
 		});
 
-		expect(result).toEqual("Group not found");
+		expect(result).toEqual(mockStatusText);
 	});
 
 	it("should handle group id with special characters", async () => {
@@ -118,7 +122,7 @@ describe("deleteGroup function", () => {
 		await deleteGroup(mockConfig, specialIdOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			`https://api.pinata.cloud/groups/${specialIdOptions.groupId}`,
+			`https://api.pinata.cloud/v3/files/groups/${specialIdOptions.groupId}`,
 			expect.any(Object),
 		);
 	});

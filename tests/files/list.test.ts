@@ -1,5 +1,10 @@
-import { listFiles } from "../../src/core/data/listFiles";
-import type { PinataConfig, FileListItem, FileListQuery } from "../../src";
+import { listFiles } from "../../src/core/files/list";
+import type {
+	PinataConfig,
+	FileListItem,
+	FileListQuery,
+	FileListResponse,
+} from "../../src/core/types";
 import {
 	PinataError,
 	NetworkError,
@@ -23,39 +28,31 @@ describe("listFiles function", () => {
 		pinataGateway: "test.cloud",
 	};
 
-	const mockPinListItem: FileListItem = {
+	const mockFileListItem: FileListItem = {
 		id: "test-id",
-		ipfs_pin_hash: "Qm...",
+		name: "test-file",
+		cid: "Qm...",
 		size: 1234,
-		user_id: "test-user",
-		date_pinned: "2023-07-26T12:00:00Z",
-		date_unpinned: null,
-		metadata: {
-			name: "test-file",
-			keyvalues: { key: "value" },
-		},
-		regions: [
-			{
-				regionId: "FRA1",
-				currentReplicationCount: 1,
-				desiredReplicationCount: 1,
-			},
-		],
-		mime_type: "text/plain",
 		number_of_files: 1,
+		mime_type: "text/plain",
+		group_id: "test-group",
+		created_at: "2023-07-26T12:00:00Z",
 	};
 
 	it("should list files successfully", async () => {
-		const mockResponse = { rows: [mockPinListItem] };
+		const mockResponse: FileListResponse = {
+			files: [mockFileListItem],
+			next_page_token: "next_token",
+		};
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await listFiles(mockConfig);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/data/pinList?status=pinned&includesCount=false",
+			"https://api.pinata.cloud/v3/files?",
 			{
 				method: "GET",
 				headers: {
@@ -64,36 +61,27 @@ describe("listFiles function", () => {
 				},
 			},
 		);
-		expect(result).toEqual(mockResponse.rows);
+		expect(result).toEqual(mockResponse);
 	});
 
 	it("should handle all query parameters correctly", async () => {
 		const mockQuery: FileListQuery = {
-			cid: "test-cid",
-			pinStart: "2023-01-01",
-			pinEnd: "2023-12-31",
-			pinSizeMin: 100,
-			pinSizeMax: 1000,
-			pageLimit: 10,
-			pageOffset: 5,
-			name: "test-name",
-			key: "test-key",
-			value: "test-value",
-			operator: "eq",
-			groupId: "test-group",
+			limit: 10,
+			pageToken: "test-token",
+			cidPending: true,
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ rows: [] }),
+			json: jest
+				.fn()
+				.mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
 		});
 
 		await listFiles(mockConfig, mockQuery);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			expect.stringContaining(
-				"cid=test-cid&pinStart=2023-01-01&pinEnd=2023-12-31&pinSizeMin=100&pinSizeMax=1000&pageLimit=10&pageOffset=5&groupId=test-group&metadata%5Bname%5D=test-name&metadata%5Bkeyvalues%5D=%7B%22test-key%22%3A%7B%22value%22%3A%22test-value%22%2C%22op%22%3A%22eq%22%7D%7D",
-			),
+			expect.stringContaining("limit=10&pageToken=test-token&cidPending=true"),
 			expect.any(Object),
 		);
 	});
@@ -136,5 +124,51 @@ describe("listFiles function", () => {
 		});
 
 		await expect(listFiles(mockConfig)).rejects.toThrow(PinataError);
+	});
+
+	it("should use custom endpoint if provided", async () => {
+		const customConfig: PinataConfig = {
+			...mockConfig,
+			endpointUrl: "https://custom.api.pinata.cloud",
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest
+				.fn()
+				.mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
+		});
+
+		await listFiles(customConfig);
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://custom.api.pinata.cloud/files?", // Remove "/v3" and add "?" at the end
+			expect.any(Object),
+		);
+	});
+
+	it("should use custom headers if provided", async () => {
+		const customConfig: PinataConfig = {
+			...mockConfig,
+			customHeaders: { "X-Custom-Header": "CustomValue" },
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest
+				.fn()
+				.mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
+		});
+
+		await listFiles(customConfig);
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({
+				headers: expect.objectContaining({
+					"X-Custom-Header": "CustomValue",
+				}),
+			}),
+		);
 	});
 });

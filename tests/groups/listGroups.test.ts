@@ -3,6 +3,7 @@ import type {
 	PinataConfig,
 	GroupResponseItem,
 	GroupQueryOptions,
+	GroupListResponse,
 } from "../../src";
 import {
 	PinataError,
@@ -28,33 +29,34 @@ describe("listGroups function", () => {
 		pinataGateway: "https://test.mypinata.cloud",
 	};
 
-	const mockGroups: GroupResponseItem[] = [
-		{
-			id: "group-1",
-			name: "Test Group 1",
-			user_id: "user-1",
-			createdAt: "2023-07-26T12:00:00Z",
-			updatedAt: "2023-07-26T12:00:00Z",
-		},
-		{
-			id: "group-2",
-			name: "Test Group 2",
-			user_id: "user-1",
-			createdAt: "2023-07-26T13:00:00Z",
-			updatedAt: "2023-07-26T13:00:00Z",
-		},
-	];
+	const mockGroupsResponse: GroupListResponse = {
+		groups: [
+			{
+				id: "group-1",
+				name: "Test Group 1",
+				is_public: false,
+				createdAt: "2023-07-26T12:00:00Z",
+			},
+			{
+				id: "group-2",
+				name: "Test Group 2",
+				is_public: true,
+				createdAt: "2023-07-26T13:00:00Z",
+			},
+		],
+		next_page_token: "next_token",
+	};
 
 	it("should list groups successfully without options", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockGroups),
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
 		const result = await listGroups(mockConfig);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups?",
+			"https://api.pinata.cloud/v3/files/groups?",
 			{
 				method: "GET",
 				headers: {
@@ -64,25 +66,26 @@ describe("listGroups function", () => {
 				},
 			},
 		);
-		expect(result).toEqual(mockGroups);
+		expect(result).toEqual(mockGroupsResponse);
 	});
 
 	it("should list groups with query options", async () => {
 		const options: GroupQueryOptions = {
-			offset: 10,
 			limit: 5,
 			nameContains: "Test",
+			pageToken: "token",
+			isPublic: true,
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockGroups),
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
 		await listGroups(mockConfig, options);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/groups?offset=10&nameContains=Test&limit=5",
+			"https://api.pinata.cloud/v3/files/groups?pageToken=token&isPublic=true&nameContains=Test&limit=5",
 			expect.any(Object),
 		);
 	});
@@ -122,23 +125,25 @@ describe("listGroups function", () => {
 	it("should handle empty group list", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce([]),
+			json: jest
+				.fn()
+				.mockResolvedValueOnce({ data: { groups: [], next_page_token: null } }),
 		});
 
 		const result = await listGroups(mockConfig);
 
-		expect(result).toEqual([]);
+		expect(result).toEqual({ groups: [], next_page_token: null });
 	});
 
 	it("should not include nameContains in URL if it's undefined", async () => {
 		const options: GroupQueryOptions = {
-			offset: 10,
 			limit: 5,
+			pageToken: "token",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockGroups),
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
 		await listGroups(mockConfig, options);
@@ -149,40 +154,39 @@ describe("listGroups function", () => {
 		);
 	});
 
-	it("should handle large offset and limit", async () => {
+	it("should handle large limit", async () => {
 		const options: GroupQueryOptions = {
-			offset: 1000000,
 			limit: 1000000,
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockGroups),
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
 		await listGroups(mockConfig, options);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			`https://api.pinata.cloud/groups?offset=${options.offset}&limit=${options.limit}`,
+			`https://api.pinata.cloud/v3/files/groups?limit=${options.limit}`,
 			expect.any(Object),
 		);
 	});
 
-	it("should handle negative offset and limit", async () => {
-		const options: GroupQueryOptions = {
-			offset: -10,
-			limit: -5,
+	it("should handle custom endpoint URL", async () => {
+		const customConfig: PinataConfig = {
+			...mockConfig,
+			endpointUrl: "https://custom.api.pinata.cloud",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockGroups),
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
-		await listGroups(mockConfig, options);
+		await listGroups(customConfig);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			`https://api.pinata.cloud/groups?offset=${options.offset}&limit=${options.limit}`,
+			"https://custom.api.pinata.cloud/files/groups?",
 			expect.any(Object),
 		);
 	});
