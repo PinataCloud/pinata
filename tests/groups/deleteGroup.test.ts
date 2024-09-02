@@ -1,139 +1,139 @@
 import { deleteGroup } from "../../src/core/groups/deleteGroup";
 import type { PinataConfig, GetGroupOptions } from "../../src";
 import {
-    PinataError,
-    NetworkError,
-    AuthenticationError,
-    ValidationError,
+	PinataError,
+	NetworkError,
+	AuthenticationError,
+	ValidationError,
 } from "../../src/utils/custom-errors";
 
 describe("deleteGroup function", () => {
-    let originalFetch: typeof fetch;
+	let originalFetch: typeof fetch;
 
-    beforeEach(() => {
-        originalFetch = global.fetch;
-    });
+	beforeEach(() => {
+		originalFetch = global.fetch;
+	});
 
-    afterEach(() => {
-        global.fetch = originalFetch;
-        jest.clearAllMocks();
-    });
+	afterEach(() => {
+		global.fetch = originalFetch;
+		jest.clearAllMocks();
+	});
 
-    const mockConfig: PinataConfig = {
-        pinataJwt: "test_jwt",
-        pinataGateway: "https://test.mypinata.cloud",
-    };
+	const mockConfig: PinataConfig = {
+		pinataJwt: "test_jwt",
+		pinataGateway: "https://test.mypinata.cloud",
+	};
 
-    const mockOptions: GetGroupOptions = {
-        groupId: "test-group-id",
-    };
+	const mockOptions: GetGroupOptions = {
+		groupId: "test-group-id",
+	};
 
-    it("should delete a group successfully", async () => {
-        const mockStatusText = "OK";
+	it("should delete a group successfully", async () => {
+		const mockStatusText = "OK";
 
-        global.fetch = jest.fn().mockResolvedValueOnce({
-            ok: true,
-            statusText: mockStatusText,
-            text: jest.fn().mockResolvedValueOnce("Group deleted successfully"),
-        });
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			statusText: mockStatusText,
+			text: jest.fn().mockResolvedValueOnce("Group deleted successfully"),
+		});
 
-        const result = await deleteGroup(mockConfig, mockOptions);
+		const result = await deleteGroup(mockConfig, mockOptions);
 
-        expect(global.fetch).toHaveBeenCalledWith(
-            "https://api.pinata.cloud/v3/files/groups/test-group-id",
-            {
-                method: "DELETE",
-                headers: {
-                    Source: "sdk/deleteGroup",
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${mockConfig.pinataJwt}`,
-                },
-            },
-        );
-        expect(result).toEqual(mockStatusText);
-    });
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/files/groups/test-group-id",
+			{
+				method: "DELETE",
+				headers: {
+					Source: "sdk/deleteGroup",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				},
+			},
+		);
+		expect(result).toEqual(mockStatusText);
+	});
 
-    it("should throw ValidationError if config is missing", async () => {
-        await expect(deleteGroup(undefined, mockOptions)).rejects.toThrow(
-            ValidationError,
-        );
-    });
+	it("should throw ValidationError if config is missing", async () => {
+		await expect(deleteGroup(undefined, mockOptions)).rejects.toThrow(
+			ValidationError,
+		);
+	});
 
-    it("should throw AuthenticationError on 401 response", async () => {
-        global.fetch = jest.fn().mockResolvedValueOnce({
-            ok: false,
-            status: 401,
-            text: jest.fn().mockResolvedValueOnce("Unauthorized"),
-        });
+	it("should throw AuthenticationError on 401 response", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: false,
+			status: 401,
+			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
+		});
 
-        await expect(deleteGroup(mockConfig, mockOptions)).rejects.toThrow(
-            AuthenticationError,
-        );
-    });
+		await expect(deleteGroup(mockConfig, mockOptions)).rejects.toThrow(
+			AuthenticationError,
+		);
+	});
 
-    it("should throw NetworkError on non-401 error response", async () => {
-        global.fetch = jest.fn().mockResolvedValueOnce({
-            ok: false,
-            status: 500,
-            text: jest.fn().mockResolvedValueOnce("Server Error"),
-        });
+	it("should throw NetworkError on non-401 error response", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: false,
+			status: 500,
+			text: jest.fn().mockResolvedValueOnce("Server Error"),
+		});
 
-        await expect(deleteGroup(mockConfig, mockOptions)).rejects.toThrow(
-            NetworkError,
-        );
-    });
+		await expect(deleteGroup(mockConfig, mockOptions)).rejects.toThrow(
+			NetworkError,
+		);
+	});
 
-    it("should throw PinataError on unexpected errors", async () => {
-        global.fetch = jest
-            .fn()
-            .mockRejectedValueOnce(new Error("Unexpected error"));
+	it("should throw PinataError on unexpected errors", async () => {
+		global.fetch = jest
+			.fn()
+			.mockRejectedValueOnce(new Error("Unexpected error"));
 
-        await expect(deleteGroup(mockConfig, mockOptions)).rejects.toThrow(
-            PinataError,
-        );
-    });
+		await expect(deleteGroup(mockConfig, mockOptions)).rejects.toThrow(
+			PinataError,
+		);
+	});
 
-    it("should handle deletion of non-existent group", async () => {
-        const mockStatusText = "OK";
+	it("should handle deletion of non-existent group", async () => {
+		const mockStatusText = "OK";
 
-        global.fetch = jest.fn().mockResolvedValueOnce({
-            ok: true,
-            statusText: mockStatusText,
-            text: jest.fn().mockResolvedValueOnce("Group not found"),
-        });
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			statusText: mockStatusText,
+			text: jest.fn().mockResolvedValueOnce("Group not found"),
+		});
 
-        const result = await deleteGroup(mockConfig, {
-            groupId: "non-existent-id",
-        });
+		const result = await deleteGroup(mockConfig, {
+			groupId: "non-existent-id",
+		});
 
-        expect(result).toEqual(mockStatusText);
-    });
+		expect(result).toEqual(mockStatusText);
+	});
 
-    it("should handle group id with special characters", async () => {
-        const specialIdOptions: GetGroupOptions = {
-            groupId: "group@#$%^&*()",
-        };
+	it("should handle group id with special characters", async () => {
+		const specialIdOptions: GetGroupOptions = {
+			groupId: "group@#$%^&*()",
+		};
 
-        global.fetch = jest.fn().mockResolvedValueOnce({
-            ok: true,
-            text: jest.fn().mockResolvedValueOnce("Group deleted successfully"),
-        });
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			text: jest.fn().mockResolvedValueOnce("Group deleted successfully"),
+		});
 
-        await deleteGroup(mockConfig, specialIdOptions);
+		await deleteGroup(mockConfig, specialIdOptions);
 
-        expect(global.fetch).toHaveBeenCalledWith(
-            `https://api.pinata.cloud/v3/files/groups/${specialIdOptions.groupId}`,
-            expect.any(Object),
-        );
-    });
+		expect(global.fetch).toHaveBeenCalledWith(
+			`https://api.pinata.cloud/v3/files/groups/${specialIdOptions.groupId}`,
+			expect.any(Object),
+		);
+	});
 
-    it("should handle empty group id", async () => {
-        const emptyIdOptions: GetGroupOptions = {
-            groupId: "",
-        };
+	it("should handle empty group id", async () => {
+		const emptyIdOptions: GetGroupOptions = {
+			groupId: "",
+		};
 
-        await expect(deleteGroup(mockConfig, emptyIdOptions)).rejects.toThrow(
-            PinataError,
-        );
-    });
+		await expect(deleteGroup(mockConfig, emptyIdOptions)).rejects.toThrow(
+			PinataError,
+		);
+	});
 });
