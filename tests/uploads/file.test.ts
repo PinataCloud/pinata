@@ -1,11 +1,9 @@
-import { uploadJson } from "../../src/core/pinning/json";
-import { toPinataMetadataAPI } from "../pinata-metadata-util"; // Adjust import path as necessary
+import { uploadFile } from "../../src/core/uploads/file";
 import type {
 	PinataConfig,
 	UploadOptions,
-	PinResponse,
+	UploadResponse,
 	PinataMetadata,
-	JsonBody,
 } from "../../src";
 import {
 	PinataError,
@@ -14,68 +12,57 @@ import {
 	ValidationError,
 } from "../../src/utils/custom-errors";
 
-describe("uploadJson function", () => {
+describe("uploadFile function", () => {
 	const mockConfig: PinataConfig = {
 		pinataJwt: "test-jwt",
 	};
 
-	const mockJsonData: JsonBody = {
-		key1: "value1",
-		key2: 2,
-		key3: {
-			nestedKey: "nestedValue",
-		},
-	};
+	const mockFile = new File(["test content"], "test.txt", {
+		type: "text/plain",
+	});
 
-	const mockResponse: PinResponse = {
-		IpfsHash: "QmTest123",
-		PinSize: 123,
-		Timestamp: "2023-07-26T12:00:00Z",
+	const mockResponse: UploadResponse = {
+		id: "testId",
+		name: "test.txt",
+		cid: "QmTest123",
+		size: 123,
+		number_of_files: 1,
+		mime_type: "text/plain",
+		user_id: "testUserId",
 	};
 
 	beforeEach(() => {
 		jest.resetAllMocks();
 	});
 
-	it("should upload JSON successfully", async () => {
+	it("should upload file successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		const result = await uploadJson(mockConfig, mockJsonData);
+		const result = await uploadFile(mockConfig, mockFile);
 
 		expect(result).toEqual(mockResponse);
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinJSONToIPFS",
+			"https://uploads.pinata.cloud/v3/files",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
-					Source: "sdk/json",
-					"Content-Type": "application/json",
+					Source: "sdk/file",
 					Authorization: "Bearer test-jwt",
 				},
-				body: expect.any(String),
+				body: expect.any(FormData),
 			}),
 		);
-
-		const requestBody = JSON.parse(
-			(global.fetch as jest.Mock).mock.calls[0][1].body,
-		);
-		expect(requestBody.pinataContent).toEqual(mockJsonData);
 	});
 
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
-			name: "Custom JSON Name",
-			keyValues: {
-				key1: "value1",
-				key2: "value2",
-			},
+			name: "Custom File Name",
 		};
 		const mockOptions: UploadOptions = {
 			metadata: mockMetadata,
-			cidVersion: 1,
 			groupId: "test-group",
 		};
 
@@ -84,31 +71,25 @@ describe("uploadJson function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadJson(mockConfig, mockJsonData, mockOptions);
+		await uploadFile(mockConfig, mockFile, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinJSONToIPFS",
+			"https://uploads.pinata.cloud/v3/files",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
-					Source: "sdk/json",
-					"Content-Type": "application/json",
+					Source: "sdk/file",
 					Authorization: "Bearer test-jwt",
 				},
-				body: expect.any(String),
+				body: expect.any(FormData),
 			}),
 		);
 
-		const requestBody = JSON.parse(
-			(global.fetch as jest.Mock).mock.calls[0][1].body,
-		);
-		expect(requestBody.pinataOptions).toEqual({
-			cidVersion: mockOptions.cidVersion,
-			groupId: mockOptions.groupId,
-		});
-		expect(requestBody.pinataMetadata).toEqual(
-			toPinataMetadataAPI(mockMetadata),
-		);
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("name")).toBe("Custom File Name");
+		expect(formData.get("group_id")).toBe("test-group");
 	});
 
 	it("should use custom JWT if provided in options", async () => {
@@ -122,36 +103,21 @@ describe("uploadJson function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadJson(mockConfig, mockJsonData, mockOptions);
+		await uploadFile(mockConfig, mockFile, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinJSONToIPFS",
+			"https://uploads.pinata.cloud/v3/files",
 			expect.objectContaining({
 				headers: {
-					Source: "sdk/json",
-					"Content-Type": "application/json",
+					Source: "sdk/file",
 					Authorization: `Bearer ${customJwt}`,
 				},
 			}),
 		);
 	});
 
-	it("should use default name if not provided", async () => {
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
-		});
-
-		await uploadJson(mockConfig, mockJsonData);
-
-		const requestBody = JSON.parse(
-			(global.fetch as jest.Mock).mock.calls[0][1].body,
-		);
-		expect(requestBody.pinataMetadata.name).toBe("json");
-	});
-
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(uploadJson(undefined, mockJsonData)).rejects.toThrow(
+		await expect(uploadFile(undefined, mockFile)).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -163,7 +129,7 @@ describe("uploadJson function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(uploadJson(mockConfig, mockJsonData)).rejects.toThrow(
+		await expect(uploadFile(mockConfig, mockFile)).rejects.toThrow(
 			AuthenticationError,
 		);
 	});
@@ -175,7 +141,7 @@ describe("uploadJson function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(uploadJson(mockConfig, mockJsonData)).rejects.toThrow(
+		await expect(uploadFile(mockConfig, mockFile)).rejects.toThrow(
 			NetworkError,
 		);
 	});
@@ -185,8 +151,6 @@ describe("uploadJson function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Network failure"));
 
-		await expect(uploadJson(mockConfig, mockJsonData)).rejects.toThrow(
-			PinataError,
-		);
+		await expect(uploadFile(mockConfig, mockFile)).rejects.toThrow(PinataError);
 	});
 });

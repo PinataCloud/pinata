@@ -1,8 +1,8 @@
-import { uploadBase64 } from "../../src/core/pinning/base64";
+import { uploadBase64 } from "../../src/core/uploads/base64";
 import type {
 	PinataConfig,
 	UploadOptions,
-	PinResponse,
+	UploadResponse,
 	PinataMetadata,
 } from "../../src";
 import {
@@ -11,7 +11,6 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../src/utils/custom-errors";
-import { toPinataMetadataAPI } from "../pinata-metadata-util";
 
 describe("uploadBase64 function", () => {
 	let originalFetch: typeof fetch;
@@ -33,10 +32,14 @@ describe("uploadBase64 function", () => {
 	const mockBase64String =
 		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==";
 
-	const mockResponse: PinResponse = {
-		IpfsHash: "QmTest123",
-		PinSize: 1234,
-		Timestamp: "2023-07-26T12:00:00Z",
+	const mockResponse: UploadResponse = {
+		id: "testId",
+		name: "testName",
+		cid: "QmTest123",
+		size: 1234,
+		number_of_files: 1,
+		mime_type: "image/png",
+		user_id: "testUserId",
 	};
 
 	it("should upload base64 successfully", async () => {
@@ -48,12 +51,12 @@ describe("uploadBase64 function", () => {
 		const result = await uploadBase64(mockConfig, mockBase64String);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
+			"https://uploads.pinata.cloud/v3/files",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
-					Source: "sdk/base64",
 					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+					Source: "sdk/base64",
 				},
 				body: expect.any(FormData),
 			}),
@@ -94,15 +97,10 @@ describe("uploadBase64 function", () => {
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Test File",
-			keyValues: {
-				key1: "value1",
-				key2: "value2",
-			},
 		};
 
 		const mockOptions: UploadOptions = {
 			metadata: mockMetadata,
-			cidVersion: 1,
 			groupId: "test-group",
 		};
 
@@ -114,7 +112,7 @@ describe("uploadBase64 function", () => {
 		await uploadBase64(mockConfig, mockBase64String, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
+			"https://uploads.pinata.cloud/v3/files",
 			expect.objectContaining({
 				body: expect.any(FormData),
 			}),
@@ -123,13 +121,8 @@ describe("uploadBase64 function", () => {
 		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
 		const formData = fetchCall[1].body as FormData;
 
-		expect(JSON.parse(formData.get("pinataOptions") as string)).toEqual({
-			cidVersion: mockOptions.cidVersion,
-			groupId: mockOptions.groupId,
-		});
-		expect(JSON.parse(formData.get("pinataMetadata") as string)).toEqual(
-			toPinataMetadataAPI(mockMetadata),
-		);
+		expect(formData.get("name")).toBe(mockMetadata.name);
+		expect(formData.get("group_id")).toBe(mockOptions.groupId);
 	});
 
 	it("should use custom JWT if provided in options", async () => {
@@ -146,7 +139,7 @@ describe("uploadBase64 function", () => {
 		await uploadBase64(mockConfig, mockBase64String, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinFileToIPFS",
+			"https://uploads.pinata.cloud/v3/files",
 			expect.objectContaining({
 				headers: {
 					Source: "sdk/base64",

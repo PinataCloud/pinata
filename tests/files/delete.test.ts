@@ -1,4 +1,4 @@
-import { unpinFile } from "../../src/core/pinning/unpin";
+import { deleteFile } from "../../src/core/files/delete";
 import type { PinataConfig, DeleteResponse } from "../../src";
 import {
 	PinataError,
@@ -7,34 +7,34 @@ import {
 	ValidationError,
 } from "../../src/utils/custom-errors";
 
-describe("unpinFile function", () => {
+describe("deleteFile function", () => {
 	const mockConfig: PinataConfig = {
 		pinataJwt: "test-jwt",
 	};
 
-	const mockHashes = ["QmTest123", "QmTest456"];
+	const mockFiles = ["QmTest123", "QmTest456"];
 
 	beforeEach(() => {
 		jest.resetAllMocks();
 	});
 
-	it("should unpin files successfully", async () => {
+	it("should delete files successfully", async () => {
 		global.fetch = jest
 			.fn()
 			.mockResolvedValueOnce({
 				ok: true,
-				text: jest.fn().mockResolvedValueOnce("Unpin successful"),
+				statusText: "OK",
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				text: jest.fn().mockResolvedValueOnce("Unpin successful"),
+				statusText: "OK",
 			});
 
-		const result = await unpinFile(mockConfig, mockHashes);
+		const result = await deleteFile(mockConfig, mockFiles);
 
 		expect(result).toEqual([
-			{ hash: "QmTest123", status: "Unpin successful" },
-			{ hash: "QmTest456", status: "Unpin successful" },
+			{ id: "QmTest123", status: "OK" },
+			{ id: "QmTest456", status: "OK" },
 		]);
 
 		expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -45,7 +45,7 @@ describe("unpinFile function", () => {
 			.fn()
 			.mockResolvedValueOnce({
 				ok: true,
-				text: jest.fn().mockResolvedValueOnce("Unpin successful"),
+				statusText: "OK",
 			})
 			.mockResolvedValueOnce({
 				ok: false,
@@ -53,19 +53,19 @@ describe("unpinFile function", () => {
 				text: jest.fn().mockResolvedValueOnce("Not Found"),
 			});
 
-		const result = await unpinFile(mockConfig, mockHashes);
+		const result = await deleteFile(mockConfig, mockFiles);
 
 		expect(result).toEqual([
-			{ hash: "QmTest123", status: "Unpin successful" },
+			{ id: "QmTest123", status: "OK" },
 			{
-				hash: "QmTest456",
+				id: "QmTest456",
 				status: "HTTP error: Not Found",
 			},
 		]);
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(unpinFile(undefined, mockHashes)).rejects.toThrow(
+		await expect(deleteFile(undefined, mockFiles)).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -77,11 +77,11 @@ describe("unpinFile function", () => {
 			text: jest.fn().mockResolvedValue("Unauthorized"),
 		});
 
-		const result = await unpinFile(mockConfig, mockHashes);
+		const result = await deleteFile(mockConfig, mockFiles);
 
 		expect(result).toEqual([
-			{ hash: "QmTest123", status: "Authentication failed: Unauthorized" },
-			{ hash: "QmTest456", status: "Authentication failed: Unauthorized" },
+			{ id: "QmTest123", status: "Authentication failed: Unauthorized" },
+			{ id: "QmTest456", status: "Authentication failed: Unauthorized" },
 		]);
 	});
 
@@ -92,27 +92,27 @@ describe("unpinFile function", () => {
 			text: jest.fn().mockResolvedValue("Server Error"),
 		});
 
-		const result = await unpinFile(mockConfig, mockHashes);
+		const result = await deleteFile(mockConfig, mockFiles);
 
 		expect(result).toEqual([
-			{ hash: "QmTest123", status: "HTTP error: Server Error" },
-			{ hash: "QmTest456", status: "HTTP error: Server Error" },
+			{ id: "QmTest123", status: "HTTP error: Server Error" },
+			{ id: "QmTest456", status: "HTTP error: Server Error" },
 		]);
 	});
 
 	it("should handle fetch failure", async () => {
 		global.fetch = jest.fn().mockRejectedValue(new Error("Network failure"));
 
-		const result = await unpinFile(mockConfig, mockHashes);
+		const result = await deleteFile(mockConfig, mockFiles);
 
 		expect(result).toEqual([
 			{
-				hash: "QmTest123",
-				status: "Error unpinning file QmTest123: Network failure",
+				id: "QmTest123",
+				status: "Error deleting file QmTest123: Network failure",
 			},
 			{
-				hash: "QmTest456",
-				status: "Error unpinning file QmTest456: Network failure",
+				id: "QmTest456",
+				status: "Error deleting file QmTest456: Network failure",
 			},
 		]);
 	});
@@ -120,16 +120,16 @@ describe("unpinFile function", () => {
 	it("should handle unknown errors", async () => {
 		global.fetch = jest.fn().mockRejectedValue("Unknown error");
 
-		const result = await unpinFile(mockConfig, mockHashes);
+		const result = await deleteFile(mockConfig, mockFiles);
 
 		expect(result).toEqual([
 			{
-				hash: "QmTest123",
-				status: "An unknown error occurred while unpinning file QmTest123",
+				id: "QmTest123",
+				status: "An unknown error occurred while deleting file QmTest123",
 			},
 			{
-				hash: "QmTest456",
-				status: "An unknown error occurred while unpinning file QmTest456",
+				id: "QmTest456",
+				status: "An unknown error occurred while deleting file QmTest456",
 			},
 		]);
 	});
