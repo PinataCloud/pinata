@@ -108,16 +108,14 @@ describe("createGroup function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest
-				.fn()
-				.mockResolvedValueOnce({
-					data: {
-						id: "group-123",
-						name: longNameOptions.name,
-						is_public: false,
-						createdAt: "2023-07-26T12:00:00Z",
-					},
-				}),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					id: "group-123",
+					name: longNameOptions.name,
+					is_public: false,
+					createdAt: "2023-07-26T12:00:00Z",
+				},
+			}),
 		});
 
 		const result = await createGroup(mockConfig, longNameOptions);
@@ -154,16 +152,14 @@ describe("createGroup function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest
-				.fn()
-				.mockResolvedValueOnce({
-					data: {
-						id: "group-123",
-						name: "",
-						is_public: false,
-						createdAt: "2023-07-26T12:00:00Z",
-					},
-				}),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					id: "group-123",
+					name: "",
+					is_public: false,
+					createdAt: "2023-07-26T12:00:00Z",
+				},
+			}),
 		});
 
 		const result = await createGroup(mockConfig, emptyNameOptions);
