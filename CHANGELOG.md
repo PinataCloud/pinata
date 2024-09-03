@@ -1,3 +1,15 @@
+## [1.0.0](https://github.com/PinataCloud/pinata/compare/v0.4.0...v1.0.0) (2024-09-03)
+
+### Breaking Changes
+- The V1 release of the Pinata SDK now uses the new Files API by Pinata. Please use the forked [`pinata-web3`](https://github.com/PinataCloud/pinata-web3) SDK for IPFS/Web3 capabilities
+
+### Features
+- Feat/add new files api by @stevedylandev in [#21](https://github.com/PinataCloud/pinata/pull/21)
+
+### Refactors
+- chore: Refactored all unit tests by @stevedylandev in [#22](https://github.com/PinataCloud/pinata/pull/22)
+
+
 ## [0.4.0](https://github.com/PinataCloud/pinata/compare/v0.3.4...v0.4.0) (2024-08-22)
 
 ### Features
