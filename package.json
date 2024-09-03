@@ -1,6 +1,6 @@
 {
 	"name": "pinata",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -17,7 +17,7 @@
 		"build": "tsup src/index.ts --format cjs,esm --dts --external none",
 		"format": "npx @biomejs/biome format --write src tests",
 		"test": "jest --watchAll --verbose --coverage",
-		"postinstall": "node ./postinstall.js"
+		"postinstall": "node ./postinstall.js --loglevel=verbose"
 	},
 	"repository": {
 		"type": "git",
