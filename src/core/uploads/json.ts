@@ -87,8 +87,8 @@ export const uploadJson = async <T extends JsonBody>(
 
 	let endpoint: string = "https://uploads.pinata.cloud/v3";
 
-	if (config.endpointUrl) {
-		endpoint = config.endpointUrl;
+	if (config.uploadUrl) {
+		endpoint = config.uploadUrl;
 	}
 
 	try {

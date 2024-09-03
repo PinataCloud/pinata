@@ -4,6 +4,7 @@ export type PinataConfig = {
 	pinataGatewayKey?: string;
 	customHeaders?: Record<string, string>;
 	endpointUrl?: string;
+	uploadUrl?: string;
 };
 
 export type AuthTestResponse = {
