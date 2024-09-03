@@ -1,3 +1,13 @@
+## [1.0.3](https://github.com/PinataCloud/pinata/compare/v1.0.1...v1.0.2) (2024-09-03)
+
+### Features
+- feat: Added custom uploadurl endpoint option by @stevedylandev in [#23](https://github.com/PinataCloud/pinata/pull/23)
+
+## [1.0.2](https://github.com/PinataCloud/pinata/compare/v1.0.0...v1.0.1) (2024-09-03)
+
+### Fixes
+- Updated package.json
+
 ## [1.0.0](https://github.com/PinataCloud/pinata/compare/v0.4.0...v1.0.0) (2024-09-03)
 
 ### Breaking Changes
