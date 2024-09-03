@@ -1,11 +1,11 @@
 {
 	"name": "pinata",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"files": ["dist"],
+	"files": ["dist", "postinstall.ts"],
 	"exports": {
 		".": {
 			"require": "./dist/index.js",
