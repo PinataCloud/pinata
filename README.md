@@ -4,6 +4,9 @@
 
 The new all-in-one Pinata SDK
 
+> [!IMPORTANT]
+> The `v1.*.*` release is a breaking change and does not support IPFS. Please use the [`pinata-web3`](https://github.com/PinataCloud/pinata-web3) SDK.
+
 ## Quickstart
 
 [View the full documentation here](https://docs.pinata.cloud/sdk-beta/getting-started)
