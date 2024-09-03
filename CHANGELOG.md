@@ -1,3 +1,18 @@
+## [1.0.5]
+
+- Updated package.json
+
+## [1.0.4](https://github.com/PinataCloud/pinata/compare/v1.0.3...v1.0.4) (2024-09-03)
+
+## What's Changed
+
+### Fixes
+- fix/create signed url endpoint by @stevedylandev in [#24](https://github.com/PinataCloud/pinata/pull/24)
+
+## [1.0.3]
+
+- Updated package.json
+
 ## [1.0.2](https://github.com/PinataCloud/pinata/compare/v1.0.1...v1.0.2) (2024-09-03)
 
 ### Features
