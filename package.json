@@ -5,7 +5,7 @@
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"files": ["dist", "postinstall.ts"],
+	"files": ["dist", "postinstall.js"],
 	"exports": {
 		".": {
 			"require": "./dist/index.js",
@@ -17,7 +17,7 @@
 		"build": "tsup src/index.ts --format cjs,esm --dts --external none",
 		"format": "npx @biomejs/biome format --write src tests",
 		"test": "jest --watchAll --verbose --coverage",
-		"postinstall": "npx ts-node ./postinstall.ts"
+		"postinstall": "node ./postinstall.js"
 	},
 	"repository": {
 		"type": "git",

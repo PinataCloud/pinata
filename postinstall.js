@@ -13,11 +13,11 @@ const boxWidth = 70;
 const horizontalBorder = "+" + "=".repeat(boxWidth - 2) + "+";
 const emptyLine = "|" + " ".repeat(boxWidth - 2) + "|";
 
-function stripAnsi(str: string): string {
+function stripAnsi(str) {
 	return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-function centeredText(text: string, width: number): string {
+function centeredText(text, width) {
 	const visibleLength = stripAnsi(text).length;
 	const padding = Math.max(0, width - visibleLength);
 	const leftPad = Math.floor(padding / 2);
