@@ -29,6 +29,12 @@ export const createSignedURL = async (
 		method: "GET",
 	});
 
+	let endpoint: string = "https://api.pinata.cloud/v3";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
 	// const params = new URLSearchParams();
 	// if (config?.pinataGatewayKey) {
 	// 	params.append("pinataGatewayToken", config.pinataGatewayKey);
@@ -57,7 +63,7 @@ export const createSignedURL = async (
 	// }
 
 	try {
-		const request = await fetch("https://api.pinata.cloud/v3/files/sign", {
+		const request = await fetch(`${endpoint}/files/sign`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
