@@ -86,12 +86,12 @@ async function main() {
 main();
 ```
 
-[View the full documentation here](https://docs.pinata.cloud/sdk-beta/getting-started)
+[View the full documentation here](https://docs.pinata.cloud/web3/sdk/getting-started)
 
 ## Developing
 
 ```bash
-git clone https://github.com/PinataCloud/pinata
+git clone https://github.com/PinataCloud/pinata-web3
 cd pinata
 npm install
 ```
