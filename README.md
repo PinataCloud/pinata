@@ -11,7 +11,7 @@ The new all-in-one Pinata SDK
 ### 1. Install
 
 ```bash
-npm i pinata
+npm i pinata-web3
 ```
 
 Import and initialize the SDK in your codebase with the following variables
@@ -19,7 +19,7 @@ Import and initialize the SDK in your codebase with the following variables
 - [Pinata Dedicated Gateway Domain](https://docs.pinata.cloud/gateways/dedicated-ipfs-gateways)
 
 ```typescript
-import { PinataSDK } from "pinata";
+import { PinataSDK } from "pinata-web3";
 
 const pinata = new PinataSDK({
   pinataJwt: "PINATA_JWT",
@@ -32,7 +32,7 @@ const pinata = new PinataSDK({
 ### 2. Upload a File
 
 ```typescript
-import { PinataSDK } from "pinata";
+import { PinataSDK } from "pinata-web3";
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT!,
@@ -67,7 +67,7 @@ This will return an object like the following:
 Use the CID or `IpfsHash` from the upload to fetch a file
 
 ```typescript
-import { PinataSDK } from "pinata";
+import { PinataSDK } from "pinata-web3";
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT!,
