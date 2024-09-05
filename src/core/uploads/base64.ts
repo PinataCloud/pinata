@@ -124,8 +124,9 @@ export const uploadBase64 = async (
 			);
 		}
 
-		const res: UploadResponse = await request.json();
-		return res;
+		const res = await request.json();
+		const resData: UploadResponse = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
