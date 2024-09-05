@@ -16,9 +16,11 @@ export type UploadResponse = {
 	name: string;
 	cid: string;
 	size: number;
+	created_at: string;
 	number_of_files: number;
 	mime_type: string;
 	user_id: string;
+	group_id: string | null;
 };
 
 export type FileObject = {
@@ -61,7 +63,7 @@ export type FileListItem = {
 	size: number;
 	number_of_files: number;
 	mime_type: string;
-	group_id: string;
+	group_id: string | null;
 	created_at: string;
 };
 
