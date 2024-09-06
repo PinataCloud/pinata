@@ -1,3 +1,12 @@
+## [1.1.0](https://github.com/PinataCloud/pinata/compare/v1.0.5...v1.1.0) (2024-09-06)
+
+### Features
+- feat/add page tokens by @stevedylandev in [#29](https://github.com/PinataCloud/pinata/pull/29)
+
+### Refactors
+- chore: Refactor upload response based on new API response by @stevedylandev in [#27](https://github.com/PinataCloud/pinata/pull/27)
+- chore: Updated types for upload response and group_id by @stevedylandev in [#28](https://github.com/PinataCloud/pinata/pull/28)
+
 ## [1.0.5]
 
 - Updated package.json
