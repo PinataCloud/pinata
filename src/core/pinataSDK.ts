@@ -35,6 +35,7 @@ import type {
 	OptimizeImageOptions,
 	GroupListResponse,
 	SignedUrlOptions,
+	FileListResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -289,17 +290,17 @@ class FilterFiles {
 		return this;
 	}
 
-	then(onfulfilled?: ((value: FileListItem[]) => any) | null): Promise<any> {
+	then(onfulfilled?: ((value: FileListResponse) => any) | null): Promise<any> {
 		return this.fetchPage().then(onfulfilled);
 	}
 
-	private async fetchPage(): Promise<FileListItem[]> {
+	private async fetchPage(): Promise<FileListResponse> {
 		if (this.currentPageToken) {
 			this.query.pageToken = this.currentPageToken;
 		}
 		const response = await listFiles(this.config, this.query);
 		this.currentPageToken = response.next_page_token;
-		return response.files;
+		return response;
 	}
 
 	// // rate limit, hopefully temporary?
@@ -320,7 +321,7 @@ class FilterFiles {
 	async *[Symbol.asyncIterator](): AsyncGenerator<FileListItem, void, unknown> {
 		while (true) {
 			const items = await this.fetchPage();
-			for (const item of items) {
+			for (const item of items.files) {
 				yield item;
 			}
 			if (!this.currentPageToken) {
@@ -640,13 +641,18 @@ class FilterGroups {
 		return this;
 	}
 
+	pageToken(pageToken: string): FilterGroups {
+		this.query.pageToken = pageToken;
+		return this;
+	}
+
 	then(
-		onfulfilled?: ((value: GroupResponseItem[]) => any) | null,
-	): Promise<GroupResponseItem[]> {
+		onfulfilled?: ((value: GroupListResponse) => any) | null,
+	): Promise<GroupListResponse> {
 		return this.fetchPage()
 			.then((response) => {
 				this.nextPageToken = response.next_page_token;
-				return response.groups;
+				return response;
 			})
 			.then(onfulfilled);
 	}
