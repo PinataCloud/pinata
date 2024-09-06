@@ -284,6 +284,11 @@ class FilterFiles {
 		return this;
 	}
 
+	pageToken(pageToken: string): FilterFiles {
+		this.query.pageToken = pageToken;
+		return this;
+	}
+
 	then(onfulfilled?: ((value: FileListItem[]) => any) | null): Promise<any> {
 		return this.fetchPage().then(onfulfilled);
 	}
