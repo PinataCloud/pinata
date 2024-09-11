@@ -375,12 +375,12 @@ class Gateways {
 		this.config = newConfig;
 	}
 
-	get(cid: string): Promise<GetCIDResponse> {
-		return getCid(this.config, cid);
+	get(cid: string): OptimizeImageGetCid {
+		return new OptimizeImageGetCid(this.config, cid);
 	}
 
-	createSignedURL(options: SignedUrlOptions): Promise<string> {
-		return createSignedURL(this.config, options);
+	createSignedURL(options: SignedUrlOptions): OptimizeImageCreateSignedURL {
+		return new OptimizeImageCreateSignedURL(this.config, options);
 	}
 
 	// get(cid: string): OptimizeImage {
@@ -446,25 +446,47 @@ class Gateways {
 	// }
 }
 
-// class OptimizeImage {
-// 	private config: PinataConfig | undefined;
-// 	private cid: string;
-// 	private options: OptimizeImageOptions = {};
+class OptimizeImageGetCid {
+	private config: PinataConfig | undefined;
+	private cid: string;
+	private options: OptimizeImageOptions = {};
 
-// 	constructor(config: PinataConfig | undefined, cid: string) {
-// 		this.config = config;
-// 		this.cid = cid;
-// 	}
+	constructor(config: PinataConfig | undefined, cid: string) {
+		this.config = config;
+		this.cid = cid;
+	}
 
-// 	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
-// 		this.options = { ...this.options, ...options };
-// 		return this;
-// 	}
+	optimizeImage(options: OptimizeImageOptions): OptimizeImageGetCid {
+		this.options = { ...this.options, ...options };
+		return this;
+	}
 
-// 	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
-// 		return getCid(this.config, this.cid, this.options).then(onfulfilled);
-// 	}
-// }
+	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
+		return getCid(this.config, this.cid, this.options).then(onfulfilled);
+	}
+}
+
+class OptimizeImageCreateSignedURL {
+	private config: PinataConfig | undefined;
+	private urlOpts: SignedUrlOptions;
+	private imgOpts: OptimizeImageOptions = {};
+
+	constructor(config: PinataConfig | undefined, urlOpts: SignedUrlOptions) {
+		this.config = config;
+		this.urlOpts = urlOpts;
+	}
+
+	optimizeImage(options: OptimizeImageOptions): OptimizeImageCreateSignedURL {
+		this.imgOpts = { ...this.imgOpts, ...options };
+		return this;
+	}
+
+	then(onfulfilled?: ((value: string) => any) | null): Promise<any> {
+		return createSignedURL(this.config, this.urlOpts, this.imgOpts).then(
+			onfulfilled,
+		);
+	}
+}
 
 // class Usage {
 // 	config: PinataConfig | undefined;
