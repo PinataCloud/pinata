@@ -326,7 +326,7 @@ export type GroupResponseItem = {
 };
 
 export type GroupQueryOptions = {
-	nameContains?: string;
+	name?: string;
 	limit?: number;
 	pageToken?: string;
 	isPublic?: boolean;
