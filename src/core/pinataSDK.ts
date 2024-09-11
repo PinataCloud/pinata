@@ -673,10 +673,10 @@ class FilterGroups {
 		this.config = config;
 	}
 
-	// name(nameContains: string): FilterGroups {
-	// 	this.query.nameContains = nameContains;
-	// 	return this;
-	// }
+	name(name: string): FilterGroups {
+		this.query.name = name;
+		return this;
+	}
 
 	limit(limit: number): FilterGroups {
 		this.query.limit = limit;
