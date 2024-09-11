@@ -77,6 +77,8 @@ export const getCid = async (
 
 	const date = Math.floor(new Date().getTime() / 1000);
 
+	console.log(newUrl);
+
 	const payload = JSON.stringify({
 		url: newUrl,
 		date: date,
@@ -84,19 +86,24 @@ export const getCid = async (
 		method: "GET",
 	});
 
-	const signedUrlRequest = await fetch(
-		"https://api.pinata.cloud/v3/files/sign",
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${config?.pinataJwt}`,
-			},
-			body: payload,
+	let endpoint: string = "https://api.pinata.cloud/v3";
+
+	if (config.endpointUrl) {
+		endpoint = config.endpointUrl;
+	}
+
+	const signedUrlRequest = await fetch(`${endpoint}/files/sign`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${config?.pinataJwt}`,
 		},
-	);
+		body: payload,
+	});
 
 	const signedUrl = await signedUrlRequest.json();
+
+	console.log(signedUrl);
 
 	// if (config?.pinataGatewayKey) {
 	// 	params.append("pinataGatewayToken", config.pinataGatewayKey);

@@ -13,12 +13,37 @@ import {
 export const createSignedURL = async (
 	config: PinataConfig | undefined,
 	options: SignedUrlOptions,
+	imgOpts: OptimizeImageOptions,
 ): Promise<string> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
 	let newUrl: string = `${config?.pinataGateway}/files/${options.cid}`;
+
+	const params = new URLSearchParams();
+
+	if (imgOpts) {
+		if (imgOpts.width) params.append("img-width", imgOpts.width.toString());
+		if (imgOpts.height) params.append("img-height", imgOpts.height.toString());
+		if (imgOpts.dpr) params.append("img-dpr", imgOpts.dpr.toString());
+		if (imgOpts.fit) params.append("img-fit", imgOpts.fit);
+		if (imgOpts.gravity) params.append("img-gravity", imgOpts.gravity);
+		if (imgOpts.quality)
+			params.append("img-quality", imgOpts.quality.toString());
+		if (imgOpts.format) params.append("img-format", imgOpts.format);
+		if (imgOpts.animation !== undefined)
+			params.append("img-anim", imgOpts.animation.toString());
+		if (imgOpts.sharpen)
+			params.append("img-sharpen", imgOpts.sharpen.toString());
+		if (imgOpts.onError === true) params.append("img-onerror", "redirect");
+		if (imgOpts.metadata) params.append("img-metadata", imgOpts.metadata);
+	}
+
+	const queryString = params.toString();
+	if (queryString) {
+		newUrl += `?${queryString}`;
+	}
 
 	const date = options?.date || Math.floor(new Date().getTime() / 1000);
 
@@ -34,33 +59,6 @@ export const createSignedURL = async (
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
-
-	// const params = new URLSearchParams();
-	// if (config?.pinataGatewayKey) {
-	// 	params.append("pinataGatewayToken", config.pinataGatewayKey);
-	// }
-
-	// if (options) {
-	// 	if (options.width) params.append("img-width", options.width.toString());
-	// 	if (options.height) params.append("img-height", options.height.toString());
-	// 	if (options.dpr) params.append("img-dpr", options.dpr.toString());
-	// 	if (options.fit) params.append("img-fit", options.fit);
-	// 	if (options.gravity) params.append("img-gravity", options.gravity);
-	// 	if (options.quality)
-	// 		params.append("img-quality", options.quality.toString());
-	// 	if (options.format) params.append("img-format", options.format);
-	// 	if (options.animation !== undefined)
-	// 		params.append("img-anim", options.animation.toString());
-	// 	if (options.sharpen)
-	// 		params.append("img-sharpen", options.sharpen.toString());
-	// 	if (options.onError === true) params.append("img-onerror", "redirect");
-	// 	if (options.metadata) params.append("img-metadata", options.metadata);
-	// }
-
-	// const queryString = params.toString();
-	// if (queryString) {
-	// 	newUrl += `?${queryString}`;
-	// }
 
 	try {
 		const request = await fetch(`${endpoint}/files/sign`, {
