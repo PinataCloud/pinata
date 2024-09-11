@@ -275,6 +275,31 @@ class FilterFiles {
 		this.config = config;
 	}
 
+	name(name: string): FilterFiles {
+		this.query.name = name;
+		return this;
+	}
+
+	group(group: string): FilterFiles {
+		this.query.group = group;
+		return this;
+	}
+
+	cid(cid: string): FilterFiles {
+		this.query.cid = cid;
+		return this;
+	}
+
+	mimeType(mimeType: string): FilterFiles {
+		this.query.mimeType = mimeType;
+		return this;
+	}
+
+	order(order: "ASC" | "DESC"): FilterFiles {
+		this.query.order = order;
+		return this;
+	}
+
 	limit(limit: number): FilterFiles {
 		this.query.limit = limit;
 		return this;
