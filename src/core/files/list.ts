@@ -82,9 +82,15 @@ export const listFiles = async (
 	const params = new URLSearchParams();
 
 	if (options) {
-		const { limit, pageToken, cidPending } = options;
+		const { name, group, cid, order, limit, mimeType, pageToken, cidPending } =
+			options;
 
 		if (limit) params.append("limit", limit.toString());
+		if (name) params.append("name", name);
+		if (group) params.append("group", group);
+		if (cid) params.append("cid", cid);
+		if (mimeType) params.append("mimeType", mimeType);
+		if (order) params.append("order", order);
 		if (pageToken) params.append("pageToken", pageToken);
 		if (cidPending) params.append("cidPending", "true");
 	}

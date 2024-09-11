@@ -73,9 +73,14 @@ export type FileListResponse = {
 };
 
 export type FileListQuery = {
+	name?: string;
+	group?: string;
+	mimeType?: string;
+	cid?: string;
+	cidPending?: boolean;
+	order?: "ASC" | "DESC";
 	limit?: number;
 	pageToken?: string;
-	cidPending?: boolean;
 };
 
 export type PinJobQuery = {
