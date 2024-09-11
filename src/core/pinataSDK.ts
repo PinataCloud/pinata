@@ -375,8 +375,8 @@ class Gateways {
 		this.config = newConfig;
 	}
 
-	get(cid: string): Promise<GetCIDResponse> {
-		return getCid(this.config, cid);
+	get(cid: string): OptimizeImage {
+		return new OptimizeImage(this.config, cid);
 	}
 
 	createSignedURL(options: SignedUrlOptions): Promise<string> {
@@ -446,25 +446,25 @@ class Gateways {
 	// }
 }
 
-// class OptimizeImage {
-// 	private config: PinataConfig | undefined;
-// 	private cid: string;
-// 	private options: OptimizeImageOptions = {};
+class OptimizeImage {
+	private config: PinataConfig | undefined;
+	private cid: string;
+	private options: OptimizeImageOptions = {};
 
-// 	constructor(config: PinataConfig | undefined, cid: string) {
-// 		this.config = config;
-// 		this.cid = cid;
-// 	}
+	constructor(config: PinataConfig | undefined, cid: string) {
+		this.config = config;
+		this.cid = cid;
+	}
 
-// 	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
-// 		this.options = { ...this.options, ...options };
-// 		return this;
-// 	}
+	optimizeImage(options: OptimizeImageOptions): OptimizeImage {
+		this.options = { ...this.options, ...options };
+		return this;
+	}
 
-// 	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
-// 		return getCid(this.config, this.cid, this.options).then(onfulfilled);
-// 	}
-// }
+	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
+		return getCid(this.config, this.cid, this.options).then(onfulfilled);
+	}
+}
 
 // class Usage {
 // 	config: PinataConfig | undefined;

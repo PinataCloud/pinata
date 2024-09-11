@@ -162,6 +162,7 @@ export type SignedUrlOptions = {
 	cid: string;
 	date?: number;
 	expires: number;
+	imageOpt?: OptimizeImageOptions;
 };
 
 export type GatewayAnalyticsQuery = {
