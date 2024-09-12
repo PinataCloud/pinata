@@ -1,3 +1,13 @@
+## [1.2.0](https://github.com/PinataCloud/pinata/compare/v1.1.0...v1.2.0) (2024-09-12)
+
+### Features
+- feat: Added new query methods to listing files by @stevedylandev in [#31](https://github.com/PinataCloud/pinata/pull/31)
+- feat/integrate image optimizations by @stevedylandev in [#32](https://github.com/PinataCloud/pinata/pull/32)
+- feat: Add name query to list groups by @stevedylandev in [#33](https://github.com/PinataCloud/pinata/pull/33)
+
+### Refactors
+- chore/refactor unit tests by @stevedylandev in [#34](https://github.com/PinataCloud/pinata/pull/34)
+
 ## [1.1.0](https://github.com/PinataCloud/pinata/compare/v1.0.5...v1.1.0) (2024-09-06)
 
 ### Features
