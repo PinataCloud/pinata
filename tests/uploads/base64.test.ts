@@ -37,15 +37,17 @@ describe("uploadBase64 function", () => {
 		name: "testName",
 		cid: "QmTest123",
 		size: 1234,
+		created_at: "2023-01-01T00:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/png",
 		user_id: "testUserId",
+		group_id: null,
 	};
 
 	it("should upload base64 successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await uploadBase64(mockConfig, mockBase64String);

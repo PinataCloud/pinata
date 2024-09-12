@@ -69,6 +69,11 @@ describe("listFiles function", () => {
 			limit: 10,
 			pageToken: "test-token",
 			cidPending: true,
+			name: "test-name",
+			group: "test-group",
+			mimeType: "text/plain",
+			cid: "Qm...",
+			order: "ASC",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
@@ -81,7 +86,9 @@ describe("listFiles function", () => {
 		await listFiles(mockConfig, mockQuery);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			expect.stringContaining("limit=10&pageToken=test-token&cidPending=true"),
+			expect.stringContaining(
+				"limit=10&name=test-name&group=test-group&cid=Qm...&mimeType=text%2Fplain&order=ASC&pageToken=test-token&cidPending=true",
+			),
 			expect.any(Object),
 		);
 	});
@@ -142,7 +149,7 @@ describe("listFiles function", () => {
 		await listFiles(customConfig);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://custom.api.pinata.cloud/files?", // Remove "/v3" and add "?" at the end
+			"https://custom.api.pinata.cloud/files?",
 			expect.any(Object),
 		);
 	});

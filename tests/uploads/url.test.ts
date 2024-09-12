@@ -24,9 +24,11 @@ describe("uploadUrl function", () => {
 		name: "test-name",
 		cid: "QmTest123",
 		size: 12345,
+		created_at: "2023-04-01T12:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/jpeg",
 		user_id: "test-user-id",
+		group_id: null,
 	};
 
 	beforeEach(() => {
@@ -42,7 +44,7 @@ describe("uploadUrl function", () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce(mockResponse),
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
 		const result = await uploadUrl(mockConfig, mockUrl);
@@ -81,7 +83,7 @@ describe("uploadUrl function", () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce(mockResponse),
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
 		await uploadUrl(mockConfig, mockUrl, mockOptions);
@@ -107,7 +109,7 @@ describe("uploadUrl function", () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce(mockResponse),
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
 		await uploadUrl(mockConfig, mockUrl, mockOptions);
@@ -134,7 +136,7 @@ describe("uploadUrl function", () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce(mockResponse),
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
 		await uploadUrl(mockConfig, mockUrl);

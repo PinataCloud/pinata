@@ -13,8 +13,20 @@ import {
 } from "../../src/utils/custom-errors";
 
 describe("uploadFile function", () => {
+	let originalFetch: typeof fetch;
+
+	beforeEach(() => {
+		originalFetch = global.fetch;
+	});
+
+	afterEach(() => {
+		global.fetch = originalFetch;
+		jest.clearAllMocks();
+	});
+
 	const mockConfig: PinataConfig = {
 		pinataJwt: "test-jwt",
+		pinataGateway: "https://test.mypinata.cloud",
 	};
 
 	const mockFile = new File(["test content"], "test.txt", {
@@ -26,19 +38,17 @@ describe("uploadFile function", () => {
 		name: "test.txt",
 		cid: "QmTest123",
 		size: 123,
+		created_at: "2023-01-01T00:00:00Z",
 		number_of_files: 1,
 		mime_type: "text/plain",
 		user_id: "testUserId",
+		group_id: null,
 	};
-
-	beforeEach(() => {
-		jest.resetAllMocks();
-	});
 
 	it("should upload file successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await uploadFile(mockConfig, mockFile);

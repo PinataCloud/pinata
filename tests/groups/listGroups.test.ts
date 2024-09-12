@@ -72,7 +72,7 @@ describe("listGroups function", () => {
 	it("should list groups with query options", async () => {
 		const options: GroupQueryOptions = {
 			limit: 5,
-			nameContains: "Test",
+			name: "Test",
 			pageToken: "token",
 			isPublic: true,
 		};
@@ -85,7 +85,7 @@ describe("listGroups function", () => {
 		await listGroups(mockConfig, options);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups?pageToken=token&isPublic=true&nameContains=Test&limit=5",
+			"https://api.pinata.cloud/v3/files/groups?pageToken=token&isPublic=true&name=Test&limit=5",
 			expect.any(Object),
 		);
 	});

@@ -77,8 +77,6 @@ export const getCid = async (
 
 	const date = Math.floor(new Date().getTime() / 1000);
 
-	console.log(newUrl);
-
 	const payload = JSON.stringify({
 		url: newUrl,
 		date: date,
@@ -102,8 +100,6 @@ export const getCid = async (
 	});
 
 	const signedUrl = await signedUrlRequest.json();
-
-	console.log(signedUrl);
 
 	// if (config?.pinataGatewayKey) {
 	// 	params.append("pinataGatewayToken", config.pinataGatewayKey);
