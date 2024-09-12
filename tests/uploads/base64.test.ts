@@ -47,7 +47,7 @@ describe("uploadBase64 function", () => {
 	it("should upload base64 successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
 		const result = await uploadBase64(mockConfig, mockBase64String);
