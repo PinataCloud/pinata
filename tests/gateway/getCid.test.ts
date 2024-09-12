@@ -1,5 +1,9 @@
 import { getCid } from "../../src/core/gateway/getCid";
-import type { PinataConfig, GetCIDResponse } from "../../src";
+import type {
+	PinataConfig,
+	GetCIDResponse,
+	OptimizeImageOptions,
+} from "../../src";
 import {
 	PinataError,
 	NetworkError,
@@ -154,5 +158,41 @@ describe("getCid function", () => {
 		await getCid(mockConfig, "QmTest...");
 
 		expect(global.fetch).toHaveBeenNthCalledWith(2, mockSignedUrl);
+	});
+
+	it("should apply image optimization options", async () => {
+		const mockBlob = new Blob(["optimized image data"], { type: "image/webp" });
+		global.fetch = jest
+			.fn()
+			.mockResolvedValueOnce({
+				json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				headers: new Headers({ "content-type": "image/webp" }),
+				blob: jest.fn().mockResolvedValueOnce(mockBlob),
+			});
+
+		const result = await getCid(mockConfig, "QmTest...", {
+			width: 100,
+			height: 100,
+			quality: 80,
+			format: "webp",
+		});
+
+		expect(result).toEqual({
+			data: mockBlob,
+			contentType: "image/webp",
+		});
+
+		expect(global.fetch).toHaveBeenNthCalledWith(
+			1,
+			"https://api.pinata.cloud/v3/files/sign",
+			expect.objectContaining({
+				body: expect.stringContaining(
+					"img-width=100&img-height=100&img-quality=80&img-format=webp",
+				),
+			}),
+		);
 	});
 });

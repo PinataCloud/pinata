@@ -1,5 +1,9 @@
 import { createSignedURL } from "../../src/core/gateway/createSignedURL";
-import type { PinataConfig, SignedUrlOptions } from "../../src";
+import type {
+	PinataConfig,
+	SignedUrlOptions,
+	OptimizeImageOptions,
+} from "../../src";
 import {
 	PinataError,
 	NetworkError,
@@ -29,6 +33,11 @@ describe("createSignedURL function", () => {
 		expires: 3600,
 	};
 
+	const mockImageOpts: OptimizeImageOptions = {
+		width: 100,
+		height: 100,
+	};
+
 	it("should create a signed URL successfully", async () => {
 		const mockSignedUrl = "https://test.mypinata.cloud/signed_url";
 		global.fetch = jest.fn().mockResolvedValueOnce({
@@ -36,7 +45,11 @@ describe("createSignedURL function", () => {
 			json: () => Promise.resolve({ data: mockSignedUrl }),
 		});
 
-		const result = await createSignedURL(mockConfig, mockOptions);
+		const result = await createSignedURL(
+			mockConfig,
+			mockOptions,
+			mockImageOpts,
+		);
 
 		expect(result).toBe(mockSignedUrl);
 		expect(global.fetch).toHaveBeenCalledWith(
@@ -53,9 +66,9 @@ describe("createSignedURL function", () => {
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(createSignedURL(undefined, mockOptions)).rejects.toThrow(
-			ValidationError,
-		);
+		await expect(
+			createSignedURL(undefined, mockOptions, mockImageOpts),
+		).rejects.toThrow(ValidationError);
 	});
 
 	it("should throw AuthenticationError on 401 response", async () => {
@@ -65,9 +78,9 @@ describe("createSignedURL function", () => {
 			json: () => Promise.resolve({ error: "Server Error" }),
 		});
 
-		await expect(createSignedURL(mockConfig, mockOptions)).rejects.toThrow(
-			PinataError,
-		);
+		await expect(
+			createSignedURL(mockConfig, mockOptions, mockImageOpts),
+		).rejects.toThrow(PinataError);
 	});
 
 	it("should throw NetworkError on non-401 error response", async () => {
@@ -77,9 +90,9 @@ describe("createSignedURL function", () => {
 			text: () => Promise.resolve("Server Error"),
 		});
 
-		await expect(createSignedURL(mockConfig, mockOptions)).rejects.toThrow(
-			NetworkError,
-		);
+		await expect(
+			createSignedURL(mockConfig, mockOptions, mockImageOpts),
+		).rejects.toThrow(NetworkError);
 	});
 
 	it("should throw PinataError on unexpected errors", async () => {
@@ -87,9 +100,9 @@ describe("createSignedURL function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Unexpected error"));
 
-		await expect(createSignedURL(mockConfig, mockOptions)).rejects.toThrow(
-			PinataError,
-		);
+		await expect(
+			createSignedURL(mockConfig, mockOptions, mockImageOpts),
+		).rejects.toThrow(PinataError);
 	});
 
 	it("should use the correct payload in the request", async () => {
@@ -98,13 +111,13 @@ describe("createSignedURL function", () => {
 			json: () => Promise.resolve({ data: "signed_url" }),
 		});
 
-		await createSignedURL(mockConfig, mockOptions);
+		await createSignedURL(mockConfig, mockOptions, mockImageOpts);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://api.pinata.cloud/v3/files/sign",
 			expect.objectContaining({
 				body: expect.stringContaining(
-					'"url":"https://test.mypinata.cloud/files/QmTest..."',
+					'"url":"https://test.mypinata.cloud/files/QmTest...?img-width=100&img-height=100"',
 				),
 			}),
 		);
