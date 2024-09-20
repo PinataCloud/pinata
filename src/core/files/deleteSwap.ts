@@ -1,21 +1,19 @@
 /**
- * Retrieves the swap history for a specific CID (Content Identifier) in Pinata.
+ * Deletes a CID swap
  *
- * This function allows you to fetch the history of CID swaps for a given CID and domain.
- * It's useful for tracking changes and updates to content over time.
+ * This function allows you to remove a CID swap configuration from your Pinata account.
+ * It's useful for reverting a CID swap or cleaning up outdated swap configurations.
  *
  * @async
- * @function swapHistory
+ * @function deleteSwap
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {SwapHistoryOptions} options - The options for retrieving swap history.
- * @param {string} options.cid - The CID for which to retrieve swap history.
- * @param {string} options.domain - The gateway domain that has the hot swaps plugin installed.
- * @returns {Promise<SwapCidResponse[]>} A promise that resolves to an array of objects, each containing details of a CID swap operation.
+ * @param {string} cid - The CID of the swap configuration to be deleted.
+ * @returns {Promise<string>} A promise that resolves to a string indicating the result of the deletion operation.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
  * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {PinataError} If the CID does not have any swap history.
+ * @throws {PinataError} If the deletion is unauthorized or if the CID is not found in the account.
  * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the retrieval process.
+ * @throws {PinataError} For any other errors that occur during the deletion process.
  *
  * @example
  * import { PinataSDK } from "pinata";
@@ -25,17 +23,10 @@
  *   pinataGateway: "example-gateway.mypinata.cloud",
  * });
  *
- * const swapHistory = await pinata.gateways.swapHistory({
- *   cid: "QmSomeCid123",
- *   domain: "example.mypinata.cloud"
- * });
+ * const deleteResult = await pinata.gateways.deleteSwap("QmSomeCid123");
  */
 
-import type {
-	SwapCidResponse,
-	PinataConfig,
-	SwapHistoryOptions,
-} from "../types";
+import type { SwapCidResponse, PinataConfig } from "../types";
 
 import {
 	PinataError,
@@ -44,10 +35,10 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
-export const swapHistory = async (
+export const deleteSwap = async (
 	config: PinataConfig | undefined,
-	options: SwapHistoryOptions,
-): Promise<SwapCidResponse[]> => {
+	cid: string,
+): Promise<string> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
@@ -60,24 +51,21 @@ export const swapHistory = async (
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,
 			"Content-Type": "application/json",
-			Source: "sdk/swapHistory",
+			Source: "sdk/deleteSwap",
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(
-			`${endpoint}/v3/ipfs/swap/${options.cid}?domain=${options.domain}`,
-			{
-				method: "GET",
-				headers: headers,
-			},
-		);
+		const request = await fetch(`${endpoint}/files/swap/${cid}`, {
+			method: "DELETE",
+			headers: headers,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.text();
@@ -88,9 +76,16 @@ export const swapHistory = async (
 					errorData,
 				);
 			}
+			if (request.status === 403) {
+				throw new PinataError(
+					"Unauthorized CID Swap Deletion",
+					request.status,
+					errorData,
+				);
+			}
 			if (request.status === 404) {
 				throw new PinataError(
-					"CID does not have history",
+					"CID not pinned to account",
 					request.status,
 					errorData,
 				);
@@ -102,18 +97,14 @@ export const swapHistory = async (
 			);
 		}
 
-		const res = await request.json();
-		const resData: SwapCidResponse[] = res.data;
-		return resData;
+		return request.statusText;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error fetching swap history: ${error.message}`);
+			throw new PinataError(`Error processing deleteSwap: ${error.message}`);
 		}
-		throw new PinataError(
-			"An unknown error occurred while fetching swap history",
-		);
+		throw new PinataError("An unknown error occurred while deleting swap");
 	}
 };

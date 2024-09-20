@@ -65,9 +65,9 @@ import { deleteGroup } from "./groups/deleteGroup";
 // import { removeSignature } from "./signatures/removeSignature";
 import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
 import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
-import { swapCid } from "./gateway/swapCid";
-import { swapHistory } from "./gateway/swapHistory";
-import { deleteSwap } from "./gateway/deleteSwap";
+import { swapCid } from "./files/swapCid";
+import { swapHistory } from "./files/swapHistory";
+import { deleteSwap } from "./files/deleteSwap";
 import { containsCID } from "../utils/gateway-tools";
 import { createSignedURL } from "./gateway/createSignedURL";
 
@@ -145,6 +145,18 @@ class Files {
 
 	update(options: UpdateFileOptions): Promise<FileListItem> {
 		return updateFile(this.config, options);
+	}
+
+	addSwap(options: SwapCidOptions): Promise<SwapCidResponse> {
+		return swapCid(this.config, options);
+	}
+
+	getSwapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
+		return swapHistory(this.config, options);
+	}
+
+	deleteSwap(cid: string): Promise<string> {
+		return deleteSwap(this.config, cid);
 	}
 }
 
@@ -383,18 +395,6 @@ class Gateways {
 		return new OptimizeImageCreateSignedURL(this.config, options);
 	}
 
-	// get(cid: string): OptimizeImage {
-	// 	return new OptimizeImage(this.config, cid);
-	// }
-
-	// convert(url: string, gatewayPrefix?: string): Promise<string> {
-	// 	return convertIPFSUrl(this.config, url, gatewayPrefix);
-	// }
-
-	// containsCID(cid: string): Promise<ContainsCIDResponse> {
-	// 	return containsCID(cid);
-	// }
-
 	// topUsageAnalytics(options: {
 	// 	domain: string;
 	// 	start: string;
@@ -431,18 +431,6 @@ class Gateways {
 	// 		options.end,
 	// 		options.interval,
 	// 	);
-	// }
-
-	// swapCid(options: SwapCidOptions): Promise<SwapCidResponse> {
-	// 	return swapCid(this.config, options);
-	// }
-
-	// swapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
-	// 	return swapHistory(this.config, options);
-	// }
-
-	// deleteSwap(cid: string): Promise<string> {
-	// 	return deleteSwap(this.config, cid);
 	// }
 }
 
