@@ -49,7 +49,7 @@ export const swapCid = async (
 	}
 
 	const data = JSON.stringify({
-		swapCid: options.swapCid,
+		swap_cid: options.swapCid,
 	});
 
 	let headers: Record<string, string>;
@@ -64,14 +64,14 @@ export const swapCid = async (
 		};
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/v3/ipfs/swap/${options.cid}`, {
+		const request = await fetch(`${endpoint}/files/swap/${options.cid}`, {
 			method: "PUT",
 			headers: headers,
 			body: data,

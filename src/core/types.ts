@@ -358,8 +358,8 @@ export type SwapHistoryOptions = {
 };
 
 export type SwapCidResponse = {
-	mappedCid: string;
-	createdAt: string;
+	mapped_cid: string;
+	created_at: string;
 };
 
 export type ContainsCIDResponse = {
