@@ -1,3 +1,8 @@
+## [1.3.0](https://github.com/PinataCloud/pinata/compare/v1.2.0...v1.3.0) (2024-09-20)
+
+### Features
+- feat: Added hot swap methods to Files class by @stevedylandev in [#35](https://github.com/PinataCloud/pinata/pull/35)
+
 ## [1.2.0](https://github.com/PinataCloud/pinata/compare/v1.1.0...v1.2.0) (2024-09-12)
 
 ### Features
