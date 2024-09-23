@@ -169,4 +169,26 @@ describe("createSignedURL function", () => {
 			}),
 		);
 	});
+
+	it("should use custom gateway if provided in options", async () => {
+		const customGatewayOptions = {
+			...mockOptions,
+			gateway: "https://custom.gateway.com",
+		};
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: () => Promise.resolve({ data: "signed_url" }),
+		});
+
+		await createSignedURL(mockConfig, customGatewayOptions, mockImageOpts);
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({
+				body: expect.stringContaining(
+					'"url":"https://custom.gateway.com/files/QmTest...?img-width=100&img-height=100&img-dpr=2&img-fit=contain&img-gravity=auto&img-quality=80&img-format=webp&img-anim=true&img-sharpen=3&img-onerror=redirect&img-metadata=keep"',
+				),
+			}),
+		);
+	});
 });
