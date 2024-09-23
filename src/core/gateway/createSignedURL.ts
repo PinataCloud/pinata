@@ -19,7 +19,17 @@ export const createSignedURL = async (
 		throw new ValidationError("Pinata configuration is missing");
 	}
 
-	let newUrl: string = `${config?.pinataGateway}/files/${options.cid}`;
+	let baseUrl: string | undefined;
+
+	if (options?.gateway) {
+		baseUrl = options.gateway.startsWith("https://")
+			? options.gateway
+			: `https://${options.gateway}`;
+	} else {
+		baseUrl = config.pinataGateway;
+	}
+
+	let newUrl: string = `${baseUrl}/files/${options.cid}`;
 
 	const params = new URLSearchParams();
 
@@ -41,6 +51,7 @@ export const createSignedURL = async (
 	}
 
 	const queryString = params.toString();
+
 	if (queryString) {
 		newUrl += `?${queryString}`;
 	}
