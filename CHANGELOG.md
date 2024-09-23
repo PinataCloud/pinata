@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/PinataCloud/pinata/compare/v1.3.0...v1.4.0) (2024-09-23)
+
+### Features
+
+- feat: Added optional param of gateway to createSignedURL by @stevedylandev in [#36](https://github.com/PinataCloud/pinata/pull/36)
+
 ## [1.3.0](https://github.com/PinataCloud/pinata/compare/v1.2.0...v1.3.0) (2024-09-20)
 
 ### Features
