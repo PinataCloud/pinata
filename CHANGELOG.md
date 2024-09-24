@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/PinataCloud/pinata/compare/v1.4.0...v1.4.1) (2024-9-24)
+
+### Fixes
+
+- fix/add custom headers to gateway methods by @stevedylandev in [#37](https://github.com/PinataCloud/pinata/pull/37)
+
 ## [1.4.0](https://github.com/PinataCloud/pinata/compare/v1.3.0...v1.4.0) (2024-09-23)
 
 ### Features
