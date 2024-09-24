@@ -59,7 +59,7 @@ export const deleteFile = async (
 	} else {
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,
-			Source: "sdk/unpin",
+			Source: "sdk/deleteFile",
 		};
 	}
 
