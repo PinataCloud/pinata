@@ -71,13 +71,22 @@ export const createSignedURL = async (
 		endpoint = config.endpointUrl;
 	}
 
+	let headers: Record<string, string>;
+
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = { ...config.customHeaders };
+	} else {
+		headers = {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${config.pinataJwt}`,
+			Source: "sdk/createSignURL",
+		};
+	}
+
 	try {
 		const request = await fetch(`${endpoint}/files/sign`, {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${config?.pinataJwt}`,
-			},
+			headers: headers,
 			body: payload,
 		});
 
