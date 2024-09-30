@@ -1,3 +1,7 @@
+## [0.5.0](https://github.com/PinataCloud/pinata-web3/compare/v0.4.1...v0.5.0) (2024-09-30)
+
+- Feat/add upload stream by @stevedylandev in [#2](https://github.com/PinataCloud/pinata-web3/pull/2)
+
 ## [0.4.0](https://github.com/PinataCloud/pinata/compare/v0.3.4...v0.4.0) (2024-08-22)
 
 ### Features
