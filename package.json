@@ -1,6 +1,6 @@
 {
 	"name": "pinata-web3",
-	"version": "0.4.1",
+	"version": "0.5.0",
 	"description": "The new Pinata IPFS SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -33,13 +33,15 @@
 		"@biomejs/biome": "1.8.3",
 		"@types/jest": "^29.5.12",
 		"@types/node": "^20.11.17",
+		"jest": "^29.7.0",
+		"ts-jest": "^29.2.2",
 		"ts-node": "^10.9.2",
 		"tsup": "^8.0.1",
-		"typescript": "^5.3.3",
-		"jest": "^29.7.0",
-		"ts-jest": "^29.2.2"
+		"typescript": "^5.3.3"
 	},
 	"dependencies": {
+		"axios": "^1.7.7",
+		"form-data": "^4.0.0",
 		"is-ipfs": "^8.0.4",
 		"node-fetch": "^3.3.1"
 	}

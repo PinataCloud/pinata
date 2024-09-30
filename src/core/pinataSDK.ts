@@ -45,6 +45,7 @@ import { uploadBase64 } from "./pinning/base64";
 import { uploadUrl } from "./pinning/url";
 import { uploadJson } from "./pinning/json";
 import { uploadCid } from "./pinning/cid";
+import { uploadStream } from "./pinning/stream";
 import { unpinFile } from "./pinning/unpin";
 import { listFiles } from "./data/listFiles";
 import { updateMetadata } from "./data/updateMetadata";
@@ -260,6 +261,13 @@ class Upload {
 
 	json(data: object, options?: UploadOptions): UploadBuilder<PinResponse> {
 		return new UploadBuilder(this.config, uploadJson, data, options);
+	}
+
+	stream(
+		stream: NodeJS.ReadableStream,
+		options?: UploadOptions,
+	): UploadBuilder<PinResponse> {
+		return new UploadBuilder(this.config, uploadStream, stream, options);
 	}
 
 	cid(
