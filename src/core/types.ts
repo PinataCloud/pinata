@@ -41,6 +41,7 @@ export type PinataMetadata = {
 export type UpdateFileOptions = {
 	id: string;
 	name?: string;
+	keyvalues?: Record<string, string>;
 };
 
 export type UploadOptions = {
@@ -63,6 +64,7 @@ export type FileListItem = {
 	size: number;
 	number_of_files: number;
 	mime_type: string;
+	keyvalues: Record<string, string>;
 	group_id: string | null;
 	created_at: string;
 };
@@ -78,6 +80,7 @@ export type FileListQuery = {
 	mimeType?: string;
 	cid?: string;
 	cidPending?: boolean;
+	metadata?: Record<string, string>;
 	order?: "ASC" | "DESC";
 	limit?: number;
 	pageToken?: string;

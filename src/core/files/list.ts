@@ -82,8 +82,17 @@ export const listFiles = async (
 	const params = new URLSearchParams();
 
 	if (options) {
-		const { name, group, cid, order, limit, mimeType, pageToken, cidPending } =
-			options;
+		const {
+			name,
+			group,
+			cid,
+			order,
+			limit,
+			mimeType,
+			pageToken,
+			cidPending,
+			metadata,
+		} = options;
 
 		if (limit) params.append("limit", limit.toString());
 		if (name) params.append("name", name);
@@ -93,6 +102,11 @@ export const listFiles = async (
 		if (order) params.append("order", order);
 		if (pageToken) params.append("pageToken", pageToken);
 		if (cidPending) params.append("cidPending", "true");
+		if (metadata && typeof metadata === "object") {
+			Object.entries(metadata).forEach(([key, value]) => {
+				params.append(`metadata[${key}]`, value.toString());
+			});
+		}
 	}
 
 	let endpoint: string = "https://api.pinata.cloud/v3";

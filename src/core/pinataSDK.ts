@@ -322,6 +322,11 @@ class FilterFiles {
 		return this;
 	}
 
+	metadata(keyvalues: Record<string, string>): FilterFiles {
+		this.query.metadata = keyvalues;
+		return this;
+	}
+
 	pageToken(pageToken: string): FilterFiles {
 		this.query.pageToken = pageToken;
 		return this;
