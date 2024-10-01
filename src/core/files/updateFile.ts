@@ -49,9 +49,26 @@ export const updateFile = async (
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
-	const data = JSON.stringify({
-		name: options.name,
-	});
+
+	if (
+		!options.name &&
+		(!options.keyvalues || Object.keys(options.keyvalues).length === 0)
+	) {
+		throw new ValidationError(
+			"At least one of 'name' or 'keyvalues' must be provided",
+		);
+	}
+
+	const data: Record<string, any> = {};
+
+	if (options.name !== undefined) {
+		data.name = options.name;
+	}
+	if (options.keyvalues && Object.keys(options.keyvalues).length > 0) {
+		data.keyvalues = options.keyvalues;
+	}
+
+	const body = JSON.stringify(data);
 
 	let headers: Record<string, string>;
 
@@ -75,7 +92,7 @@ export const updateFile = async (
 		const request = await fetch(`${endpoint}/files/${options.id}`, {
 			method: "PUT",
 			headers: headers,
-			body: data,
+			body: body,
 		});
 
 		if (!request.ok) {
