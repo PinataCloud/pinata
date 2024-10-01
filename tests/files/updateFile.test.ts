@@ -38,6 +38,7 @@ describe("updateFile function", () => {
 			mime_type: "text/plain",
 			group_id: "groupId",
 			created_at: "2023-01-01T00:00:00Z",
+			keyvalues: {},
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
@@ -119,6 +120,7 @@ describe("updateFile function", () => {
 			mime_type: "text/plain",
 			group_id: "groupId",
 			created_at: "2023-01-01T00:00:00Z",
+			keyvalues: {},
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
@@ -153,6 +155,7 @@ describe("updateFile function", () => {
 			mime_type: "text/plain",
 			group_id: "groupId",
 			created_at: "2023-01-01T00:00:00Z",
+			keyvalues: {},
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({

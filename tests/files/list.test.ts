@@ -35,6 +35,7 @@ describe("listFiles function", () => {
 		size: 1234,
 		number_of_files: 1,
 		mime_type: "text/plain",
+		keyvalues: {},
 		group_id: "test-group",
 		created_at: "2023-07-26T12:00:00Z",
 	};
@@ -74,6 +75,7 @@ describe("listFiles function", () => {
 			mimeType: "text/plain",
 			cid: "Qm...",
 			order: "ASC",
+			metadata: { key1: "value1", key2: "value2" },
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
@@ -87,7 +89,7 @@ describe("listFiles function", () => {
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			expect.stringContaining(
-				"limit=10&name=test-name&group=test-group&cid=Qm...&mimeType=text%2Fplain&order=ASC&pageToken=test-token&cidPending=true",
+				"limit=10&name=test-name&group=test-group&cid=Qm...&mimeType=text%2Fplain&order=ASC&pageToken=test-token&cidPending=true&metadata%5Bkey1%5D=value1&metadata%5Bkey2%5D=value2",
 			),
 			expect.any(Object),
 		);
