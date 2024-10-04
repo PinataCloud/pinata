@@ -1,3 +1,12 @@
+## [1.5.0](https://github.com/PinataCloud/pinata/compare/v1.4.1...v1.5.0) (2024-10-04)
+
+### Features
+- feat/add metadata kvs by @stevedylandev in [#38](https://github.com/PinataCloud/pinata/pull/38)
+- Feat/add set new jwt by @stevedylandev in [#40](https://github.com/PinataCloud/pinata/pull/40)
+
+### Refactors
+- chore: Updated next version by @stevedylandev in [#39](https://github.com/PinataCloud/pinata/pull/39)
+
 ## [1.4.1](https://github.com/PinataCloud/pinata/compare/v1.4.0...v1.4.1) (2024-9-24)
 
 ### Fixes
