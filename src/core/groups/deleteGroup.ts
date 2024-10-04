@@ -49,6 +49,11 @@ export const deleteGroup = async (
 	let headers: Record<string, string>;
 
 	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			"Content-Type": "application/json",
+			...config.customHeaders,
+		};
 		headers = { ...config.customHeaders };
 	} else {
 		headers = {

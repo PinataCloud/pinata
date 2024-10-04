@@ -53,7 +53,11 @@ export const createGroup = async (
 	let headers: Record<string, string>;
 
 	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
-		headers = { ...config.customHeaders };
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			"Content-Type": "application/json",
+			...config.customHeaders,
+		};
 	} else {
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,

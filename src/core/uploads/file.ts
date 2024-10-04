@@ -78,7 +78,10 @@ export const uploadFile = async (
 	let headers: Record<string, string>;
 
 	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
-		headers = { ...config.customHeaders };
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			...config.customHeaders,
+		};
 	} else {
 		headers = {
 			Authorization: `Bearer ${jwt}`,
