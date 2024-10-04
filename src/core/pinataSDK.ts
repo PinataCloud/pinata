@@ -119,6 +119,22 @@ export class PinataSDK {
 		//		this.signatures.updateConfig(this.config);
 	}
 
+	setNewJwt(jwt: string): void {
+		if (!this.config) {
+			this.config = { pinataJwt: "" };
+		}
+		this.config.pinataJwt = jwt;
+
+		// Update headers for all sub-modules
+		this.files.updateConfig(this.config);
+		this.upload.updateConfig(this.config);
+		this.gateways.updateConfig(this.config);
+		//		this.usage.updateConfig(this.config);
+		this.keys.updateConfig(this.config);
+		this.groups.updateConfig(this.config);
+		//		this.signatures.updateConfig(this.config);
+	}
+
 	testAuthentication(): Promise<AuthTestResponse> {
 		return testAuthentication(this.config);
 	}
