@@ -73,6 +73,9 @@ export const uploadJson = async <T extends JsonBody>(
 	if (options?.groupId) {
 		data.append("group_id", options.groupId);
 	}
+	if (options?.metadata?.keyValues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyValues));
+	}
 
 	let headers: Record<string, string>;
 

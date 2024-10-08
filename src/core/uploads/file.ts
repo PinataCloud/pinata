@@ -58,22 +58,9 @@ export const uploadFile = async (
 	if (options?.groupId) {
 		data.append("group_id", options.groupId);
 	}
-
-	// data.append(
-	// 	"pinataOptions",
-	// 	JSON.stringify({
-	// 		cidVersion: options?.cidVersion,
-	// 		groupId: options?.groupId,
-	// 	}),
-	// );
-
-	// data.append(
-	// 	"pinataMetadata",
-	// 	JSON.stringify({
-	// 		name: options?.metadata?.name || file.name || "File from SDK",
-	// 		keyvalues: options?.metadata?.keyValues,
-	// 	}),
-	// );
+	if (options?.metadata?.keyValues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyValues));
+	}
 
 	let headers: Record<string, string>;
 
