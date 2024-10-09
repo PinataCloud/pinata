@@ -101,7 +101,6 @@ describe("uploadBase64 function", () => {
 			name: "Test File",
 			keyValues: {
 				key1: "value1",
-				key2: 2,
 			},
 		};
 
@@ -129,9 +128,7 @@ describe("uploadBase64 function", () => {
 
 		expect(formData.get("name")).toBe(mockMetadata.name);
 		expect(formData.get("group_id")).toBe(mockOptions.groupId);
-		expect(formData.get("keyvalues")).toBe(
-			JSON.stringify({ key1: "value1", key2: 2 }),
-		);
+		expect(formData.get("keyvalues")).toBe(JSON.stringify({ key1: "value1" }));
 	});
 
 	it("should use custom JWT if provided in options", async () => {
