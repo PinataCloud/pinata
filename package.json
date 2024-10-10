@@ -1,6 +1,6 @@
 {
 	"name": "pinata-web3",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "The new Pinata IPFS SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
