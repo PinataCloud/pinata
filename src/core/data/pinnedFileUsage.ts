@@ -48,7 +48,10 @@ export const pinnedFileCount = async (
 	let headers: Record<string, string>;
 
 	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
-		headers = { ...config.customHeaders };
+		headers = {
+			Authorization: `Bearer ${config.pinataJwt}`,
+			...config.customHeaders,
+		};
 	} else {
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,
