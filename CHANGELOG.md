@@ -1,3 +1,9 @@
+## [0.5.1](https://github.com/PinataCloud/pinata-web3/compare/v0.5.0...v0.5.1) (2024-10-10)
+
+### Refactors
+
+- chore: Updated and refactored custom headers feature by @stevedylandev in [#3] (ttps://github.com/PinataCloud/pinata-web3/pull/3)
+
 ## [0.5.0](https://github.com/PinataCloud/pinata-web3/compare/v0.4.1...v0.5.0) (2024-09-30)
 
 - Feat/add upload stream by @stevedylandev in [#2](https://github.com/PinataCloud/pinata-web3/pull/2)
