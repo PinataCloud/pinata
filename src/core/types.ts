@@ -35,7 +35,7 @@ export type JsonBody = Record<string, unknown>;
 
 export type PinataMetadata = {
 	name?: string;
-	//keyValues?: Record<string, string | number>;
+	keyvalues?: Record<string, string>;
 };
 
 export type UpdateFileOptions = {

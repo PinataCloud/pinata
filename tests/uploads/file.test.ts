@@ -70,6 +70,9 @@ describe("uploadFile function", () => {
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom File Name",
+			keyValues: {
+				key1: "value1",
+			},
 		};
 		const mockOptions: UploadOptions = {
 			metadata: mockMetadata,
@@ -100,6 +103,7 @@ describe("uploadFile function", () => {
 
 		expect(formData.get("name")).toBe("Custom File Name");
 		expect(formData.get("group_id")).toBe("test-group");
+		expect(formData.get("keyvalues")).toBe(JSON.stringify({ key1: "value1" }));
 	});
 
 	it("should use custom JWT if provided in options", async () => {
