@@ -92,6 +92,7 @@ export const listFiles = async (
 			pageToken,
 			cidPending,
 			metadata,
+			noGroup,
 		} = options;
 
 		if (limit) params.append("limit", limit.toString());
@@ -102,6 +103,7 @@ export const listFiles = async (
 		if (order) params.append("order", order);
 		if (pageToken) params.append("pageToken", pageToken);
 		if (cidPending) params.append("cidPending", "true");
+		if (noGroup) params.append("group", "null");
 		if (metadata && typeof metadata === "object") {
 			Object.entries(metadata).forEach(([key, value]) => {
 				params.append(`metadata[${key}]`, value.toString());
