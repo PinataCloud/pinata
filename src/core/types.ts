@@ -77,6 +77,7 @@ export type FileListResponse = {
 export type FileListQuery = {
 	name?: string;
 	group?: string;
+	noGroup?: boolean;
 	mimeType?: string;
 	cid?: string;
 	cidPending?: boolean;

@@ -343,6 +343,11 @@ class FilterFiles {
 		return this;
 	}
 
+	noGroup(noGroup: boolean): FilterFiles {
+		this.query.noGroup = noGroup;
+		return this;
+	}
+
 	pageToken(pageToken: string): FilterFiles {
 		this.query.pageToken = pageToken;
 		return this;
