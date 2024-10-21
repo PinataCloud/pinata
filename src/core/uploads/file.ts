@@ -59,21 +59,21 @@ export const uploadFile = async (
 		endpoint = config.uploadUrl;
 	}
 
-	let headers: Record<string, string>;
-
-	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
-		headers = {
-			Authorization: `Bearer ${jwt}`,
-			...config.customHeaders,
-		};
-	} else {
-		headers = {
-			Authorization: `Bearer ${jwt}`,
-			Source: "sdk/file",
-		};
-	}
-
 	if (file.size > 94371840) {
+		let headers: Record<string, string>;
+
+		if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+			headers = {
+				Authorization: `Bearer ${jwt}`,
+				...config.customHeaders,
+			};
+		} else {
+			headers = {
+				Authorization: `Bearer ${jwt}`,
+				Source: "sdk/file",
+			};
+		}
+
 		const name = options?.metadata?.name || file.name || "File from SDK";
 		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)}`;
 		if (options?.groupId) {
@@ -88,7 +88,7 @@ export const uploadFile = async (
 			headers: {
 				"Upload-Length": `${file.size}`,
 				"Upload-Metadata": metadata,
-				Authorization: `Bearer ${process.env.PINATA_JWT}`,
+				...headers,
 			},
 		});
 		const url = urlReq.headers.get("Location");
@@ -98,7 +98,7 @@ export const uploadFile = async (
 			headers: {
 				"Content-Type": "application/offset+octet-stream",
 				"Upload-Offset": "0",
-				Authorization: `Bearer ${jwt}`,
+				...headers,
 			},
 		});
 
@@ -136,6 +136,20 @@ export const uploadFile = async (
 			const data: UploadResponse = fileInfo.data;
 			return data;
 		}
+	}
+
+	let headers: Record<string, string>;
+
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			...config.customHeaders,
+		};
+	} else {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			Source: "sdk/file",
+		};
 	}
 
 	const data = new FormData();
