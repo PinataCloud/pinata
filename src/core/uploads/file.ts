@@ -83,6 +83,7 @@ export const uploadFile = async (
 			metadata +
 				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
 		}
+		console.log("metadata: ", metadata);
 		const urlReq = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: {
@@ -92,6 +93,9 @@ export const uploadFile = async (
 			},
 		});
 		const url = urlReq.headers.get("Location");
+		console.log("Url req: ", urlReq.status);
+		console.log(url);
+		console.log(urlReq.headers);
 
 		const uploadReq = await fetch(url as string, {
 			method: "PATCH",
@@ -100,6 +104,7 @@ export const uploadFile = async (
 				"Upload-Offset": "0",
 				...headers,
 			},
+			body: file,
 		});
 
 		if (!uploadReq.ok) {
@@ -120,6 +125,7 @@ export const uploadFile = async (
 
 		if (uploadReq.status === 204) {
 			const fileId = getFileIdFromMetadata(urlReq.headers);
+			console.log("Upload through TUS successful. File ID: ", fileId);
 			let dataEndpoint: string;
 			if (config.endpointUrl) {
 				dataEndpoint = config.endpointUrl;
@@ -132,6 +138,7 @@ export const uploadFile = async (
 					Authorization: `Bearer ${process.env.PINATA_JWT}`,
 				},
 			});
+			console.log(fileInfoReq.status);
 			const fileInfo = await fileInfoReq.json();
 			const data: UploadResponse = fileInfo.data;
 			return data;
