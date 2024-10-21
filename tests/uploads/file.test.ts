@@ -70,7 +70,7 @@ describe("uploadFile function", () => {
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom File Name",
-			keyValues: {
+			keyvalues: {
 				key1: "value1",
 			},
 		};

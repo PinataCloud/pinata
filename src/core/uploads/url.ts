@@ -79,8 +79,8 @@ export const uploadUrl = async (
 		data.append("group_id", options.groupId);
 	}
 
-	if (options?.metadata?.keyValues) {
-		data.append("keyvalues", JSON.stringify(options.metadata.keyValues));
+	if (options?.metadata?.keyvalues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
 	}
 
 	let headers: Record<string, string>;
