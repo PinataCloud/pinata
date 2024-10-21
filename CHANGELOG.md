@@ -1,3 +1,11 @@
+## [1.6.0](https://github.com/PinataCloud/pinata/compare/v1.5.0...v1.6.0) (2024-10-21)
+
+### Features
+- feat/add keyvalues to uploads by @stevedylandev in [#43](https://github.com/PinataCloud/pinata/pull/43)
+
+### Refactors
+- chore: Added option for no group in listing files by @stevedylandev in [#44](https://github.com/PinataCloud/pinata/pull/44)
+
 ## [1.5.0](https://github.com/PinataCloud/pinata/compare/v1.4.1...v1.5.0) (2024-10-04)
 
 ### Features
