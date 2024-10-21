@@ -99,7 +99,7 @@ describe("uploadBase64 function", () => {
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Test File",
-			keyValues: {
+			keyvalues: {
 				key1: "value1",
 			},
 		};

@@ -69,7 +69,7 @@ describe("uploadUrl function", () => {
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom URL Name",
-			keyValues: {
+			keyvalues: {
 				key1: "value1",
 			},
 		};

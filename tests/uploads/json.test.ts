@@ -67,7 +67,7 @@ describe("uploadJson function", () => {
 	it("should handle upload options", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom JSON Name",
-			keyValues: {
+			keyvalues: {
 				key1: "value1",
 			},
 		};
