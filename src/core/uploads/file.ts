@@ -40,6 +40,7 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../utils/custom-errors";
+import { getFileIdFromMetadata } from "../../utils/resumable";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -52,14 +53,10 @@ export const uploadFile = async (
 
 	const jwt: string | undefined = options?.keys || config.pinataJwt;
 
-	const data = new FormData();
-	data.append("file", file, file.name);
-	data.append("name", options?.metadata?.name || file.name || "File from SDK");
-	if (options?.groupId) {
-		data.append("group_id", options.groupId);
-	}
-	if (options?.metadata?.keyValues) {
-		data.append("keyvalues", JSON.stringify(options.metadata.keyValues));
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
+
+	if (config.uploadUrl) {
+		endpoint = config.uploadUrl;
 	}
 
 	let headers: Record<string, string>;
@@ -76,10 +73,79 @@ export const uploadFile = async (
 		};
 	}
 
-	let endpoint: string = "https://uploads.pinata.cloud/v3";
+	if (file.size > 94371840) {
+		const name = options?.metadata?.name || file.name || "File from SDK";
+		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)}`;
+		if (options?.groupId) {
+			metadata + `,group_id ${btoa(options.groupId)}`;
+		}
+		if (options?.metadata?.keyvalues) {
+			metadata +
+				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
+		}
+		const urlReq = await fetch(`${endpoint}/files`, {
+			method: "POST",
+			headers: {
+				"Upload-Length": `${file.size}`,
+				"Upload-Metadata": metadata,
+				Authorization: `Bearer ${process.env.PINATA_JWT}`,
+			},
+		});
+		const url = urlReq.headers.get("Location");
 
-	if (config.uploadUrl) {
-		endpoint = config.uploadUrl;
+		const uploadReq = await fetch(url as string, {
+			method: "PATCH",
+			headers: {
+				"Content-Type": "application/offset+octet-stream",
+				"Upload-Offset": "0",
+				Authorization: `Bearer ${jwt}`,
+			},
+		});
+
+		if (!uploadReq.ok) {
+			const errorData = await uploadReq.text();
+			if (uploadReq.status === 401 || uploadReq.status === 403) {
+				throw new AuthenticationError(
+					`Authentication failed: ${errorData}`,
+					uploadReq.status,
+					errorData,
+				);
+			}
+			throw new NetworkError(
+				`HTTP error: ${errorData}`,
+				uploadReq.status,
+				errorData,
+			);
+		}
+
+		if (uploadReq.status === 204) {
+			const fileId = getFileIdFromMetadata(urlReq.headers);
+			let dataEndpoint: string;
+			if (config.endpointUrl) {
+				dataEndpoint = config.endpointUrl;
+			} else {
+				dataEndpoint = "https://api.pinata.cloud/v3";
+			}
+			const fileInfoReq = await fetch(`${dataEndpoint}/files/${fileId}`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${process.env.PINATA_JWT}`,
+				},
+			});
+			const fileInfo = await fileInfoReq.json();
+			const data: UploadResponse = fileInfo.data;
+			return data;
+		}
+	}
+
+	const data = new FormData();
+	data.append("file", file, file.name);
+	data.append("name", options?.metadata?.name || file.name || "File from SDK");
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
+	if (options?.metadata?.keyvalues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
 	}
 
 	try {
