@@ -1,12 +1,9 @@
-export function getFileIdFromMetadata(headers: Headers): string {
-	const uploadMetadata = headers.get("upload-metadata");
-	if (!uploadMetadata) return "";
+import { NetworkError } from "./custom-errors";
 
-	const metadataParts = uploadMetadata.split(",");
-	const fileIdPart = metadataParts.find((part) => part.startsWith("file_id "));
-
-	if (!fileIdPart) return "";
-
-	const encodedFileId = fileIdPart.split(" ")[1];
-	return atob(encodedFileId);
+export function getFileIdFromUrl(url: string): string {
+	const match = url.match(/\/files\/([^\/]+)/);
+	if (match && match[1]) {
+		return match[1];
+	}
+	throw new NetworkError("File ID not found in URL", 400, url);
 }

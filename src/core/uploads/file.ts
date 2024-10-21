@@ -40,7 +40,7 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../utils/custom-errors";
-import { getFileIdFromMetadata } from "../../utils/resumable";
+import { getFileIdFromUrl } from "../../utils/resumable";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -93,38 +93,41 @@ export const uploadFile = async (
 			},
 		});
 		const url = urlReq.headers.get("Location");
-		console.log("Url req: ", urlReq.status);
-		console.log(url);
-		console.log(urlReq.headers);
+		if (!url) {
+			throw new NetworkError("Upload URL not provided", urlReq.status, "");
+		}
 
-		const uploadReq = await fetch(url as string, {
-			method: "PATCH",
-			headers: {
-				"Content-Type": "application/offset+octet-stream",
-				"Upload-Offset": "0",
-				...headers,
-			},
-			body: file,
-		});
+		const chunkSize = 50 * 1024 * 1024; // 50MB in bytes
+		const totalChunks = Math.ceil(file.size / chunkSize);
+		let offset = 0;
+		let uploadReq: any;
 
-		if (!uploadReq.ok) {
-			const errorData = await uploadReq.text();
-			if (uploadReq.status === 401 || uploadReq.status === 403) {
-				throw new AuthenticationError(
-					`Authentication failed: ${errorData}`,
+		for (let i = 0; i < totalChunks; i++) {
+			const chunk = file.slice(offset, offset + chunkSize);
+			uploadReq = await fetch(url as string, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/offset+octet-stream",
+					"Upload-Offset": offset.toString(),
+					...headers,
+				},
+				body: chunk,
+			});
+
+			if (!uploadReq.ok) {
+				const errorData = await uploadReq.text();
+				throw new NetworkError(
+					`HTTP error during chunk upload: ${errorData}`,
 					uploadReq.status,
 					errorData,
 				);
 			}
-			throw new NetworkError(
-				`HTTP error: ${errorData}`,
-				uploadReq.status,
-				errorData,
-			);
+
+			offset += chunk.size;
 		}
 
 		if (uploadReq.status === 204) {
-			const fileId = getFileIdFromMetadata(urlReq.headers);
+			const fileId = getFileIdFromUrl(url);
 			console.log("Upload through TUS successful. File ID: ", fileId);
 			let dataEndpoint: string;
 			if (config.endpointUrl) {
