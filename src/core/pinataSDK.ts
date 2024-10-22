@@ -657,11 +657,11 @@ class Groups {
 		return getGroup(this.config, options);
 	}
 
-	add(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
+	addFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
 		return addToGroup(this.config, options);
 	}
 
-	remove(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
+	removeFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
 		return removeFromGroup(this.config, options);
 	}
 
