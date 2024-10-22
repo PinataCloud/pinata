@@ -1,3 +1,9 @@
+## [1.7.0](https://github.com/PinataCloud/pinata/compare/v1.6.0...v1.7.0) (2024-10-22)
+
+### Features
+
+- feat/add remove files in groups by @stevedylandev in [#46](https://github.com/PinataCloud/pinata/pull/46)
+
 ## [1.6.0](https://github.com/PinataCloud/pinata/compare/v1.5.0...v1.6.0) (2024-10-21)
 
 ### Features
