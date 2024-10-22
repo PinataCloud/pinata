@@ -36,6 +36,7 @@ import type {
 	GroupListResponse,
 	SignedUrlOptions,
 	FileListResponse,
+	UpdateGroupFilesResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -656,13 +657,13 @@ class Groups {
 		return getGroup(this.config, options);
 	}
 
-	// addFiles(options: GroupCIDOptions): Promise<string> {
-	// 	return addToGroup(this.config, options);
-	// }
+	add(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
+		return addToGroup(this.config, options);
+	}
 
-	// removeFiles(options: GroupCIDOptions): Promise<string> {
-	// 	return removeFromGroup(this.config, options);
-	// }
+	remove(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
+		return removeFromGroup(this.config, options);
+	}
 
 	update(options: UpdateGroupOptions): Promise<GroupResponseItem> {
 		return updateGroup(this.config, options);
