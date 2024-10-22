@@ -30,7 +30,11 @@
  *});
  */
 
-import type { GroupCIDOptions, PinataConfig } from "../types";
+import type {
+	GroupCIDOptions,
+	PinataConfig,
+	UpdateGroupFilesResponse,
+} from "../types";
 
 import {
 	PinataError,
@@ -42,10 +46,18 @@ import {
 export const removeFromGroup = async (
 	config: PinataConfig | undefined,
 	options: GroupCIDOptions,
-): Promise<string> => {
+): Promise<UpdateGroupFilesResponse[]> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
+
+	const wait = (milliseconds: number): Promise<void> => {
+		return new Promise((resolve) => {
+			setTimeout(resolve, milliseconds);
+		});
+	};
+
+	const responses: UpdateGroupFilesResponse[] = [];
 
 	let headers: Record<string, string>;
 
@@ -59,56 +71,64 @@ export const removeFromGroup = async (
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,
 			"Content-Type": "application/json",
-			Source: "sdk/removeFromGroup",
+			Source: "sdk/addToGroup",
 		};
 	}
 
-	const data = JSON.stringify({
-		cids: options.cids,
-	});
-
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
-	try {
-		const request = await fetch(`${endpoint}/groups/${options.groupId}/cids`, {
-			method: "DELETE",
-			headers: headers,
-			body: data,
-		});
+	for (const id of options.files) {
+		try {
+			const response = await fetch(
+				`${endpoint}/files/groups/${options.groupId}/ids/${id}`,
+				{
+					method: "DELETE",
+					headers: headers,
+				},
+			);
 
-		if (!request.ok) {
-			const errorData = await request.text();
-			if (request.status === 401 || request.status === 403) {
-				throw new AuthenticationError(
-					`Authentication failed: ${errorData}`,
-					request.status,
+			await wait(300);
+
+			if (!response.ok) {
+				const errorData = await response.text();
+				if (response.status === 401) {
+					throw new AuthenticationError(
+						`Authentication failed: ${errorData}`,
+						response.status,
+						errorData,
+					);
+				}
+				throw new NetworkError(
+					`HTTP error: ${errorData}`,
+					response.status,
 					errorData,
 				);
 			}
-			throw new NetworkError(
-				`HTTP error: ${errorData}`,
-				request.status,
-				errorData,
-			);
-		}
 
-		const res: string = await request.text();
-		return res;
-	} catch (error) {
-		if (error instanceof PinataError) {
-			throw error;
+			responses.push({
+				id: id,
+				status: response.statusText,
+			});
+		} catch (error) {
+			let errorMessage: string;
+
+			if (error instanceof PinataError) {
+				errorMessage = error.message;
+			} else if (error instanceof Error) {
+				errorMessage = `Error adding file ${id} to group: ${error.message}`;
+			} else {
+				errorMessage = `An unknown error occurred while adding file ${id} to group`;
+			}
+
+			responses.push({
+				id: id,
+				status: errorMessage,
+			});
 		}
-		if (error instanceof Error) {
-			throw new PinataError(
-				`Error processing removeFromGroup: ${error.message}`,
-			);
-		}
-		throw new PinataError(
-			"An unknown error occurred while removing CIDs from a group",
-		);
 	}
+	return responses;
 };
