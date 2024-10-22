@@ -339,7 +339,12 @@ export type GroupQueryOptions = {
 
 export type GroupCIDOptions = {
 	groupId: string;
-	cids: string[];
+	files: string[];
+};
+
+export type UpdateGroupFilesResponse = {
+	id: string;
+	status: string;
 };
 
 export type SignatureOptions = {
