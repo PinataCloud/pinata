@@ -83,7 +83,6 @@ export const uploadFile = async (
 			metadata +
 				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
 		}
-		console.log("metadata: ", metadata);
 		const urlReq = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: {
@@ -128,7 +127,6 @@ export const uploadFile = async (
 
 		if (uploadReq.status === 204) {
 			const fileId = getFileIdFromUrl(url);
-			console.log("Upload through TUS successful. File ID: ", fileId);
 			let dataEndpoint: string;
 			if (config.endpointUrl) {
 				dataEndpoint = config.endpointUrl;
@@ -141,7 +139,6 @@ export const uploadFile = async (
 					Authorization: `Bearer ${process.env.PINATA_JWT}`,
 				},
 			});
-			console.log(fileInfoReq.status);
 			const fileInfo = await fileInfoReq.json();
 			const data: UploadResponse = fileInfo.data;
 			return data;
