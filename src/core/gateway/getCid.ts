@@ -137,7 +137,8 @@ export const getCid = async (
 			);
 		}
 
-		const contentType: string | null = request.headers.get("content-type");
+		const contentType: string | null =
+			request.headers.get("content-type")?.split(";")[0] || null;
 
 		if (contentType?.includes("application/json")) {
 			data = await request.json();
