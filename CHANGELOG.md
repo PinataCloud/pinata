@@ -1,3 +1,7 @@
+## [0.5.2](https://github.com/PinataCloud/pinata-web3/compare/v0.5.1...v0.5.2) (2024-10-24)
+
+- fix: Fixed header interpretation for content types by @stevedylandev in  [#4](https://github.com/PinataCloud/pinata-web3/pull/4)
+
 ## [0.5.1](https://github.com/PinataCloud/pinata-web3/compare/v0.5.0...v0.5.1) (2024-10-10)
 
 ### Refactors
