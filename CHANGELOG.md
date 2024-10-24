@@ -1,3 +1,7 @@
+## [1.7.1](https://github.com/PinataCloud/pinata/compare/v1.7.0...v1.7.1) (2024-10-24)
+
+- fix: Sliced charset from content type header by @stevedylandev in [#49](https://github.com/PinataCloud/pinata/pull/49)
+
 ## [1.7.0](https://github.com/PinataCloud/pinata/compare/v1.6.0...v1.7.0) (2024-10-22)
 
 ### Features
