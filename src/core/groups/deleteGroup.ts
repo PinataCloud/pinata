@@ -54,7 +54,6 @@ export const deleteGroup = async (
 			"Content-Type": "application/json",
 			...config.customHeaders,
 		};
-		headers = { ...config.customHeaders };
 	} else {
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,
