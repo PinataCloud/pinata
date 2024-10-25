@@ -1,3 +1,9 @@
+## [1.7.2](https://github.com/PinataCloud/pinata/compare/v1.7.1...v1.7.2) (2024-10-25)
+
+### Fixes
+
+- fix: Removed line of code that was wiping headers after settingthem by @stevedylandev in [#50](https://github.com/PinataCloud/pinata/pull/50)
+
 ## [1.7.1](https://github.com/PinataCloud/pinata/compare/v1.7.0...v1.7.1) (2024-10-24)
 
 - fix: Sliced charset from content type header by @stevedylandev in [#49](https://github.com/PinataCloud/pinata/pull/49)
