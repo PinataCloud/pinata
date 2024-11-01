@@ -40,6 +40,7 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../utils/custom-errors";
+import { getFileIdFromUrl } from "../../utils/resumable";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -52,14 +53,96 @@ export const uploadFile = async (
 
 	const jwt: string | undefined = options?.keys || config.pinataJwt;
 
-	const data = new FormData();
-	data.append("file", file, file.name);
-	data.append("name", options?.metadata?.name || file.name || "File from SDK");
-	if (options?.groupId) {
-		data.append("group_id", options.groupId);
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
+
+	if (config.uploadUrl) {
+		endpoint = config.uploadUrl;
 	}
-	if (options?.metadata?.keyvalues) {
-		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+
+	if (file.size > 94371840) {
+		let headers: Record<string, string>;
+
+		if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+			headers = {
+				Authorization: `Bearer ${jwt}`,
+				...config.customHeaders,
+			};
+		} else {
+			headers = {
+				Authorization: `Bearer ${jwt}`,
+				Source: "sdk/file",
+			};
+		}
+
+		const name = options?.metadata?.name || file.name || "File from SDK";
+		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)}`;
+		if (options?.groupId) {
+			metadata + `,group_id ${btoa(options.groupId)}`;
+		}
+		if (options?.metadata?.keyvalues) {
+			metadata +
+				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
+		}
+		const urlReq = await fetch(`${endpoint}/files`, {
+			method: "POST",
+			headers: {
+				"Upload-Length": `${file.size}`,
+				"Upload-Metadata": metadata,
+				...headers,
+			},
+		});
+		const url = urlReq.headers.get("Location");
+		if (!url) {
+			throw new NetworkError("Upload URL not provided", urlReq.status, "");
+		}
+
+		const chunkSize = 50 * 1024 * 1024; // 50MB in bytes
+		const totalChunks = Math.ceil(file.size / chunkSize);
+		let offset = 0;
+		let uploadReq: any;
+
+		for (let i = 0; i < totalChunks; i++) {
+			const chunk = file.slice(offset, offset + chunkSize);
+			uploadReq = await fetch(url as string, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/offset+octet-stream",
+					"Upload-Offset": offset.toString(),
+					...headers,
+				},
+				body: chunk,
+			});
+
+			if (!uploadReq.ok) {
+				const errorData = await uploadReq.text();
+				throw new NetworkError(
+					`HTTP error during chunk upload: ${errorData}`,
+					uploadReq.status,
+					errorData,
+				);
+			}
+
+			offset += chunk.size;
+		}
+
+		if (uploadReq.status === 204) {
+			const fileId = getFileIdFromUrl(url);
+			let dataEndpoint: string;
+			if (config.endpointUrl) {
+				dataEndpoint = config.endpointUrl;
+			} else {
+				dataEndpoint = "https://api.pinata.cloud/v3";
+			}
+			const fileInfoReq = await fetch(`${dataEndpoint}/files/${fileId}`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${process.env.PINATA_JWT}`,
+				},
+			});
+			const fileInfo = await fileInfoReq.json();
+			const data: UploadResponse = fileInfo.data;
+			return data;
+		}
 	}
 
 	let headers: Record<string, string>;
@@ -76,10 +159,14 @@ export const uploadFile = async (
 		};
 	}
 
-	let endpoint: string = "https://uploads.pinata.cloud/v3";
-
-	if (config.uploadUrl) {
-		endpoint = config.uploadUrl;
+	const data = new FormData();
+	data.append("file", file, file.name);
+	data.append("name", options?.metadata?.name || file.name || "File from SDK");
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
+	if (options?.metadata?.keyvalues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
 	}
 
 	try {
