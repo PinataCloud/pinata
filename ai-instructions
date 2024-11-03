@@ -1,0 +1,568 @@
+Pinata IPFS API Documentation Guide
+
+Overview
+This guide covers Pinata's IPFS API endpoints for managing content on IPFS. All API requests require bearer token authentication obtained from https://app.pinata.cloud/developers/api-keys.
+
+Base URL
+https://api.pinata.cloud
+
+Authentication
+Include bearer token in all requests:
+Authorization: Bearer YOUR_PINATA_JWT
+
+File Operations
+
+Pin File to IPFS
+POST /pinning/pinFileToIPFS
+
+Upload and pin a file to IPFS.
+
+Request Body (multipart/form-data):
+- file (File, required): File to upload
+- pinataMetadata (object, optional):
+  {
+    "name": "filename.txt",
+    "keyvalues": {
+      "customKey": "customValue"
+    }
+  }
+- pinataOptions (object, optional):
+  {
+    "cidVersion": 0,
+    "groupId": "your-group-id"
+  }
+
+Response:
+{
+    "IpfsHash": "QmHash...",
+    "PinSize": 1234,
+    "Timestamp": "2024-01-01T00:00:00.000Z",
+    "isDuplicate": false
+}
+
+Pin JSON to IPFS
+POST /pinning/pinJSONToIPFS
+
+Pin JSON content to IPFS.
+
+Request Body:
+{
+    "pinataContent": {
+        // Your JSON content
+    },
+    "pinataMetadata": {
+        "name": "metadata.json",
+        "keyvalues": {
+            "customKey": "customValue"
+        }
+    },
+    "pinataOptions": {
+        "cidVersion": 1
+    }
+}
+
+Response: Same as Pin File to IPFS
+
+Pin By CID (Hash)
+POST /pinning/pinByHash
+
+Pin existing IPFS content by its CID.
+
+Request Body:
+{
+    "hashToPin": "QmHash...",
+    "pinataMetadata": {
+        "name": "My Pinned Content",
+        "keyvalues": {
+            "customKey": "customValue"
+        }
+    },
+    "pinataOptions": {
+        "groupId": "your-group-id",
+        "hostNodes": [
+            "/ip4/hostnode/tcp/4001/p2p/nodeid"
+        ]
+    }
+}
+
+Response:
+{
+    "id": "pin-job-id",
+    "ipfsHash": "QmHash...",
+    "status": "prechecking",
+    "name": "My Pinned Content"
+}
+
+List Pin Jobs
+GET /pinning/pinJobs
+
+List all running pin-by-hash jobs.
+
+Query Parameters:
+- sort (string): "ASC" or "DESC"
+- status (string): Filter by status
+  - "prechecking"
+  - "retrieving"
+  - "expired"
+  - "over_free_limit"
+  - "over_max_size"
+  - "invalid_object"
+  - "bad_host_node"
+- ipfs_pin_hash (string): Filter by CID
+- limit (integer): Results per page (default: 5, max: 1000)
+- offset (integer): Pagination offset
+
+Response:
+{
+    "count": 10,
+    "rows": [
+        {
+            "id": "job-id",
+            "ipfs_pin_hash": "QmHash...",
+            "date_queued": "2024-01-01T00:00:00.000Z",
+            "name": "Pin Job Name",
+            "status": "retrieving",
+            "keyvalues": {
+                "customKey": "customValue"
+            },
+            "host_nodes": [
+                "/ip4/node/tcp/4001/p2p/nodeid"
+            ],
+            "pin_policy": {
+                "regions": [
+                    {
+                        "id": "US-EAST-1",
+                        "desiredReplicationCount": 1
+                    }
+                ],
+                "version": 1
+            }
+        }
+    ]
+}
+
+Update File Metadata
+PUT /pinning/hashMetadata
+
+Update metadata for a pinned file.
+
+Request Body:
+{
+    "ipfsPinHash": "QmHash...",
+    "name": "Updated Name",
+    "keyvalues": {
+        "customKey": "newValue"
+    }
+}
+
+Response: "OK"
+
+Unpin File
+DELETE /pinning/unpin/{CID}
+
+Remove a pinned file.
+
+Response: "OK"
+
+Data Management
+
+Test Authentication
+GET /data/testAuthentication
+
+Verify API credentials.
+
+Response:
+{
+    "message": "Congratulations! You are communicating with the Pinata API!"
+}
+
+Get Data Usage
+GET /data/userPinnedDataTotal
+
+Get account storage statistics.
+
+Response:
+{
+    "pin_count": 1000,
+    "pin_size_total": 1234567,
+    "pin_size_with_replications_total": 1234567
+}
+
+List Files
+GET /data/pinList
+
+List all pinned files.
+
+Query Parameters:
+- includeCount (boolean)
+- cid (string): Filter by CID
+- groupId (string): Filter by group
+- pinStart (string): ISO 8601 date
+- pinEnd (string): ISO 8601 date
+- unpinStart (string): ISO 8601 date
+- unpinEnd (string): ISO 8601 date
+- pinSizeMin (string): Min size in bytes
+- pinSizeMax (string): Max size in bytes
+- status ("all"|"pinned"|"unpinned")
+- pageLimit (string): Results per page
+- pageOffset (string): Pagination offset
+- metadata (string): Metadata filters
+
+Response:
+{
+    "rows": [
+        {
+            "id": "file-id",
+            "ipfs_pin_hash": "QmHash...",
+            "size": 1234,
+            "user_id": "user-id",
+            "date_pinned": "2024-01-01T00:00:00.000Z",
+            "date_unpinned": null,
+            "metadata": {
+                "name": "filename",
+                "keyvalues": {
+                    "customKey": "value"
+                }
+            },
+            "regions": [
+                {
+                    "regionId": "pinata",
+                    "currentReplicationCount": 1,
+                    "desiredReplicationCount": 1
+                }
+            ],
+            "mime_type": "text/plain",
+            "number_of_files": 1
+        }
+    ]
+}
+
+API Key Management
+
+Create API Key
+POST /v3/pinata/keys
+
+Create a new API key with specific permissions.
+
+Request Body:
+{
+    "keyName": "My API Key",
+    "permissions": {
+        "admin": false,
+        "endpoints": {
+            "data": {
+                "pinList": true,
+                "userPinnedDataTotal": true
+            },
+            "pinning": {
+                "hashMetadata": true,
+                "hashPinPolicy": true,
+                "pinByHash": true,
+                "pinFileToIPFS": true,
+                "pinJSONToIPFS": true,
+                "pinJobs": true,
+                "unpin": true,
+                "userPinPolicy": true
+            }
+        }
+    },
+    "maxUses": 100
+}
+
+Response:
+{
+    "JWT": "jwt-token",
+    "pinata_api_key": "key",
+    "pinata_api_secret": "secret"
+}
+
+List API Keys
+GET /v3/pinata/keys
+
+List all API keys with optional filtering.
+
+Query Parameters:
+- revoked (boolean): Returns only API keys that have been revoked
+- limitedUse (boolean): Returns only API keys with a max_uses value set
+- exhausted (boolean): Can only be used with limitedUse=true. Returns only API keys that have hit their use limit
+- name (string): Returns API keys that match ilike on the name column
+- offset (number): Paginate through list of keys by offsetting results
+
+Response:
+{
+    "keys": [
+        {
+            "id": "d4ea5a38-4e0a-4126-8fd4-7534d258a995",
+            "name": "My API Key",
+            "key": "6270c5f4ed520756d498effbb6eb4b5f",
+            "secret": "secretkey",
+            "max_uses": 2,
+            "uses": 2,
+            "user_id": "32bd7147-51d5-4df2-8771-7aeb9dcac7a2",
+            "scopes": {
+                "endpoints": {
+                    "pinning": {
+                        "pinFileToIPFS": true,
+                        "pinJSONToIPFS": true
+                    }
+                },
+                "admin": false
+            },
+            "revoked": true,
+            "createdAt": "2024-06-12T15:34:50.324Z",
+            "updatedAt": "2024-06-12T15:34:51.204Z"
+        }
+    ],
+    "count": 1
+}
+
+Revoke API Key
+PUT /v3/pinata/keys/{key}
+
+Revoke an existing API key.
+
+Parameters:
+- key (path parameter): The API key to revoke
+
+Response: "Revoked"
+
+Error Handling
+
+The API uses standard HTTP status codes:
+- 200: Success
+- 400: Bad Request
+- 401: Unauthorized
+- 404: Not Found
+- 500: Internal Server Error
+
+Implement appropriate error handling and retries for network failures. Always validate inputs before making API calls.
+
+Best Practices
+1. Always use environment variables for API keys
+2. Implement proper error handling and retries
+3. Validate all inputs before making API calls
+4. Use appropriate content types for file uploads
+5. Follow rate limiting guidelines
+6. Properly handle pagination for list operations
+7. Store CIDs securely for future reference
+8. Consider implementing webhook handlers for job status updates
+
+IPFS SDK
+
+Install with npm i pinata-web3
+
+Usage:
+import { PinataSDK } from "pinata-web3";
+
+const pinata = new PinataSDK({
+  pinataJwt: process.env.PINATA_JWT!,
+  pinataGateway: "example-gateway.mypinata.cloud"
+});
+
+// Upload a file
+const file = new File(["hello"], "hello.txt", { type: "text/plain" });
+const upload = await pinata.upload.file(file);
+
+// Upload JSON
+const json = await pinata.upload.json({
+  name: "My NFT",
+  description: "An awesome NFT",
+  image: "ipfs://Qm..."
+});
+
+// Upload base64
+const base64Upload = await pinata.upload
+  .base64("SGVsbG8gV29ybGQh")
+  .addMetadata({
+    name: "hello.txt"
+  });
+
+// Upload multiple files
+const file1 = new File(["hello"], "hello1.txt", { type: "text/plain" });
+const file2 = new File(["world"], "hello2.txt", { type: "text/plain" });
+const multiUpload = await pinata.upload.fileArray([file1, file2]);
+
+// Upload stream
+const stream = fs.createReadStream("path/to/file");
+const streamUpload = await pinata.upload.stream(stream);
+
+// Upload from URL
+const urlUpload = await pinata.upload.url("https://example.com/image.png");
+
+// All Upload Responses:
+// {
+//   IpfsHash: "QmHash...",
+//   PinSize: 1234,
+//   Timestamp: "2024-01-01T00:00:00.000Z"
+// }
+
+
+// Pin existing CID
+const pin = await pinata.upload.cid("QmHash...");
+// Response:
+// {
+//   id: "pin-job-id",
+//   ipfsHash: "QmHash...",
+//   status: "prechecking",
+//   name: "My Pinned Content"
+// }
+
+// Fetch file data
+const data = await pinata.gateways.get("QmHash...");
+// Response:
+// {
+//   data: "file contents",
+//   contentType: "text/plain"
+// }
+
+// List files
+const files = await pinata.listFiles()
+  .name("my-file")
+  .pageLimit(100);
+// Response:
+// {
+//   rows: [{
+//     id: "file-id",
+//     ipfs_pin_hash: "QmHash...",
+//     size: 1234,
+//     user_id: "user-id",
+//     date_pinned: "2024-01-01T00:00:00.000Z",
+//     metadata: {
+//       name: "filename",
+//       keyvalues: {}
+//     }
+//   }]
+// }
+
+// Unpin files
+const unpin = await pinata.unpin([
+  "bafkreih5aznjvttude6c3wbvqeebb6rlx5wkbzyppv7garjiubll2ceym4"
+]);
+// Response:
+// [{
+//   hash: "QmHash...",
+//   status: "unpinned"
+// }]
+
+// Update metadata
+const updateMetadata = await pinata.updateMetadata({
+  cid: "bafkreih5aznjvttude6c3wbvqeebb6rlx5wkbzyppv7garjiubll2ceym4",
+  name: "Updated Name",
+  keyValues: {
+    customKey: "newValue"
+  }
+});
+// Response: "OK"
+
+// Create API key
+const key = await pinata.keys.create({
+  keyName: "My Key",
+  permissions: { admin: true }
+});
+// Response:
+// {
+//   JWT: "jwt-token",
+//   pinata_api_key: "key",
+//   pinata_api_secret: "secret"
+// }
+
+// Create group
+const group = await pinata.groups.create({
+  name: "My New Group"
+});
+// Response:
+// {
+//   id: "group-id",
+//   user_id: "user-id",
+//   name: "My New Group",
+//   updatedAt: "2024-01-01T00:00:00.000Z",
+//   createdAt: "2024-01-01T00:00:00.000Z"
+// }
+
+// Delete group
+const deleteGroup = await pinata.groups.delete({
+  groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0"
+});
+// Response: "OK"
+
+// Get group info
+const groupInfo = await pinata.groups.get({
+  groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0"
+});
+// Response:
+// {
+//   id: "group-id",
+//   user_id: "user-id",
+//   name: "Group Name",
+//   updatedAt: "2024-01-01T00:00:00.000Z",
+//   createdAt: "2024-01-01T00:00:00.000Z"
+// }
+
+// List groups
+const groups = await pinata.groups
+  .list()
+  .name("Test Group")
+  .limit(10);
+// Response:
+// [{
+//   id: "group-id",
+//   user_id: "user-id",
+//   name: "Test Group",
+//   updatedAt: "2024-01-01T00:00:00.000Z",
+//   createdAt: "2024-01-01T00:00:00.000Z"
+// }]
+
+// Add CIDs to group
+const addCids = await pinata.groups.addCids({
+  groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0",
+  cids: ["QmVLwvmGehsrNEvhcCnnsw5RQNseohgEkFNN1848zNzdng"]
+});
+// Response: "OK"
+
+// Remove CIDs from group
+const removeCids = await pinata.groups.removeCids({
+  groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0",
+  cids: ["QmVLwvmGehsrNEvhcCnnsw5RQNseohgEkFNN1848zNzdng"]
+});
+// Response: "OK"
+
+// Update group
+const updateGroup = await pinata.groups.update({
+  groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0",
+  name: "Updated Group Name"
+});
+// Response:
+// {
+//   id: "group-id",
+//   user_id: "user-id",
+//   name: "Updated Group Name",
+//   updatedAt: "2024-01-01T00:00:00.000Z",
+//   createdAt: "2024-01-01T00:00:00.000Z"
+// }
+
+// Add signature
+const addSig = await pinata.signatures.add({
+  cid: "QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU",
+  signature: "0x1b...911b"
+});
+// Response:
+// {
+//   cid: "QmHash...",
+//   signature: "0x1b...911b"
+// }
+
+// Delete signature
+const deleteSig = await pinata.signatures.delete(
+  "QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU"
+);
+// Response: "OK"
+
+// Get signature
+const getSig = await pinata.signatures.get(
+  "QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU"
+);
+// Response:
+// {
+//   cid: "QmHash...",
+//   signature: "0x1b...911b"
+// }
