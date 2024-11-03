@@ -291,6 +291,95 @@
     "data": null
   }
 
+API Key Management
+
+Create API Key
+POST /pinata/keys
+
+Create a new API key with specific permissions.
+
+Request Body:
+{
+    "keyName": "My API Key",
+    "permissions": {
+        "admin": false,
+        "endpoints": {
+            "data": {
+                "pinList": true,
+                "userPinnedDataTotal": true
+            },
+            "pinning": {
+                "hashMetadata": true,
+                "hashPinPolicy": true,
+                "pinByHash": true,
+                "pinFileToIPFS": true,
+                "pinJSONToIPFS": true,
+                "pinJobs": true,
+                "unpin": true,
+                "userPinPolicy": true
+            }
+        }
+    },
+    "maxUses": 100
+}
+
+Response:
+{
+    "JWT": "jwt-token",
+    "pinata_api_key": "key",
+    "pinata_api_secret": "secret"
+}
+
+List API Keys
+GET /pinata/keys
+
+List all API keys with optional filtering.
+
+Query Parameters:
+- revoked (boolean): Returns only API keys that have been revoked
+- limitedUse (boolean): Returns only API keys with a max_uses value set
+- exhausted (boolean): Can only be used with limitedUse=true. Returns only API keys that have hit their use limit
+- name (string): Returns API keys that match ilike on the name column
+- offset (number): Paginate through list of keys by offsetting results
+
+Response:
+{
+    "keys": [
+        {
+            "id": "d4ea5a38-4e0a-4126-8fd4-7534d258a995",
+            "name": "My API Key",
+            "key": "6270c5f4ed520756d498effbb6eb4b5f",
+            "secret": "secretkey",
+            "max_uses": 2,
+            "uses": 2,
+            "user_id": "32bd7147-51d5-4df2-8771-7aeb9dcac7a2",
+            "scopes": {
+                "endpoints": {
+                    "pinning": {
+                        "pinFileToIPFS": true,
+                        "pinJSONToIPFS": true
+                    }
+                },
+                "admin": false
+            },
+            "revoked": true,
+            "createdAt": "2024-06-12T15:34:50.324Z",
+            "updatedAt": "2024-06-12T15:34:51.204Z"
+        }
+    ],
+    "count": 1
+}
+
+Revoke API Key
+PUT /pinata/keys/{key}
+
+Revoke an existing API key.
+
+Parameters:
+- key (path parameter): The API key to revoke
+
+Response: "Revoked"
+
   Error Handling
   The API uses standard HTTP response codes:
   - 200: Success
