@@ -169,7 +169,7 @@ export type SignedUrlOptions = {
 	gateway?: string;
 };
 
-export type GatewayAnalyticsQuery = {
+export type AnalyticsQuery = {
 	gateway_domain: string;
 	start_date: string;
 	end_date: string;
@@ -183,7 +183,7 @@ export type GatewayAnalyticsQuery = {
 	sort_order?: "asc" | "desc";
 };
 
-export type TopGatewayAnalyticsQuery = GatewayAnalyticsQuery & {
+export type TopAnalyticsQuery = AnalyticsQuery & {
 	sort_by: "requests" | "bandwidth";
 	attribute:
 		| "cid"
@@ -194,13 +194,17 @@ export type TopGatewayAnalyticsQuery = GatewayAnalyticsQuery & {
 		| "file_name";
 };
 
-export type TopGatewayAnalyticsItem = {
+export type TopAnalyticsResponse = {
+	data: TopAnalyticsItem[];
+};
+
+export type TopAnalyticsItem = {
 	value: string;
 	requests: number;
 	bandwidth: number;
 };
 
-export type TimeIntervalGatewayAnalyticsQuery = GatewayAnalyticsQuery & {
+export type TimeIntervalAnalyticsQuery = AnalyticsQuery & {
 	sort_by?: "requests" | "bandwidth";
 	date_interval: "day" | "week";
 };
@@ -211,7 +215,7 @@ export type TimePeriodItem = {
 	bandwidth: number;
 };
 
-export type TimeIntervalGatewayAnalyticsResponse = {
+export type TimeIntervalAnalyticsResponse = {
 	total_requests: number;
 	total_bandwidth: number;
 	time_periods: TimePeriodItem[];

@@ -1,13 +1,13 @@
 /**
- * Retrieves gateway analytics data for a specified time interval from Pinata.
+ * Retrieves top gateway analytics data from Pinata.
  *
- * This function fetches analytics data for Pinata gateways, allowing for various
- * filtering options and time interval specifications.
+ * This function fetches top analytics data for Pinata gateways, allowing for various
+ * filtering options and customization of the results.
  *
  * @async
- * @function analyticsDateInterval
+ * @function analyticsTopUsage
  * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {TimeIntervalGatewayAnalyticsQuery} [options] - Optional query parameters to filter and customize the analytics results.
+ * @param {TopGatewayAnalyticsQuery} [options] - Optional query parameters to filter and customize the analytics results.
  * @param {string} [options.cid] - Filter by the CID of the file.
  * @param {string} [options.gateway_domain] - The gateway domain to fetch analytics for.
  * @param {string} [options.start_date] - The start date for the analytics period (ISO 8601 format).
@@ -19,9 +19,9 @@
  * @param {string} [options.referer] - Filter by referer.
  * @param {number} [options.limit] - Limit the number of results.
  * @param {"asc" | "desc"} [options.sort_order] - Sort order for the results.
- * @param {"day" | "week"} [options.date_interval] - The time interval for grouping results.
  * @param {"requests" | "bandwidth"} [options.sort_by] - Sort the results by requests or bandwidth.
- * @returns {Promise<TimeIntervalGatewayAnalyticsResponse>} A promise that resolves to an object containing the analytics data.
+ * @param {"cid" | "country" | "region" | "user_agent" | "referer" | "file_name"} [options.attribute] - Group results by this attribute.
+ * @returns {Promise<TopGatewayAnalyticsItem[]>} A promise that resolves to an array of top gateway analytics items.
  * @throws {ValidationError} If the Pinata configuration or JWT is missing.
  * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
  * @throws {NetworkError} If there's a network-related error during the API request.
@@ -35,18 +35,20 @@
  *    pinataGateway: "example-gateway.mypinata.cloud",
  *  });
  *
- *  const analytics = await pinata.gateways.dateIntervalAnalytics({
+ *  const topAnalytics = await pinata.gateways.topUsageAnalytics({
  *    domain: "example-gateway.mypinata.cloud",
  *    start: "2024-08-01",
  *    end: "2024-08-15",
- *    interval: "day"
- *  }).sortBy("bandwidth");
+ *    sortBy: "requests",
+ *    attribute: "cid"
+ *  }).cid("QmVLwvmGehsrNEvhcCnnsw5RQNseohgEkFNN1848zNzdng").sort("asc");
  */
 
 import type {
-	TimeIntervalGatewayAnalyticsQuery,
-	TimeIntervalGatewayAnalyticsResponse,
+	TopAnalyticsQuery,
+	TopAnalyticsItem,
 	PinataConfig,
+	TopAnalyticsResponse,
 } from "../types";
 import {
 	PinataError,
@@ -55,10 +57,10 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
-export const analyticsDateInterval = async (
+export const analyticsTopUsage = async (
 	config: PinataConfig | undefined,
-	options?: TimeIntervalGatewayAnalyticsQuery,
-): Promise<TimeIntervalGatewayAnalyticsResponse> => {
+	options?: TopAnalyticsQuery,
+): Promise<TopAnalyticsResponse> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
@@ -78,8 +80,8 @@ export const analyticsDateInterval = async (
 			referer,
 			limit,
 			sort_order,
-			date_interval,
 			sort_by,
+			attribute,
 		} = options;
 
 		if (cid) params.append("cid", cid);
@@ -94,16 +96,16 @@ export const analyticsDateInterval = async (
 		if (limit) params.append("limit", limit.toString());
 		if (sort_order) params.append("sort_order", sort_order);
 		if (sort_by) params.append("sort_by", sort_by);
-		if (date_interval) params.append("by", date_interval);
+		if (attribute) params.append("by", attribute);
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
-	const url = `${endpoint}/v3/ipfs/gateway_analytics_time_series?${params.toString()}`;
+	const url = `${endpoint}/ipfs/gateway_analytics_top?${params.toString()}`;
 
 	try {
 		let headers: Record<string, string>;
@@ -113,7 +115,7 @@ export const analyticsDateInterval = async (
 		} else {
 			headers = {
 				Authorization: `Bearer ${config.pinataJwt}`,
-				Source: "sdk/analyticsDateInterval",
+				Source: "sdk/analyticsTopUsage",
 			};
 		}
 
@@ -137,9 +139,8 @@ export const analyticsDateInterval = async (
 			);
 		}
 
-		const res = await request.json();
-		const resData: TimeIntervalGatewayAnalyticsResponse = res.data;
-		return resData;
+		const res: TopAnalyticsResponse = await request.json();
+		return res;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;
