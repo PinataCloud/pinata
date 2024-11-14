@@ -783,7 +783,7 @@ class Analytics {
 		this.config = newConfig;
 	}
 
-	topUsage(options: {
+	detailed(options: {
 		domain: string;
 		start: string;
 		end: string;
@@ -806,7 +806,7 @@ class Analytics {
 		);
 	}
 
-	dateInterval(options: {
+	summary(options: {
 		domain: string;
 		start: string;
 		end: string;
