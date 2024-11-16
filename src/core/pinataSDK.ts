@@ -23,11 +23,11 @@ import type {
 	RevokeKeyResponse,
 	SignatureOptions,
 	SignatureResponse,
-	TopGatewayAnalyticsQuery,
-	TopGatewayAnalyticsItem,
-	TimeIntervalGatewayAnalyticsQuery,
-	GatewayAnalyticsQuery,
-	TimeIntervalGatewayAnalyticsResponse,
+	TopAnalyticsQuery,
+	TopAnalyticsItem,
+	TimeIntervalAnalyticsQuery,
+	AnalyticsQuery,
+	TimeIntervalAnalyticsResponse,
 	SwapCidOptions,
 	SwapCidResponse,
 	SwapHistoryOptions,
@@ -37,6 +37,7 @@ import type {
 	SignedUrlOptions,
 	FileListResponse,
 	UpdateGroupFilesResponse,
+	TopAnalyticsResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -64,8 +65,8 @@ import { deleteGroup } from "./groups/deleteGroup";
 // import { addSignature } from "./signatures/addSignature";
 // import { getSignature } from "./signatures/getSignature";
 // import { removeSignature } from "./signatures/removeSignature";
-import { analyticsTopUsage } from "./gateway/analyticsTopUsage";
-import { analyticsDateInterval } from "./gateway/analyticsDateInterval";
+import { analyticsTopUsage } from "./analytics/analyticsTopUsage";
+import { analyticsDateInterval } from "./analytics/analyticsDateInterval";
 import { swapCid } from "./files/swapCid";
 import { swapHistory } from "./files/swapHistory";
 import { deleteSwap } from "./files/deleteSwap";
@@ -91,6 +92,7 @@ export class PinataSDK {
 	//	usage: Usage;
 	keys: Keys;
 	groups: Groups;
+	analytics: Analytics;
 	//signatures: Signatures;
 
 	constructor(config?: PinataConfig) {
@@ -101,6 +103,7 @@ export class PinataSDK {
 		//		this.usage = new Usage(this.config);
 		this.keys = new Keys(this.config);
 		this.groups = new Groups(this.config);
+		this.analytics = new Analytics(this.config);
 		//		this.signatures = new Signatures(this.config);
 	}
 
@@ -117,6 +120,7 @@ export class PinataSDK {
 		//		this.usage.updateConfig(this.config);
 		this.keys.updateConfig(this.config);
 		this.groups.updateConfig(this.config);
+		this.analytics.updateConfig(this.config);
 		//		this.signatures.updateConfig(this.config);
 	}
 
@@ -133,6 +137,7 @@ export class PinataSDK {
 		//		this.usage.updateConfig(this.config);
 		this.keys.updateConfig(this.config);
 		this.groups.updateConfig(this.config);
+		this.analytics.updateConfig(this.config);
 		//		this.signatures.updateConfig(this.config);
 	}
 
@@ -767,6 +772,62 @@ class FilterGroups {
 	}
 }
 
+class Analytics {
+	config: PinataConfig | undefined;
+	requests: AnalyticsRequests;
+	bandwidth: AnalyticsBandwidth;
+
+	constructor(config?: PinataConfig) {
+		this.config = formatConfig(config);
+		this.requests = new AnalyticsRequests(this.config);
+		this.bandwidth = new AnalyticsBandwidth(this.config);
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+		this.requests.updateConfig(newConfig);
+		this.bandwidth.updateConfig(newConfig);
+	}
+
+	// detailed(options: {
+	// 	domain: string;
+	// 	start: string;
+	// 	end: string;
+	// 	sortBy: "requests" | "bandwidth";
+	// 	attribute:
+	// 		| "cid"
+	// 		| "country"
+	// 		| "region"
+	// 		| "user_agent"
+	// 		| "referer"
+	// 		| "file_name";
+	// }): TopAnalyticsBuilder {
+	// 	return new TopAnalyticsBuilder(
+	// 		this.config,
+	// 		options.domain,
+	// 		options.start,
+	// 		options.end,
+	// 		options.sortBy,
+	// 		options.attribute,
+	// 	);
+	// }
+
+	summary(options: {
+		domain: string;
+		start: string;
+		end: string;
+		interval: "day" | "week";
+	}): TimeIntervalAnalyticsBuilder {
+		return new TimeIntervalAnalyticsBuilder(
+			this.config,
+			options.domain,
+			options.start,
+			options.end,
+			options.interval,
+		);
+	}
+}
+
 // class Signatures {
 // 	config: PinataConfig | undefined;
 
@@ -791,86 +852,234 @@ class FilterGroups {
 // 	}
 // }
 
-// class GatewayAnalyticsBuilder<T extends GatewayAnalyticsQuery, R> {
-// 	protected config: PinataConfig | undefined;
-// 	protected query: T;
-// 	private requestCount = 0;
-// 	private lastRequestTime = 0;
-// 	private readonly MAX_REQUESTS_PER_MINUTE = 30;
-// 	private readonly MINUTE_IN_MS = 60000;
+const calculateDates = (days: number): { start: string; end: string } => {
+	const end = new Date();
+	const start = new Date();
+	start.setDate(start.getDate() - days);
 
-// 	constructor(config: PinataConfig | undefined, query: T) {
-// 		this.config = config;
-// 		this.query = query;
-// 	}
+	// Format dates to ISO string and trim time portion
+	return {
+		start: start.toISOString().split("T")[0],
+		end: end.toISOString().split("T")[0],
+	};
+};
 
-// 	cid(cid: string): this {
-// 		this.query.cid = cid;
-// 		return this;
-// 	}
+class AnalyticsFilter {
+	protected config: PinataConfig | undefined;
+	protected query: TopAnalyticsQuery;
 
-// 	fileName(fileName: string): this {
-// 		this.query.file_name = fileName;
-// 		return this;
-// 	}
+	constructor(
+		config: PinataConfig | undefined,
+		domain: string,
+		start: string,
+		end: string,
+	) {
+		this.config = config;
+		this.query = {
+			gateway_domain: domain,
+			start_date: start,
+			end_date: end,
+			sort_by: "requests", // Will be overridden in child classes
+			attribute: "cid",
+		};
+	}
 
-// 	userAgent(userAgent: string): this {
-// 		this.query.user_agent = userAgent;
-// 		return this;
-// 	}
+	cid(cid?: string): this {
+		this.query.attribute = "cid";
+		if (cid) {
+			this.query.cid = cid;
+		}
+		return this;
+	}
 
-// 	country(country: string): this {
-// 		this.query.country = country;
-// 		return this;
-// 	}
+	fileName(fileName?: string): this {
+		this.query.attribute = "file_name";
+		if (fileName) {
+			this.query.file_name = fileName;
+		}
+		return this;
+	}
 
-// 	region(region: string): this {
-// 		this.query.region = region;
-// 		return this;
-// 	}
+	userAgent(userAgent?: string): this {
+		this.query.attribute = "user_agent";
+		if (userAgent) {
+			this.query.user_agent = userAgent;
+		}
+		return this;
+	}
 
-// 	referer(referer: string): this {
-// 		this.query.referer = referer;
-// 		return this;
-// 	}
+	country(country?: string): this {
+		this.query.attribute = "country";
+		if (country) {
+			this.query.country = country;
+		}
+		return this;
+	}
 
-// 	limit(limit: number): this {
-// 		this.query.limit = limit;
-// 		return this;
-// 	}
+	region(region?: string): this {
+		this.query.attribute = "region";
+		if (region) {
+			this.query.region = region;
+		}
+		return this;
+	}
 
-// 	sort(order: "asc" | "desc"): this {
-// 		this.query.sort_order = order;
-// 		return this;
-// 	}
+	referer(referer?: string): this {
+		this.query.attribute = "referer";
+		if (referer) {
+			this.query.referer = referer;
+		}
+		return this;
+	}
 
-// 	private async rateLimit(): Promise<void> {
-// 		this.requestCount++;
-// 		const now = Date.now();
-// 		if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
-// 			const timePassedSinceLastRequest = now - this.lastRequestTime;
-// 			if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
-// 				const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
-// 				await new Promise((resolve) => setTimeout(resolve, delayTime));
-// 			}
-// 			this.requestCount = 0;
-// 		}
-// 		this.lastRequestTime = Date.now();
-// 	}
+	limit(limit: number): this {
+		this.query.limit = limit;
+		return this;
+	}
 
-// 	protected async getAnalytics(): Promise<R> {
-// 		await this.rateLimit();
-// 		throw new Error("getAnalytics method must be implemented in derived class");
-// 	}
+	sort(order: "asc" | "desc"): this {
+		this.query.sort_order = order;
+		return this;
+	}
 
-// 	then(onfulfilled?: ((value: R) => any) | null): Promise<any> {
-// 		return this.getAnalytics().then(onfulfilled);
-// 	}
-// }
+	days(numberOfDays: number): this {
+		const { start, end } = calculateDates(numberOfDays);
+		this.query.start_date = start;
+		this.query.end_date = end;
+		return this;
+	}
 
-// class TopGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
-// 	TopGatewayAnalyticsQuery,
-// 	TopGatewayAnalyticsItem[]
+	then(
+		onfulfilled?: ((value: TopAnalyticsResponse) => any) | null,
+	): Promise<any> {
+		return analyticsTopUsage(this.config, this.query).then(onfulfilled);
+	}
+}
+
+class AnalyticsRequests extends AnalyticsFilter {
+	constructor(config?: PinataConfig) {
+		super(config, "", "", ""); // These will need to be set through methods
+		this.query.sort_by = "requests";
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
+
+	customDates(start?: string, end?: string): this {
+		if (start) this.query.start_date = start;
+		if (end) this.query.end_date = end;
+		return this;
+	}
+
+	from(domain: string): this {
+		this.query.gateway_domain = domain;
+		return this;
+	}
+}
+
+class AnalyticsBandwidth extends AnalyticsFilter {
+	constructor(config?: PinataConfig) {
+		super(config, "", "", ""); // These will need to be set through methods
+		this.query.sort_by = "bandwidth";
+	}
+
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
+
+	customDates(start?: string, end?: string): this {
+		if (start) this.query.start_date = start;
+		if (end) this.query.end_date = end;
+		return this;
+	}
+
+	from(domain: string): this {
+		this.query.gateway_domain = domain;
+		return this;
+	}
+}
+
+class AnalyticsBuilder<T extends AnalyticsQuery, R> {
+	protected config: PinataConfig | undefined;
+	protected query: T;
+	private requestCount = 0;
+	private lastRequestTime = 0;
+	private readonly MAX_REQUESTS_PER_MINUTE = 30;
+	private readonly MINUTE_IN_MS = 60000;
+
+	constructor(config: PinataConfig | undefined, query: T) {
+		this.config = config;
+		this.query = query;
+	}
+
+	cid(cid: string): this {
+		this.query.cid = cid;
+		return this;
+	}
+
+	fileName(fileName: string): this {
+		this.query.file_name = fileName;
+		return this;
+	}
+
+	userAgent(userAgent: string): this {
+		this.query.user_agent = userAgent;
+		return this;
+	}
+
+	country(country: string): this {
+		this.query.country = country;
+		return this;
+	}
+
+	region(region: string): this {
+		this.query.region = region;
+		return this;
+	}
+
+	referer(referer: string): this {
+		this.query.referer = referer;
+		return this;
+	}
+
+	limit(limit: number): this {
+		this.query.limit = limit;
+		return this;
+	}
+
+	sort(order: "asc" | "desc"): this {
+		this.query.sort_order = order;
+		return this;
+	}
+
+	// private async rateLimit(): Promise<void> {
+	// 	this.requestCount++;
+	// 	const now = Date.now();
+	// 	if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+	// 		const timePassedSinceLastRequest = now - this.lastRequestTime;
+	// 		if (timePassedSinceLastRequest < this.MINUTE_IN_MS) {
+	// 			const delayTime = this.MINUTE_IN_MS - timePassedSinceLastRequest;
+	// 			await new Promise((resolve) => setTimeout(resolve, delayTime));
+	// 		}
+	// 		this.requestCount = 0;
+	// 	}
+	// 	this.lastRequestTime = Date.now();
+	// }
+
+	protected async getAnalytics(): Promise<R> {
+		//await this.rateLimit();
+		throw new Error("getAnalytics method must be implemented in derived class");
+	}
+
+	then(onfulfilled?: ((value: R) => any) | null): Promise<any> {
+		return this.getAnalytics().then(onfulfilled);
+	}
+}
+
+// class TopAnalyticsBuilder extends AnalyticsBuilder<
+// 	TopAnalyticsQuery,
+// 	TopAnalyticsResponse
 // > {
 // 	constructor(
 // 		config: PinataConfig | undefined,
@@ -895,44 +1104,44 @@ class FilterGroups {
 // 		});
 // 	}
 
-// 	protected async getAnalytics(): Promise<TopGatewayAnalyticsItem[]> {
+// 	protected async getAnalytics(): Promise<TopAnalyticsResponse> {
 // 		return analyticsTopUsage(this.config, this.query);
 // 	}
 
-// 	async all(): Promise<TopGatewayAnalyticsItem[]> {
+// 	async all(): Promise<TopAnalyticsResponse> {
 // 		return this.getAnalytics();
 // 	}
 // }
 
-// class TimeIntervalGatewayAnalyticsBuilder extends GatewayAnalyticsBuilder<
-// 	TimeIntervalGatewayAnalyticsQuery,
-// 	TimeIntervalGatewayAnalyticsResponse
-// > {
-// 	constructor(
-// 		config: PinataConfig | undefined,
-// 		domain: string,
-// 		start: string,
-// 		end: string,
-// 		dateInterval: "day" | "week",
-// 	) {
-// 		super(config, {
-// 			gateway_domain: domain,
-// 			start_date: start,
-// 			end_date: end,
-// 			date_interval: dateInterval,
-// 		});
-// 	}
+class TimeIntervalAnalyticsBuilder extends AnalyticsBuilder<
+	TimeIntervalAnalyticsQuery,
+	TimeIntervalAnalyticsResponse
+> {
+	constructor(
+		config: PinataConfig | undefined,
+		domain: string,
+		start: string,
+		end: string,
+		dateInterval: "day" | "week",
+	) {
+		super(config, {
+			gateway_domain: domain,
+			start_date: start,
+			end_date: end,
+			date_interval: dateInterval,
+		});
+	}
 
-// 	sortBy(sortBy: "requests" | "bandwidth"): this {
-// 		this.query.sort_by = sortBy;
-// 		return this;
-// 	}
+	sortBy(sortBy: "requests" | "bandwidth"): this {
+		this.query.sort_by = sortBy;
+		return this;
+	}
 
-// 	protected async getAnalytics(): Promise<TimeIntervalGatewayAnalyticsResponse> {
-// 		return analyticsDateInterval(this.config, this.query);
-// 	}
+	protected async getAnalytics(): Promise<TimeIntervalAnalyticsResponse> {
+		return analyticsDateInterval(this.config, this.query);
+	}
 
-// 	async all(): Promise<TimeIntervalGatewayAnalyticsResponse> {
-// 		return this.getAnalytics();
-// 	}
-// }
+	async all(): Promise<TimeIntervalAnalyticsResponse> {
+		return this.getAnalytics();
+	}
+}
