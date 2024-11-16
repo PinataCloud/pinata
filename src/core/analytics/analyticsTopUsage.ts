@@ -84,8 +84,15 @@ export const analyticsTopUsage = async (
 			attribute,
 		} = options;
 
-		if (cid) params.append("cid", cid);
-		if (gateway_domain) params.append("gateway_domain", gateway_domain);
+		const domain = gateway_domain || config.pinataGateway;
+		if (domain) {
+			// Remove 'https://' if present
+			const cleanDomain = domain.replace(/^https?:\/\//, "");
+			params.append("gateway_domain", cleanDomain);
+		}
+		if (cid) {
+			params.append("cid", cid);
+		}
 		if (start_date) params.append("start_date", start_date);
 		if (end_date) params.append("end_date", end_date);
 		if (file_name) params.append("file_name", file_name);
