@@ -1,11 +1,11 @@
 {
 	"name": "pinata",
-	"version": "1.8.0",
+	"version": "1.8.1",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"files": ["dist", "postinstall.js"],
+	"files": ["dist"],
 	"exports": {
 		".": {
 			"require": "./dist/index.js",
@@ -16,8 +16,7 @@
 	"scripts": {
 		"build": "tsup src/index.ts --format cjs,esm --dts --external none",
 		"format": "npx @biomejs/biome format --write src tests",
-		"test": "jest --watchAll --verbose --coverage",
-		"postinstall": "node ./postinstall.js --loglevel=verbose"
+		"test": "jest --watchAll --verbose --coverage"
 	},
 	"repository": {
 		"type": "git",
