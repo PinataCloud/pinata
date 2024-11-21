@@ -427,43 +427,6 @@ class Gateways {
 		return new OptimizeImageCreateSignedURL(this.config, options);
 	}
 
-	// topUsageAnalytics(options: {
-	// 	domain: string;
-	// 	start: string;
-	// 	end: string;
-	// 	sortBy: "requests" | "bandwidth";
-	// 	attribute:
-	// 		| "cid"
-	// 		| "country"
-	// 		| "region"
-	// 		| "user_agent"
-	// 		| "referer"
-	// 		| "file_name";
-	// }): TopGatewayAnalyticsBuilder {
-	// 	return new TopGatewayAnalyticsBuilder(
-	// 		this.config,
-	// 		options.domain,
-	// 		options.start,
-	// 		options.end,
-	// 		options.sortBy,
-	// 		options.attribute,
-	// 	);
-	// }
-
-	// dateIntervalAnalytics(options: {
-	// 	domain: string;
-	// 	start: string;
-	// 	end: string;
-	// 	interval: "day" | "week";
-	// }): TimeIntervalGatewayAnalyticsBuilder {
-	// 	return new TimeIntervalGatewayAnalyticsBuilder(
-	// 		this.config,
-	// 		options.domain,
-	// 		options.start,
-	// 		options.end,
-	// 		options.interval,
-	// 	);
-	// }
 }
 
 class OptimizeImageGetCid {
@@ -789,28 +752,6 @@ class Analytics {
 		this.bandwidth.updateConfig(newConfig);
 	}
 
-	// detailed(options: {
-	// 	domain: string;
-	// 	start: string;
-	// 	end: string;
-	// 	sortBy: "requests" | "bandwidth";
-	// 	attribute:
-	// 		| "cid"
-	// 		| "country"
-	// 		| "region"
-	// 		| "user_agent"
-	// 		| "referer"
-	// 		| "file_name";
-	// }): TopAnalyticsBuilder {
-	// 	return new TopAnalyticsBuilder(
-	// 		this.config,
-	// 		options.domain,
-	// 		options.start,
-	// 		options.end,
-	// 		options.sortBy,
-	// 		options.attribute,
-	// 	);
-	// }
 
 	summary(options: {
 		domain: string;
@@ -1077,41 +1018,6 @@ class AnalyticsBuilder<T extends AnalyticsQuery, R> {
 	}
 }
 
-// class TopAnalyticsBuilder extends AnalyticsBuilder<
-// 	TopAnalyticsQuery,
-// 	TopAnalyticsResponse
-// > {
-// 	constructor(
-// 		config: PinataConfig | undefined,
-// 		domain: string,
-// 		start: string,
-// 		end: string,
-// 		sortBy: "requests" | "bandwidth",
-// 		attribute:
-// 			| "cid"
-// 			| "country"
-// 			| "region"
-// 			| "user_agent"
-// 			| "referer"
-// 			| "file_name",
-// 	) {
-// 		super(config, {
-// 			gateway_domain: domain,
-// 			start_date: start,
-// 			end_date: end,
-// 			sort_by: sortBy,
-// 			attribute: attribute,
-// 		});
-// 	}
-
-// 	protected async getAnalytics(): Promise<TopAnalyticsResponse> {
-// 		return analyticsTopUsage(this.config, this.query);
-// 	}
-
-// 	async all(): Promise<TopAnalyticsResponse> {
-// 		return this.getAnalytics();
-// 	}
-// }
 
 class TimeIntervalAnalyticsBuilder extends AnalyticsBuilder<
 	TimeIntervalAnalyticsQuery,
