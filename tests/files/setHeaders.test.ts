@@ -1,5 +1,5 @@
 import { PinataSDK } from "../../src/core/pinataSDK";
-import * as testAuthenticationModule from "../../src/core/authentication/testAuthentication";
+import * as testAuthenticationModule from "../../src/core/testAuthentication";
 
 jest.mock("../../src/core/authentication/testAuthentication");
 

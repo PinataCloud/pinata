@@ -39,7 +39,7 @@ import type {
 	UpdateGroupFilesResponse,
 	TopAnalyticsResponse,
 } from "./types";
-import { testAuthentication } from "./authentication/testAuthentication";
+import { testAuthentication } from "./testAuthentication";
 import { uploadFile } from "./uploads/file";
 import { uploadFileArray } from "./uploads/fileArray";
 import { uploadBase64 } from "./uploads/base64";
@@ -426,7 +426,6 @@ class Gateways {
 	createSignedURL(options: SignedUrlOptions): OptimizeImageCreateSignedURL {
 		return new OptimizeImageCreateSignedURL(this.config, options);
 	}
-
 }
 
 class OptimizeImageGetCid {
@@ -752,7 +751,6 @@ class Analytics {
 		this.bandwidth.updateConfig(newConfig);
 	}
 
-
 	summary(options: {
 		domain: string;
 		start: string;
@@ -1017,7 +1015,6 @@ class AnalyticsBuilder<T extends AnalyticsQuery, R> {
 		return this.getAnalytics().then(onfulfilled);
 	}
 }
-
 
 class TimeIntervalAnalyticsBuilder extends AnalyticsBuilder<
 	TimeIntervalAnalyticsQuery,
