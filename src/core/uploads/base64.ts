@@ -116,6 +116,27 @@ export const uploadBase64 = async (
 
 		const res = await request.json();
 		const resData: UploadResponse = res.data;
+		if (options?.vectorize) {
+			const vectorReq = await fetch(
+				`${endpoint}/vectorize/files/${resData.id}`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${jwt}`,
+					},
+				},
+			);
+			if (vectorReq.ok) {
+				return resData;
+			} else {
+				const errorData = await vectorReq.text();
+				throw new NetworkError(
+					`HTTP error during vectorization: ${errorData}`,
+					vectorReq.status,
+					errorData,
+				);
+			}
+		}
 		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
