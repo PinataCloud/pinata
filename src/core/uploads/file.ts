@@ -136,7 +136,7 @@ export const uploadFile = async (
 			const fileInfoReq = await fetch(`${dataEndpoint}/files/${fileId}`, {
 				method: "GET",
 				headers: {
-					Authorization: `Bearer ${process.env.PINATA_JWT}`,
+					Authorization: `Bearer ${jwt}`,
 				},
 			});
 			const fileInfo = await fileInfoReq.json();
