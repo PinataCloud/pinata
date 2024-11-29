@@ -24,7 +24,7 @@ export const vectorizeFile = async (
 	} else {
 		headers = {
 			Authorization: `Bearer ${config.pinataJwt}`,
-			Source: "sdk/updateMetadata",
+			Source: "sdk/vectorizeFile",
 		};
 	}
 
