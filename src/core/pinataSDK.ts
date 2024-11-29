@@ -192,6 +192,7 @@ class UploadBuilder<T> {
 	private metadata: PinataMetadata | undefined;
 	private keys: string | undefined;
 	private groupId: string | undefined;
+	private vector: boolean | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -213,6 +214,11 @@ class UploadBuilder<T> {
 
 	key(jwt: string): UploadBuilder<T> {
 		this.keys = jwt;
+		return this;
+	}
+
+	vectorize(): UploadBuilder<T> {
+		this.vector = true;
 		return this;
 	}
 
@@ -245,6 +251,9 @@ class UploadBuilder<T> {
 		}
 		if (this.groupId) {
 			options.groupId = this.groupId;
+		}
+		if (this.vector) {
+			options.vectorize = this.vector;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
@@ -426,7 +435,6 @@ class Gateways {
 	createSignedURL(options: SignedUrlOptions): OptimizeImageCreateSignedURL {
 		return new OptimizeImageCreateSignedURL(this.config, options);
 	}
-
 }
 
 class OptimizeImageGetCid {
@@ -752,7 +760,6 @@ class Analytics {
 		this.bandwidth.updateConfig(newConfig);
 	}
 
-
 	summary(options: {
 		domain: string;
 		start: string;
@@ -1017,7 +1024,6 @@ class AnalyticsBuilder<T extends AnalyticsQuery, R> {
 		return this.getAnalytics().then(onfulfilled);
 	}
 }
-
 
 class TimeIntervalAnalyticsBuilder extends AnalyticsBuilder<
 	TimeIntervalAnalyticsQuery,

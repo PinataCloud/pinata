@@ -49,7 +49,7 @@ export type UploadOptions = {
 	//pinType?: "async" | "sync" | "cidOnly";
 	keys?: string;
 	groupId?: string;
-	//cidVersion?: 0 | 1;
+	vectorize?: boolean;
 };
 
 export type DeleteResponse = {
