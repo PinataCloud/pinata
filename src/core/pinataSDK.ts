@@ -38,6 +38,9 @@ import type {
 	FileListResponse,
 	UpdateGroupFilesResponse,
 	TopAnalyticsResponse,
+	VectorizeFileResponse,
+	VectorizeQuery,
+	VectorizeQueryResponse,
 } from "./types";
 import { testAuthentication } from "./testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -72,6 +75,9 @@ import { swapHistory } from "./files/swapHistory";
 import { deleteSwap } from "./files/deleteSwap";
 import { containsCID } from "../utils/gateway-tools";
 import { createSignedURL } from "./gateway/createSignedURL";
+import { vectorizeFile } from "./files/vectorizeFile";
+import { vectorizeQuery } from "./files/vectorizeQuery";
+import { deleteFileVectors } from "./files/deleteFileVectors";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -180,6 +186,18 @@ class Files {
 	deleteSwap(cid: string): Promise<string> {
 		return deleteSwap(this.config, cid);
 	}
+
+	vectorize(fileId: string): Promise<VectorizeFileResponse> {
+		return vectorizeFile(this.config, fileId);
+	}
+
+	queryVector(options: VectorizeQuery): Promise<VectorizeQueryResponse> {
+		return vectorizeQuery(this.config, options);
+	}
+
+	deleteVectors(fileId: string): Promise<VectorizeFileResponse> {
+		return deleteFileVectors(this.config, fileId);
+	}
 }
 
 class UploadBuilder<T> {
@@ -192,6 +210,7 @@ class UploadBuilder<T> {
 	private metadata: PinataMetadata | undefined;
 	private keys: string | undefined;
 	private groupId: string | undefined;
+	private vector: boolean | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -213,6 +232,11 @@ class UploadBuilder<T> {
 
 	key(jwt: string): UploadBuilder<T> {
 		this.keys = jwt;
+		return this;
+	}
+
+	vectorize(): UploadBuilder<T> {
+		this.vector = true;
 		return this;
 	}
 
@@ -245,6 +269,9 @@ class UploadBuilder<T> {
 		}
 		if (this.groupId) {
 			options.groupId = this.groupId;
+		}
+		if (this.vector) {
+			options.vectorize = this.vector;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(

@@ -136,11 +136,33 @@ export const uploadFile = async (
 			const fileInfoReq = await fetch(`${dataEndpoint}/files/${fileId}`, {
 				method: "GET",
 				headers: {
-					Authorization: `Bearer ${process.env.PINATA_JWT}`,
+					Authorization: `Bearer ${jwt}`,
 				},
 			});
 			const fileInfo = await fileInfoReq.json();
 			const data: UploadResponse = fileInfo.data;
+			if (options?.vectorize) {
+				const vectorReq = await fetch(
+					`${endpoint}/vectorize/files/${data.id}`,
+					{
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${jwt}`,
+						},
+					},
+				);
+				if (vectorReq.ok) {
+					data.vectorized = true;
+					return data;
+				} else {
+					const errorData = await vectorReq.text();
+					throw new NetworkError(
+						`HTTP error during vectorization: ${errorData}`,
+						vectorReq.status,
+						errorData,
+					);
+				}
+			}
 			return data;
 		}
 	}
@@ -193,6 +215,28 @@ export const uploadFile = async (
 		}
 		const res = await request.json();
 		const resData: UploadResponse = res.data;
+		if (options?.vectorize) {
+			const vectorReq = await fetch(
+				`${endpoint}/vectorize/files/${resData.id}`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${jwt}`,
+					},
+				},
+			);
+			if (vectorReq.ok) {
+				resData.vectorized = true;
+				return resData;
+			} else {
+				const errorData = await vectorReq.text();
+				throw new NetworkError(
+					`HTTP error during vectorization: ${errorData}`,
+					vectorReq.status,
+					errorData,
+				);
+			}
+		}
 		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
