@@ -67,9 +67,9 @@ export const vectorizeQuery = async (
 				errorData,
 			);
 		}
-
-		const res: VectorizeQueryResponse = await request.json();
-		return res;
+		const res = await request.json();
+		const resData: VectorizeQueryResponse = res.data;
+		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
 			throw error;

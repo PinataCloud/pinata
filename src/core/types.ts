@@ -397,8 +397,6 @@ export type VectorQueryMatch = {
 };
 
 export type VectorizeQueryResponse = {
-	data: {
-		count: number;
-		matches: VectorQueryMatch[];
-	};
+	count: number;
+	matches: VectorQueryMatch[];
 };

@@ -38,6 +38,9 @@ import type {
 	FileListResponse,
 	UpdateGroupFilesResponse,
 	TopAnalyticsResponse,
+	VectorizeFileResponse,
+	VectorizeQuery,
+	VectorizeQueryResponse,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -72,6 +75,8 @@ import { swapHistory } from "./files/swapHistory";
 import { deleteSwap } from "./files/deleteSwap";
 import { containsCID } from "../utils/gateway-tools";
 import { createSignedURL } from "./gateway/createSignedURL";
+import { vectorizeFile } from "./files/vectorizeFile";
+import { vectorizeQuery } from "./files/vectorizeQuery";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -179,6 +184,14 @@ class Files {
 
 	deleteSwap(cid: string): Promise<string> {
 		return deleteSwap(this.config, cid);
+	}
+
+	vectorize(fileId: string): Promise<VectorizeFileResponse> {
+		return vectorizeFile(this.config, fileId);
+	}
+
+	queryVector(options: VectorizeQuery): Promise<VectorizeQueryResponse> {
+		return vectorizeQuery(this.config, options);
 	}
 }
 
