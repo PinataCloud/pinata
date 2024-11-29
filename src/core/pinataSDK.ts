@@ -191,7 +191,7 @@ class Files {
 		return vectorizeFile(this.config, fileId);
 	}
 
-	queryVector(options: VectorizeQuery): Promise<VectorizeQueryResponse> {
+	queryVectors(options: VectorizeQuery): Promise<VectorizeQueryResponse> {
 		return vectorizeQuery(this.config, options);
 	}
 
