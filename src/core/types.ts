@@ -380,3 +380,7 @@ export type ContainsCIDResponse = {
 	containsCid: boolean;
 	cid: string | null;
 };
+
+export type VectorizeFileResponse = {
+	status: boolean;
+};
