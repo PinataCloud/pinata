@@ -77,6 +77,7 @@ import { containsCID } from "../utils/gateway-tools";
 import { createSignedURL } from "./gateway/createSignedURL";
 import { vectorizeFile } from "./files/vectorizeFile";
 import { vectorizeQuery } from "./files/vectorizeQuery";
+import { deleteFileVectors } from "./files/deleteFileVectors";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -192,6 +193,10 @@ class Files {
 
 	queryVector(options: VectorizeQuery): Promise<VectorizeQueryResponse> {
 		return vectorizeQuery(this.config, options);
+	}
+
+	deleteVectors(fileId: string): Promise<VectorizeFileResponse> {
+		return deleteFileVectors(this.config, fileId);
 	}
 }
 
