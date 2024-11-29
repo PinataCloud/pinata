@@ -21,6 +21,8 @@ export type UploadResponse = {
 	mime_type: string;
 	user_id: string;
 	group_id: string | null;
+	is_duplicate: true | null;
+	vectorized: true | null;
 };
 
 export type FileObject = {
@@ -49,7 +51,7 @@ export type UploadOptions = {
 	//pinType?: "async" | "sync" | "cidOnly";
 	keys?: string;
 	groupId?: string;
-	//cidVersion?: 0 | 1;
+	vectorize?: boolean;
 };
 
 export type DeleteResponse = {
@@ -379,4 +381,24 @@ export type SwapCidResponse = {
 export type ContainsCIDResponse = {
 	containsCid: boolean;
 	cid: string | null;
+};
+
+export type VectorizeFileResponse = {
+	status: boolean;
+};
+
+export type VectorizeQuery = {
+	groupId: string;
+	query: string;
+};
+
+export type VectorQueryMatch = {
+	file_id: string;
+	cid: string;
+	score: number;
+};
+
+export type VectorizeQueryResponse = {
+	count: number;
+	matches: VectorQueryMatch[];
 };
