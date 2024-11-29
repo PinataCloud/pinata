@@ -384,3 +384,21 @@ export type ContainsCIDResponse = {
 export type VectorizeFileResponse = {
 	status: boolean;
 };
+
+export type VectorizeQuery = {
+	groupId: string;
+	query: string;
+};
+
+export type VectorQueryMatch = {
+	file_id: string;
+	cid: string;
+	score: number;
+};
+
+export type VectorizeQueryResponse = {
+	data: {
+		count: number;
+		matches: VectorQueryMatch[];
+	};
+};
