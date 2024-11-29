@@ -152,6 +152,7 @@ export const uploadFile = async (
 					},
 				);
 				if (vectorReq.ok) {
+					data.vectorized = true;
 					return data;
 				} else {
 					const errorData = await vectorReq.text();
@@ -225,6 +226,7 @@ export const uploadFile = async (
 				},
 			);
 			if (vectorReq.ok) {
+				resData.vectorized = true;
 				return resData;
 			} else {
 				const errorData = await vectorReq.text();

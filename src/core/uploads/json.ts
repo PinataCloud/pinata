@@ -133,6 +133,7 @@ export const uploadJson = async <T extends JsonBody>(
 				},
 			);
 			if (vectorReq.ok) {
+				resData.vectorized = true;
 				return resData;
 			} else {
 				const errorData = await vectorReq.text();

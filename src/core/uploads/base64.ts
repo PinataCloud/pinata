@@ -127,6 +127,7 @@ export const uploadBase64 = async (
 				},
 			);
 			if (vectorReq.ok) {
+				resData.vectorized = true;
 				return resData;
 			} else {
 				const errorData = await vectorReq.text();

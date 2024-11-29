@@ -139,6 +139,7 @@ export const uploadUrl = async (
 				},
 			);
 			if (vectorReq.ok) {
+				resData.vectorized = true;
 				return resData;
 			} else {
 				const errorData = await vectorReq.text();

@@ -21,6 +21,8 @@ export type UploadResponse = {
 	mime_type: string;
 	user_id: string;
 	group_id: string | null;
+	is_duplicate: true | null;
+	vectorized: true | null;
 };
 
 export type FileObject = {
