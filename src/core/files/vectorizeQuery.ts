@@ -1,4 +1,5 @@
 import type {
+	GetCIDResponse,
 	PinataConfig,
 	VectorizeQuery,
 	VectorizeQueryResponse,
@@ -10,10 +11,12 @@ import {
 	ValidationError,
 } from "../../utils/custom-errors";
 
+import { getCid } from "../gateway/getCid";
+
 export const vectorizeQuery = async (
 	config: PinataConfig | undefined,
 	options: VectorizeQuery,
-): Promise<VectorizeQueryResponse> => {
+): Promise<VectorizeQueryResponse | GetCIDResponse> => {
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
@@ -34,8 +37,8 @@ export const vectorizeQuery = async (
 
 	let endpoint: string = "https://uploads.pinata.cloud/v3";
 
-	if (config.endpointUrl) {
-		endpoint = config.endpointUrl;
+	if (config.uploadUrl) {
+		endpoint = config.uploadUrl;
 	}
 
 	const body = JSON.stringify({
@@ -67,8 +70,19 @@ export const vectorizeQuery = async (
 				errorData,
 			);
 		}
+
 		const res = await request.json();
 		const resData: VectorizeQueryResponse = res.data;
+
+		if (options.returnFile) {
+			if (resData.matches.length === 0) {
+				throw new PinataError(`No files returned in query to fetch`);
+			}
+			const cid = resData.matches[0].cid;
+			const fileRes: GetCIDResponse = await getCid(config, cid, undefined);
+			return fileRes;
+		}
+
 		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {
