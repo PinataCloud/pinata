@@ -390,6 +390,7 @@ export type VectorizeFileResponse = {
 export type VectorizeQuery = {
 	groupId: string;
 	query: string;
+	returnFile?: boolean;
 };
 
 export type VectorQueryMatch = {
