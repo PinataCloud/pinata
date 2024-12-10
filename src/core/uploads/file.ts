@@ -183,6 +183,47 @@ export const uploadFile = async (
 
 	const data = new FormData();
 	data.append("file", file, file.name);
+
+	if (options?.url) {
+		try {
+			const request = await fetch(options.url, {
+				method: "POST",
+				headers: headers,
+				body: data,
+			});
+
+			if (!request.ok) {
+				const errorData = await request.text();
+				if (request.status === 401 || request.status === 403) {
+					throw new AuthenticationError(
+						`Authentication failed: ${errorData}`,
+						request.status,
+						errorData,
+					);
+				}
+				throw new NetworkError(
+					`HTTP error: ${errorData}`,
+					request.status,
+					errorData,
+				);
+			}
+
+			const res = await request.json();
+			const resData: UploadResponse = res.data;
+			return resData;
+		} catch (error) {
+			if (error instanceof PinataError) {
+				throw error;
+			}
+			if (error instanceof Error) {
+				throw new PinataError(`Error processing base64: ${error.message}`);
+			}
+			throw new PinataError(
+				"An unknown error occurred while trying to upload base64",
+			);
+		}
+	}
+
 	data.append("name", options?.metadata?.name || file.name || "File from SDK");
 	if (options?.groupId) {
 		data.append("group_id", options.groupId);

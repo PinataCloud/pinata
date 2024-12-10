@@ -52,6 +52,7 @@ export type UploadOptions = {
 	keys?: string;
 	groupId?: string;
 	vectorize?: boolean;
+	url?: string;
 };
 
 export type DeleteResponse = {
@@ -402,4 +403,13 @@ export type VectorQueryMatch = {
 export type VectorizeQueryResponse = {
 	count: number;
 	matches: VectorQueryMatch[];
+};
+
+export type SignedUploadUrlOptions = {
+	date?: number;
+	expires: number;
+	groupId?: string;
+	name?: string;
+	keyvalues?: Record<string, string>;
+	vectorize?: boolean;
 };
