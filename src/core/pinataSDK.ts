@@ -41,6 +41,7 @@ import type {
 	VectorizeFileResponse,
 	VectorizeQuery,
 	VectorizeQueryResponse,
+	SignedUploadUrlOptions,
 } from "./types";
 import { testAuthentication } from "./authentication/testAuthentication";
 import { uploadFile } from "./uploads/file";
@@ -78,6 +79,7 @@ import { createSignedURL } from "./gateway/createSignedURL";
 import { vectorizeFile } from "./files/vectorizeFile";
 import { vectorizeQuery } from "./files/vectorizeQuery";
 import { deleteFileVectors } from "./files/deleteFileVectors";
+import { createSignedUploadURL } from "./uploads/createSignedUploadURL";
 
 const formatConfig = (config: PinataConfig | undefined) => {
 	let gateway = config?.pinataGateway;
@@ -213,6 +215,7 @@ class UploadBuilder<T> {
 	private keys: string | undefined;
 	private groupId: string | undefined;
 	private vector: boolean | undefined;
+	private uploadUrl: string | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -239,6 +242,11 @@ class UploadBuilder<T> {
 
 	vectorize(): UploadBuilder<T> {
 		this.vector = true;
+		return this;
+	}
+
+	url(url: string): UploadBuilder<T> {
+		this.uploadUrl = url;
 		return this;
 	}
 
@@ -274,6 +282,9 @@ class UploadBuilder<T> {
 		}
 		if (this.vector) {
 			options.vectorize = this.vector;
+		}
+		if (this.uploadUrl) {
+			options.url = this.uploadUrl;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
@@ -321,6 +332,10 @@ class Upload {
 
 	json(data: object, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(this.config, uploadJson, data, options);
+	}
+
+	createSignedURL(options: SignedUploadUrlOptions): Promise<string> {
+		return createSignedUploadURL(this.config, options);
 	}
 }
 
