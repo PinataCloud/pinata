@@ -75,15 +75,25 @@ export const uploadFile = async (
 		}
 
 		const name = options?.metadata?.name || file.name || "File from SDK";
+
 		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)}`;
+
 		if (options?.groupId) {
 			metadata + `,group_id ${btoa(options.groupId)}`;
 		}
+
 		if (options?.metadata?.keyvalues) {
 			metadata +
 				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
 		}
-		const urlReq = await fetch(`${endpoint}/files`, {
+
+		let updatedEndpoint: string = `${endpoint}/files`;
+
+		if (options?.url) {
+			updatedEndpoint = options.url;
+		}
+
+		const urlReq = await fetch(updatedEndpoint, {
 			method: "POST",
 			headers: {
 				"Upload-Length": `${file.size}`,
