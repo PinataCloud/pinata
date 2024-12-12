@@ -59,7 +59,8 @@ export const uploadFileArray = async (
 	const data = new FormData();
 
 	for (const file of Array.from(files)) {
-		data.append("file", file, `${folder}/${file.name}`);
+		const path = file.webkitRelativePath || `${folder}/${file.name}`;
+		data.append("file", file, path);
 	}
 
 	data.append(
