@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.0]
+
+### 🚀 Features
+
+- Added presigned upload urls
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated resumable uploads to accept presigned urls
+- Version bump
+
+## [1.9.1] - 2024-12-06
+
+### ⚙️ Miscellaneous Tasks
+
+- Fixed build
+
+## [1.9.0] - 2024-12-06
+
+### 🚀 Features
+
+- Added vectors to upload.file
+- Added vectors to all upload methods
+- Added vectorizeFile
+- Added vector query
+- Added file vector methods to sdk class
+- Added delete file vectors
+
+### 🐛 Bug Fixes
+
+- Updated resumable file upload to use jwt var instead of secret
+
+### ⚙️ Miscellaneous Tasks
+
+- Removed old comments
+- Refactored source header in vectorizeFile
+- Updated response after vectorization
+- Renamed queryVector to queryVectors
+- Refactored vectors to use uploadUrl and include returnFile for queries
+- Version bump
+
 ## [1.8.0] - 2024-11-16
 
 ### 🚀 Features
