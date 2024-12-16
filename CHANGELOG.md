@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.10.0]
+## [1.10.1] - 2024-12-16
+
+### 🐛 Bug Fixes
+
+- Updated filename parameter for creating signed upload urls
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated resumable uploads to accept presigned urls
+- Version bump
+
+## [1.10.0] - 2024-12-16
 
 ### 🚀 Features
 
