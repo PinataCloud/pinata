@@ -18,7 +18,7 @@ export const createSignedUploadURL = async (
 		date: number;
 		expires: number;
 		group_id?: string;
-		name?: string;
+		filename?: string;
 		keyvalues?: Record<string, string>;
 	};
 
@@ -34,7 +34,7 @@ export const createSignedUploadURL = async (
 	}
 
 	if (options.name) {
-		payload.name = options.name;
+		payload.filename = options.name;
 	}
 
 	if (options.keyvalues) {
