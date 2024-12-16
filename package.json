@@ -1,6 +1,6 @@
 {
 	"name": "pinata",
-	"version": "1.10.0",
+	"version": "1.10.1",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
