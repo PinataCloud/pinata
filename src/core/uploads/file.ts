@@ -75,15 +75,25 @@ export const uploadFile = async (
 		}
 
 		const name = options?.metadata?.name || file.name || "File from SDK";
+
 		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)}`;
+
 		if (options?.groupId) {
 			metadata + `,group_id ${btoa(options.groupId)}`;
 		}
+
 		if (options?.metadata?.keyvalues) {
 			metadata +
 				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
 		}
-		const urlReq = await fetch(`${endpoint}/files`, {
+
+		let updatedEndpoint: string = `${endpoint}/files`;
+
+		if (options?.url) {
+			updatedEndpoint = options.url;
+		}
+
+		const urlReq = await fetch(updatedEndpoint, {
 			method: "POST",
 			headers: {
 				"Upload-Length": `${file.size}`,
@@ -183,6 +193,47 @@ export const uploadFile = async (
 
 	const data = new FormData();
 	data.append("file", file, file.name);
+
+	if (options?.url) {
+		try {
+			const request = await fetch(options.url, {
+				method: "POST",
+				headers: headers,
+				body: data,
+			});
+
+			if (!request.ok) {
+				const errorData = await request.text();
+				if (request.status === 401 || request.status === 403) {
+					throw new AuthenticationError(
+						`Authentication failed: ${errorData}`,
+						request.status,
+						errorData,
+					);
+				}
+				throw new NetworkError(
+					`HTTP error: ${errorData}`,
+					request.status,
+					errorData,
+				);
+			}
+
+			const res = await request.json();
+			const resData: UploadResponse = res.data;
+			return resData;
+		} catch (error) {
+			if (error instanceof PinataError) {
+				throw error;
+			}
+			if (error instanceof Error) {
+				throw new PinataError(`Error processing base64: ${error.message}`);
+			}
+			throw new PinataError(
+				"An unknown error occurred while trying to upload base64",
+			);
+		}
+	}
+
 	data.append("name", options?.metadata?.name || file.name || "File from SDK");
 	if (options?.groupId) {
 		data.append("group_id", options.groupId);
