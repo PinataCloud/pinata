@@ -85,7 +85,7 @@ export const listFiles = async (
 	}
 
 	const params = new URLSearchParams({
-		includesCount: "false",
+		includeCount: "false",
 	});
 
 	if (options) {
