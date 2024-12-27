@@ -127,7 +127,7 @@ export const listFiles = async (
 		endpoint = config.endpointUrl;
 	}
 
-	const url = `${endpoint}/data/pinList?status=pinned&${params.toString()}`;
+	const url = `${endpoint}/data/pinList?status=pinned&includeCount=false&${params.toString()}`
 
 	try {
 		let headers: Record<string, string>;
