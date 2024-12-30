@@ -42,6 +42,7 @@ import {
 export const getCid = async (
 	config: PinataConfig | undefined,
 	cid: string,
+	gatewayType?: "ipfs" | "files",
 	options?: OptimizeImageOptions,
 ): Promise<GetCIDResponse> => {
 	if (!config) {
@@ -49,7 +50,7 @@ export const getCid = async (
 	}
 
 	let data: JSON | string | Blob;
-	let newUrl: string = `${config?.pinataGateway}/files/${cid}`;
+	let newUrl: string = `${config?.pinataGateway}/${gatewayType}/${cid}`;
 
 	const params = new URLSearchParams();
 
@@ -70,9 +71,51 @@ export const getCid = async (
 		if (options.metadata) params.append("img-metadata", options.metadata);
 	}
 
+	if (config?.pinataGatewayKey) {
+		params.append("pinataGatewayToken", config.pinataGatewayKey);
+	}
+
 	const queryString = params.toString();
 	if (queryString) {
 		newUrl += `?${queryString}`;
+	}
+
+	if (gatewayType === "ipfs") {
+		const request = await fetch(newUrl);
+
+		if (!request.ok) {
+			const errorData = await request.text();
+			if (request.status === 401 || request.status === 403) {
+				throw new AuthenticationError(
+					`Authentication Failed: ${errorData}`,
+					request.status,
+					errorData,
+				);
+			}
+			throw new NetworkError(
+				`HTTP error: ${errorData}`,
+				request.status,
+				errorData,
+			);
+		}
+
+		const contentType: string | null =
+			request.headers.get("content-type")?.split(";")[0] || null;
+
+		if (contentType?.includes("application/json")) {
+			data = await request.json();
+		} else if (contentType?.includes("text/")) {
+			data = await request.text();
+		} else {
+			data = await request.blob();
+		}
+
+		const res: GetCIDResponse = {
+			data: data,
+			contentType: contentType,
+		};
+
+		return res;
 	}
 
 	const date = Math.floor(new Date().getTime() / 1000);
@@ -113,10 +156,6 @@ export const getCid = async (
 	});
 
 	const signedUrl = await signedUrlRequest.json();
-
-	// if (config?.pinataGatewayKey) {
-	// 	params.append("pinataGatewayToken", config.pinataGatewayKey);
-	// }
 
 	try {
 		const request = await fetch(signedUrl.data);

@@ -454,17 +454,45 @@ class FilterFiles {
 
 class Gateways {
 	config: PinataConfig | undefined;
+	ipfs: IPFSGateways;
+	private: PrivateGateways;
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
+		this.ipfs = new IPFSGateways(config);
+		this.private = new PrivateGateways(config);
 	}
 
 	updateConfig(newConfig: PinataConfig): void {
 		this.config = newConfig;
 	}
+}
+
+class IPFSGateways {
+	private config: PinataConfig | undefined;
+
+	constructor(config: PinataConfig | undefined) {
+		this.config = config;
+	}
 
 	get(cid: string): OptimizeImageGetCid {
-		return new OptimizeImageGetCid(this.config, cid);
+		return new OptimizeImageGetCid(this.config, cid, "ipfs");
+	}
+
+	convert(url: string, gatewayPrefix?: string): Promise<string> {
+		return convertIPFSUrl(this.config, url, gatewayPrefix);
+	}
+}
+
+class PrivateGateways {
+	private config: PinataConfig | undefined;
+
+	constructor(config: PinataConfig | undefined) {
+		this.config = config;
+	}
+
+	get(cid: string): OptimizeImageGetCid {
+		return new OptimizeImageGetCid(this.config, cid, "files");
 	}
 
 	createSignedURL(options: SignedUrlOptions): OptimizeImageCreateSignedURL {
@@ -475,11 +503,17 @@ class Gateways {
 class OptimizeImageGetCid {
 	private config: PinataConfig | undefined;
 	private cid: string;
+	private gatewayType?: "ipfs" | "files";
 	private options: OptimizeImageOptions = {};
 
-	constructor(config: PinataConfig | undefined, cid: string) {
+	constructor(
+		config: PinataConfig | undefined,
+		cid: string,
+		gatewayType?: "ipfs" | "files",
+	) {
 		this.config = config;
 		this.cid = cid;
+		this.gatewayType = gatewayType;
 	}
 
 	optimizeImage(options: OptimizeImageOptions): OptimizeImageGetCid {
@@ -488,7 +522,9 @@ class OptimizeImageGetCid {
 	}
 
 	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
-		return getCid(this.config, this.cid, this.options).then(onfulfilled);
+		return getCid(this.config, this.cid, this.gatewayType, this.options).then(
+			onfulfilled,
+		);
 	}
 }
 
