@@ -1,2 +1,2 @@
-export * from "./core/pinataSDK";
-export * from "./core/types";
+export * from "./core";
+export * from "./utils";
