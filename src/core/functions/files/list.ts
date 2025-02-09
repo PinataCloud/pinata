@@ -73,6 +73,7 @@ import {
 
 export const listFiles = async (
   config: PinataConfig | undefined,
+  privacy: "private" | "public",
   options?: FileListQuery,
 ): Promise<FileListResponse> => {
   if (!config) {
@@ -117,7 +118,7 @@ export const listFiles = async (
     endpoint = config.endpointUrl;
   }
 
-  const url = `${endpoint}/files?${params.toString()}`;
+  const url = `${endpoint}/ipfs/files/${privacy}?${params.toString()}`;
 
   try {
     let headers: Record<string, string>;

@@ -1,80 +1,27 @@
 import {
   PinataConfig,
-  DeleteResponse,
-  UpdateFileOptions,
-  FileListItem,
-  SwapCidOptions,
-  SwapCidResponse,
-  SwapHistoryOptions,
-  VectorizeFileResponse,
-  VectorizeQuery,
-  VectorizeQueryResponse,
-  GetCIDResponse
 } from "../../types";
 
 import {
   formatConfig
 } from "../../../utils/format-config";
 
-import {
-  deleteFile,
-  updateFile,
-  swapCid,
-  swapHistory,
-  deleteSwap,
-  vectorizeFile,
-  vectorizeQuery,
-  deleteFileVectors
-} from "../../functions";
-
-import { FilterFiles } from "./FilterFiles";
+import { PublicFiles } from "./PublicFiles";
+import { PrivateFiles } from "./PrivateFiles";
 
 export class Files {
   config: PinataConfig | undefined;
+  public: PublicFiles;
+  private: PrivateFiles;
 
   constructor(config?: PinataConfig) {
     this.config = formatConfig(config);
+    this.public = new PublicFiles(config)
+    this.private = new PrivateFiles(config)
   }
 
   updateConfig(newConfig: PinataConfig): void {
     this.config = newConfig;
   }
 
-  list(): FilterFiles {
-    return new FilterFiles(this.config);
-  }
-
-  delete(files: string[]): Promise<DeleteResponse[]> {
-    return deleteFile(this.config, files);
-  }
-
-  update(options: UpdateFileOptions): Promise<FileListItem> {
-    return updateFile(this.config, options);
-  }
-
-  addSwap(options: SwapCidOptions): Promise<SwapCidResponse> {
-    return swapCid(this.config, options);
-  }
-
-  getSwapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
-    return swapHistory(this.config, options);
-  }
-
-  deleteSwap(cid: string): Promise<string> {
-    return deleteSwap(this.config, cid);
-  }
-
-  vectorize(fileId: string): Promise<VectorizeFileResponse> {
-    return vectorizeFile(this.config, fileId);
-  }
-
-  queryVectors(
-    options: VectorizeQuery,
-  ): Promise<VectorizeQueryResponse | GetCIDResponse> {
-    return vectorizeQuery(this.config, options);
-  }
-
-  deleteVectors(fileId: string): Promise<VectorizeFileResponse> {
-    return deleteFileVectors(this.config, fileId);
-  }
 }

@@ -5,14 +5,16 @@ export class FilterFiles {
   private config: PinataConfig | undefined;
   private query: FileListQuery = {};
   private currentPageToken: string | undefined;
+  private privacy: "private" | "public"
   // rate limit vars
   // private requestCount = 0;
   // private lastRequestTime = 0;
   // private readonly MAX_REQUESTS_PER_MINUTE = 30;
   // private readonly MINUTE_IN_MS = 60000;
 
-  constructor(config: PinataConfig | undefined) {
+  constructor(config: PinataConfig | undefined, privacy: "private" | "public") {
     this.config = config;
+    this.privacy = privacy;
   }
 
   name(name: string): FilterFiles {
@@ -73,7 +75,7 @@ export class FilterFiles {
     if (this.currentPageToken) {
       this.query.pageToken = this.currentPageToken;
     }
-    const response = await listFiles(this.config, this.query);
+    const response = await listFiles(this.config, this.privacy, this.query);
     this.currentPageToken = response.next_page_token;
     return response;
   }
