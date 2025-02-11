@@ -52,7 +52,7 @@ export class FilterFiles {
     return this;
   }
 
-  metadata(keyvalues: Record<string, string>): FilterFiles {
+  keyvalues(keyvalues: Record<string, string>): FilterFiles {
     this.query.metadata = keyvalues;
     return this;
   }

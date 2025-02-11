@@ -107,7 +107,7 @@ export const listFiles = async (
     if (noGroup) params.append("group", "null");
     if (metadata && typeof metadata === "object") {
       Object.entries(metadata).forEach(([key, value]) => {
-        params.append(`metadata[${key}]`, value.toString());
+        params.append(`keyvalues[${key.toString()}]`, value.toString());
       });
     }
   }
