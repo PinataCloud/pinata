@@ -15,7 +15,7 @@ export class PublicFiles {
   }
 
   delete(files: string[]): Promise<DeleteResponse[]> {
-    return deleteFile(this.config, files);
+    return deleteFile(this.config, files, "public");
   }
 
   update(options: UpdateFileOptions): Promise<FileListItem> {

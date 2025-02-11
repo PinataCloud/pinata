@@ -45,6 +45,7 @@ const wait = (milliseconds: number): Promise<void> => {
 export const deleteFile = async (
   config: PinataConfig | undefined,
   files: string[],
+  privacy: "public" | "private"
 ): Promise<DeleteResponse[]> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -74,7 +75,7 @@ export const deleteFile = async (
 
   for (const id of files) {
     try {
-      const response = await fetch(`${endpoint}/files/${id}`, {
+      const response = await fetch(`${endpoint}/ipfs/files/${privacy}/${id}`, {
         method: "DELETE",
         headers: headers,
       });
