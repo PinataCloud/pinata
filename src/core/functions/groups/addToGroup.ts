@@ -45,6 +45,7 @@ import {
 export const addToGroup = async (
   config: PinataConfig | undefined,
   options: GroupCIDOptions,
+  privacy: "public" | "private"
 ): Promise<UpdateGroupFilesResponse[]> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -83,7 +84,7 @@ export const addToGroup = async (
   for (const id of options.files) {
     try {
       const response = await fetch(
-        `${endpoint}/files/groups/${options.groupId}/ids/${id}`,
+        `${endpoint}/ipfs/groups/${privacy}/${options.groupId}/ids/${id}`,
         {
           method: "PUT",
           headers: headers,

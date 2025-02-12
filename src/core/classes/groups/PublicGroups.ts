@@ -27,7 +27,7 @@ export class PublicGroups {
   }
 
   addFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
-    return addToGroup(this.config, options);
+    return addToGroup(this.config, options, "public");
   }
 
   removeFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
