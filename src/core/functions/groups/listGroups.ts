@@ -46,6 +46,7 @@ import {
 
 export const listGroups = async (
   config: PinataConfig | undefined,
+  privacy: "public" | "private",
   options?: GroupQueryOptions,
 ): Promise<GroupListResponse> => {
   if (!config) {
@@ -87,7 +88,7 @@ export const listGroups = async (
 
   try {
     const request = await fetch(
-      `${endpoint}/files/groups?${params.toString()}`,
+      `${endpoint}/ipfs/groups/${privacy}?${params.toString()}`,
       {
         method: "GET",
         headers: headers,

@@ -1,60 +1,22 @@
-import { FilterGroups } from "./";
-import {
-  addToGroup,
-  createGroup,
-  deleteGroup,
-  getGroup,
-  removeFromGroup,
-  updateGroup,
-} from "../../functions";
 import type {
-  GetGroupOptions,
-  GroupCIDOptions,
-  GroupOptions,
-  GroupResponseItem,
   PinataConfig,
-  UpdateGroupFilesResponse,
-  UpdateGroupOptions,
 } from "../../types";
-
 import { formatConfig } from "../../../utils/format-config";
+import { PublicGroups } from "./PublicGroups";
+import { PrivateGroups } from "./PrivateGroups";
 
 export class Groups {
   config: PinataConfig | undefined;
+  public: PublicGroups;
+  private: PrivateGroups;
 
   constructor(config?: PinataConfig) {
     this.config = formatConfig(config);
+    this.public = new PublicGroups(config)
+    this.private = new PrivateGroups(config)
   }
 
   updateConfig(newConfig: PinataConfig): void {
     this.config = newConfig;
-  }
-
-  create(options: GroupOptions): Promise<GroupResponseItem> {
-    return createGroup(this.config, options);
-  }
-
-  list(): FilterGroups {
-    return new FilterGroups(this.config);
-  }
-
-  get(options: GetGroupOptions): Promise<GroupResponseItem> {
-    return getGroup(this.config, options);
-  }
-
-  addFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
-    return addToGroup(this.config, options);
-  }
-
-  removeFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
-    return removeFromGroup(this.config, options);
-  }
-
-  update(options: UpdateGroupOptions): Promise<GroupResponseItem> {
-    return updateGroup(this.config, options);
-  }
-
-  delete(options: GetGroupOptions): Promise<string> {
-    return deleteGroup(this.config, options);
   }
 }

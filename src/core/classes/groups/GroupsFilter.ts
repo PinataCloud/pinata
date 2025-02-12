@@ -9,6 +9,7 @@ import { listGroups } from "../../functions";
 export class FilterGroups {
   private config: PinataConfig | undefined;
   private query: GroupQueryOptions = {};
+  private privacy: "private" | "public"
   // rate limit vars
   // private requestCount = 0;
   // private lastRequestTime = 0;
@@ -16,8 +17,9 @@ export class FilterGroups {
   // private readonly MINUTE_IN_MS = 60000;
   private nextPageToken: string | undefined;
 
-  constructor(config: PinataConfig | undefined) {
+  constructor(config: PinataConfig | undefined, privacy: "private" | "public") {
     this.config = config;
+    this.privacy = privacy;
   }
 
   name(name: string): FilterGroups {
@@ -55,7 +57,7 @@ export class FilterGroups {
     if (this.nextPageToken) {
       this.query.pageToken = this.nextPageToken;
     }
-    return listGroups(this.config, this.query);
+    return listGroups(this.config, this.privacy, this.query);
   }
 
   // rate limit, hopefully temporary?
