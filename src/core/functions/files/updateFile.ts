@@ -45,6 +45,7 @@ import {
 export const updateFile = async (
   config: PinataConfig | undefined,
   options: UpdateFileOptions,
+  privacy: "public" | "private"
 ): Promise<FileListItem> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -93,7 +94,7 @@ export const updateFile = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/files/${options.id}`, {
+    const request = await fetch(`${endpoint}/ipfs/files/${privacy}/${options.id}`, {
       method: "PUT",
       headers: headers,
       body: body,

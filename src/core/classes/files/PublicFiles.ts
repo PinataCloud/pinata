@@ -19,7 +19,7 @@ export class PublicFiles {
   }
 
   update(options: UpdateFileOptions): Promise<FileListItem> {
-    return updateFile(this.config, options);
+    return updateFile(this.config, options, "public");
   }
 
   addSwap(options: SwapCidOptions): Promise<SwapCidResponse> {
