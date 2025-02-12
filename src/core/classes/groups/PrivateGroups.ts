@@ -23,7 +23,7 @@ export class PrivateGroups {
   }
 
   get(options: GetGroupOptions): Promise<GroupResponseItem> {
-    return getGroup(this.config, options);
+    return getGroup(this.config, options, "private");
   }
 
   addFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {

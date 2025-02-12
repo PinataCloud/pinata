@@ -44,6 +44,7 @@ import {
 export const getGroup = async (
   config: PinataConfig | undefined,
   options: GetGroupOptions,
+  privacy: "public" | "private"
 ): Promise<GroupResponseItem> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -72,7 +73,7 @@ export const getGroup = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/files/groups/${options.groupId}`, {
+    const request = await fetch(`${endpoint}/ipfs/groups/${privacy}/${options.groupId}`, {
       method: "GET",
       headers: headers,
     });
