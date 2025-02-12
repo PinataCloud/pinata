@@ -41,6 +41,7 @@ import {
 export const deleteGroup = async (
   config: PinataConfig | undefined,
   options: GetGroupOptions,
+  privacy: "public" | "private"
 ): Promise<string> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -69,7 +70,7 @@ export const deleteGroup = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/files/groups/${options.groupId}`, {
+    const request = await fetch(`${endpoint}/ipfs/groups/${privacy}/${options.groupId}`, {
       method: "DELETE",
       headers: headers,
     });

@@ -39,6 +39,6 @@ export class PublicGroups {
   }
 
   delete(options: GetGroupOptions): Promise<string> {
-    return deleteGroup(this.config, options);
+    return deleteGroup(this.config, options, "public");
   }
 }
