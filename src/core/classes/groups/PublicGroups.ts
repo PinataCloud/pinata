@@ -15,7 +15,7 @@ export class PublicGroups {
   }
 
   create(options: GroupOptions): Promise<GroupResponseItem> {
-    return createGroup(this.config, options);
+    return createGroup(this.config, options, "public");
   }
 
   list(): FilterGroups {
