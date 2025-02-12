@@ -35,7 +35,7 @@ export class PublicGroups {
   }
 
   update(options: UpdateGroupOptions): Promise<GroupResponseItem> {
-    return updateGroup(this.config, options);
+    return updateGroup(this.config, options, "public");
   }
 
   delete(options: GetGroupOptions): Promise<string> {
