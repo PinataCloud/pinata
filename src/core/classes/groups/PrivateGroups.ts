@@ -31,7 +31,7 @@ export class PrivateGroups {
   }
 
   removeFiles(options: GroupCIDOptions): Promise<UpdateGroupFilesResponse[]> {
-    return removeFromGroup(this.config, options);
+    return removeFromGroup(this.config, options, "private");
   }
 
   update(options: UpdateGroupOptions): Promise<GroupResponseItem> {
