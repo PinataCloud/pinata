@@ -1,5 +1,6 @@
 import { formatConfig } from "../../../utils/format-config";
 import { deleteFile, updateFile, swapCid, swapHistory, deleteSwap, vectorizeFile, vectorizeQuery, deleteFileVectors } from "../../functions";
+import { getFile } from "../../functions/files/getFile";
 import { PinataConfig, DeleteResponse, UpdateFileOptions, FileListItem, SwapCidOptions, SwapCidResponse, SwapHistoryOptions, VectorizeFileResponse, VectorizeQuery, VectorizeQueryResponse, GetCIDResponse } from "../../types";
 import { FilterFiles } from "./FilterFiles";
 
@@ -14,6 +15,10 @@ export class PublicFiles {
     return new FilterFiles(this.config, "public");
   }
 
+  get(id: string): Promise<FileListItem> {
+    return getFile(this.config, id, "public")
+  }
+
   delete(files: string[]): Promise<DeleteResponse[]> {
     return deleteFile(this.config, files, "public");
   }
@@ -23,15 +28,15 @@ export class PublicFiles {
   }
 
   addSwap(options: SwapCidOptions): Promise<SwapCidResponse> {
-    return swapCid(this.config, options);
+    return swapCid(this.config, options, "public");
   }
 
   getSwapHistory(options: SwapHistoryOptions): Promise<SwapCidResponse[]> {
-    return swapHistory(this.config, options);
+    return swapHistory(this.config, options, "public");
   }
 
   deleteSwap(cid: string): Promise<string> {
-    return deleteSwap(this.config, cid);
+    return deleteSwap(this.config, cid, "public");
   }
 
   vectorize(fileId: string): Promise<VectorizeFileResponse> {
