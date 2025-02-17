@@ -1,27 +1,21 @@
 import { formatConfig } from "../../../utils/format-config";
-import { addSignature, getSignature, removeSignature } from "../../functions/signatures";
-import { PinataConfig, SignatureOptions, SignatureResponse } from "../../types";
+import { PinataConfig } from "../../types";
+import { PrivateSignatures } from "./PrivateSignatures";
+import { PublicSignatures } from "./PublicSignatures";
 
 export class Signatures {
   config: PinataConfig | undefined;
+  public: PublicSignatures;
+  private: PrivateSignatures
 
   constructor(config?: PinataConfig) {
     this.config = formatConfig(config);
+    this.public = new PublicSignatures(config)
+    this.private = new PrivateSignatures(config)
   }
 
   updateConfig(newConfig: PinataConfig): void {
     this.config = newConfig;
   }
 
-  add(options: SignatureOptions): Promise<SignatureResponse> {
-    return addSignature(this.config, options);
-  }
-
-  get(cid: string): Promise<SignatureResponse> {
-    return getSignature(this.config, cid);
-  }
-
-  delete(cid: string): Promise<string> {
-    return removeSignature(this.config, cid);
-  }
 }

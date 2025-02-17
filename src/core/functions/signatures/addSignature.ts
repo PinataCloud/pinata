@@ -47,6 +47,7 @@ import {
 export const addSignature = async (
   config: PinataConfig | undefined,
   options: SignatureOptions,
+  network: "public" | "private"
 ): Promise<SignatureResponse> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -54,6 +55,7 @@ export const addSignature = async (
 
   const data = JSON.stringify({
     signature: options.signature,
+    address: options.address
   });
 
   let headers: Record<string, string>;
@@ -68,7 +70,7 @@ export const addSignature = async (
     };
   }
 
-  let endpoint: string = "https://api.pinata.cloud";
+  let endpoint: string = "https://api.pinata.cloud/v3";
 
   if (config.endpointUrl) {
     endpoint = config.endpointUrl;
@@ -76,7 +78,7 @@ export const addSignature = async (
 
   try {
     const request = await fetch(
-      `${endpoint}/v3/ipfs/signature/${options.cid}`,
+      `${endpoint}/files/${network}/signature/${options.cid}`,
       {
         method: "POST",
         headers: headers,

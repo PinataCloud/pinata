@@ -2,7 +2,7 @@ import {
   testAuthentication,
 } from "./functions";
 import { formatConfig } from "../utils/format-config";
-import { Analytics, Groups, Keys, Gateways, Files, Upload } from "./classes";
+import { Analytics, Groups, Keys, Gateways, Files, Upload, Signatures } from "./classes";
 import { PinataConfig } from "./types";
 
 export class PinataSDK {
@@ -14,7 +14,7 @@ export class PinataSDK {
   keys: Keys;
   groups: Groups;
   analytics: Analytics;
-  //signatures: Signatures;
+  signatures: Signatures;
 
   constructor(config?: PinataConfig) {
     this.config = formatConfig(config);
@@ -25,7 +25,7 @@ export class PinataSDK {
     this.keys = new Keys(this.config);
     this.groups = new Groups(this.config);
     this.analytics = new Analytics(this.config);
-    //		this.signatures = new Signatures(this.config);
+    this.signatures = new Signatures(this.config);
   }
 
   setNewHeaders(headers: Record<string, string>): void {
@@ -42,7 +42,7 @@ export class PinataSDK {
     this.keys.updateConfig(this.config);
     this.groups.updateConfig(this.config);
     this.analytics.updateConfig(this.config);
-    //		this.signatures.updateConfig(this.config);
+    this.signatures.updateConfig(this.config);
   }
 
   setNewJwt(jwt: string): void {
@@ -59,7 +59,7 @@ export class PinataSDK {
     this.keys.updateConfig(this.config);
     this.groups.updateConfig(this.config);
     this.analytics.updateConfig(this.config);
-    //		this.signatures.updateConfig(this.config);
+    this.signatures.updateConfig(this.config);
   }
 
   testAuthentication(): Promise<string> {
