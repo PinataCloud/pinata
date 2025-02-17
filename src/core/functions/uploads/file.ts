@@ -144,7 +144,7 @@ export const uploadFile = async (
       } else {
         dataEndpoint = "https://api.pinata.cloud/v3";
       }
-      const fileInfoReq = await fetch(`${dataEndpoint}/files/${fileId}`, {
+      const fileInfoReq = await fetch(`${dataEndpoint}/files/${network}/${fileId}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${jwt}`,
@@ -197,6 +197,16 @@ export const uploadFile = async (
 
   data.append("network", network)
 
+  data.append("name", options?.metadata?.name || file.name || "File from SDK");
+
+  if (options?.groupId) {
+    data.append("group_id", options.groupId);
+  }
+
+  if (options?.metadata?.keyvalues) {
+    data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+  }
+
   if (options?.url) {
     try {
       const request = await fetch(options.url, {
@@ -237,13 +247,6 @@ export const uploadFile = async (
     }
   }
 
-  data.append("name", options?.metadata?.name || file.name || "File from SDK");
-  if (options?.groupId) {
-    data.append("group_id", options.groupId);
-  }
-  if (options?.metadata?.keyvalues) {
-    data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
-  }
 
   try {
     const request = await fetch(`${endpoint}/files`, {
