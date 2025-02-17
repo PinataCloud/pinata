@@ -88,7 +88,7 @@ export const createSignedURL = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/files/sign`, {
+    const request = await fetch(`${endpoint}/files/private/download_link`, {
       method: "POST",
       headers: headers,
       body: payload,
