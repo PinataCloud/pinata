@@ -43,6 +43,7 @@ import {
 export const swapCid = async (
   config: PinataConfig | undefined,
   options: SwapCidOptions,
+  network: "public" | "private"
 ): Promise<SwapCidResponse> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -75,7 +76,7 @@ export const swapCid = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/files/swap/${options.cid}`, {
+    const request = await fetch(`${endpoint}/files/${network}/swap/${options.cid}`, {
       method: "PUT",
       headers: headers,
       body: data,

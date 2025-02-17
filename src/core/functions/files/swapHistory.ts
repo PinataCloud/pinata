@@ -47,6 +47,7 @@ import {
 export const swapHistory = async (
   config: PinataConfig | undefined,
   options: SwapHistoryOptions,
+  network: "public" | "private"
 ): Promise<SwapCidResponse[]> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -76,7 +77,7 @@ export const swapHistory = async (
 
   try {
     const request = await fetch(
-      `${endpoint}/files/swap/${options.cid}?domain=${options.domain}`,
+      `${endpoint}/files/${network}/swap/${options.cid}?domain=${options.domain}`,
       {
         method: "GET",
         headers: headers,

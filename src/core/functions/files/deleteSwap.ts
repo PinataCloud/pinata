@@ -38,6 +38,7 @@ import {
 export const deleteSwap = async (
   config: PinataConfig | undefined,
   cid: string,
+  network: "public" | "private"
 ): Promise<string> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -66,7 +67,7 @@ export const deleteSwap = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/files/swap/${cid}`, {
+    const request = await fetch(`${endpoint}/files/${network}/swap/${cid}`, {
       method: "DELETE",
       headers: headers,
     });
