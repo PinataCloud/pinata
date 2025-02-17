@@ -55,6 +55,7 @@ import {
 export const uploadJson = async <T extends JsonBody>(
   config: PinataConfig | undefined,
   jsonData: T,
+  network: "public" | "private",
   options?: UploadOptions,
 ) => {
   if (!config) {
@@ -69,6 +70,7 @@ export const uploadJson = async <T extends JsonBody>(
 
   const data = new FormData();
   data.append("file", file, file.name);
+  data.append("network", network)
   data.append("name", options?.metadata?.name || file.name || "File from SDK");
   if (options?.groupId) {
     data.append("group_id", options.groupId);

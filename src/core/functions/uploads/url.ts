@@ -45,6 +45,7 @@ import {
 export const uploadUrl = async (
   config: PinataConfig | undefined,
   url: string,
+  network: "public" | "private",
   options?: UploadOptions,
 ) => {
   if (!config) {
@@ -74,6 +75,7 @@ export const uploadUrl = async (
   const file = new File([blob], name);
 
   data.append("file", file, name);
+  data.append("network", network)
   data.append("name", name);
   if (options?.groupId) {
     data.append("group_id", options.groupId);

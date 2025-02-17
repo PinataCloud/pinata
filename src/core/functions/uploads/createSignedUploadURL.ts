@@ -9,6 +9,7 @@ import {
 export const createSignedUploadURL = async (
   config: PinataConfig | undefined,
   options: SignedUploadUrlOptions,
+  network: "public" | "private"
 ): Promise<string> => {
   if (!config) {
     throw new ValidationError("Pinata configuration is missing");
@@ -20,6 +21,7 @@ export const createSignedUploadURL = async (
     group_id?: string;
     filename?: string;
     keyvalues?: Record<string, string>;
+    network?: "public" | "private"
   };
 
   const date = options?.date || Math.floor(new Date().getTime() / 1000);
@@ -39,6 +41,10 @@ export const createSignedUploadURL = async (
 
   if (options.keyvalues) {
     payload.keyvalues = options.keyvalues;
+  }
+
+  if (network) {
+    payload.network = network
   }
 
   let endpoint: string = "https://uploads.pinata.cloud/v3";

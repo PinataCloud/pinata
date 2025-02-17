@@ -1,49 +1,21 @@
-import { PinataConfig, FileObject, UploadOptions, UploadResponse, SignedUploadUrlOptions } from '../../types';
-import { uploadFile, uploadBase64, uploadUrl, uploadJson, createSignedUploadURL } from '../../functions';
+import { PinataConfig } from '../../types';
 import { formatConfig } from '../../../utils/format-config';
-import { UploadBuilder } from './';
+
+import { PublicUpload } from './PublicUpload';
+import { PrivateUpload } from './PrivateUpload';
 
 export class Upload {
   config: PinataConfig | undefined;
+  public: PublicUpload;
+  private: PrivateUpload;
 
   constructor(config?: PinataConfig) {
     this.config = formatConfig(config);
+    this.public = new PublicUpload(config)
+    this.private = new PrivateUpload(config)
   }
 
   updateConfig(newConfig: PinataConfig): void {
     this.config = newConfig;
-  }
-
-  file(
-    file: FileObject,
-    options?: UploadOptions,
-  ): UploadBuilder<UploadResponse> {
-    return new UploadBuilder(this.config, uploadFile, file, options);
-  }
-
-  // fileArray(
-  // 	files: FileObject[],
-  // 	options?: UploadOptions,
-  // ): UploadBuilder<UploadResponse> {
-  // 	return new UploadBuilder(this.config, uploadFileArray, files, options);
-  // }
-
-  base64(
-    base64String: string,
-    options?: UploadOptions,
-  ): UploadBuilder<UploadResponse> {
-    return new UploadBuilder(this.config, uploadBase64, base64String, options);
-  }
-
-  url(url: string, options?: UploadOptions): UploadBuilder<UploadResponse> {
-    return new UploadBuilder(this.config, uploadUrl, url, options);
-  }
-
-  json(data: object, options?: UploadOptions): UploadBuilder<UploadResponse> {
-    return new UploadBuilder(this.config, uploadJson, data, options);
-  }
-
-  createSignedURL(options: SignedUploadUrlOptions): Promise<string> {
-    return createSignedUploadURL(this.config, options);
   }
 }

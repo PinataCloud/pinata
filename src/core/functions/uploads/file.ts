@@ -45,6 +45,7 @@ import { getFileIdFromUrl } from "../../../utils/resumable";
 export const uploadFile = async (
   config: PinataConfig | undefined,
   file: File,
+  network: "public" | "private",
   options?: UploadOptions,
 ) => {
   if (!config) {
@@ -76,7 +77,7 @@ export const uploadFile = async (
 
     const name = options?.metadata?.name || file.name || "File from SDK";
 
-    let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)}`;
+    let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)},network ${btoa(network)}`;
 
     if (options?.groupId) {
       metadata + `,group_id ${btoa(options.groupId)}`;
@@ -193,6 +194,8 @@ export const uploadFile = async (
 
   const data = new FormData();
   data.append("file", file, file.name);
+
+  data.append("network", network)
 
   if (options?.url) {
     try {

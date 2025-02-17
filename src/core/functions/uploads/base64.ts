@@ -44,6 +44,7 @@ import {
 export const uploadBase64 = async (
   config: PinataConfig | undefined,
   base64String: string,
+  network: "private" | "public",
   options?: UploadOptions,
 ) => {
   if (!config) {
@@ -63,6 +64,7 @@ export const uploadBase64 = async (
   const data = new FormData();
 
   data.append("file", blob, name);
+  data.append("network", network)
   data.append("name", name);
   if (options?.groupId) {
     data.append("group_id", options.groupId);
