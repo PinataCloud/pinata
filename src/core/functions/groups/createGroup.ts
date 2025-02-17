@@ -74,7 +74,7 @@ export const createGroup = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/ipfs/groups/${privacy}`, {
+    const request = await fetch(`${endpoint}/groups/${privacy}`, {
       method: "POST",
       headers: headers,
       body: data,

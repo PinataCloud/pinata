@@ -75,7 +75,7 @@ export const deleteFile = async (
 
   for (const id of files) {
     try {
-      const response = await fetch(`${endpoint}/ipfs/files/${privacy}/${id}`, {
+      const response = await fetch(`${endpoint}/files/${privacy}/${id}`, {
         method: "DELETE",
         headers: headers,
       });

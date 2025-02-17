@@ -94,7 +94,7 @@ export const updateFile = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/ipfs/files/${privacy}/${options.id}`, {
+    const request = await fetch(`${endpoint}/files/${privacy}/${options.id}`, {
       method: "PUT",
       headers: headers,
       body: body,

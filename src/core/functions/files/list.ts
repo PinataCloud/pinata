@@ -118,7 +118,7 @@ export const listFiles = async (
     endpoint = config.endpointUrl;
   }
 
-  const url = `${endpoint}/ipfs/files/${privacy}?${params.toString()}`;
+  const url = `${endpoint}/files/${privacy}?${params.toString()}`;
 
   try {
     let headers: Record<string, string>;

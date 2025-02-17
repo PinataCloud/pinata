@@ -88,7 +88,7 @@ export const listGroups = async (
 
   try {
     const request = await fetch(
-      `${endpoint}/ipfs/groups/${privacy}?${params.toString()}`,
+      `${endpoint}/groups/${privacy}?${params.toString()}`,
       {
         method: "GET",
         headers: headers,

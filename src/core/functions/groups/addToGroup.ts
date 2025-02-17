@@ -84,7 +84,7 @@ export const addToGroup = async (
   for (const id of options.files) {
     try {
       const response = await fetch(
-        `${endpoint}/ipfs/groups/${privacy}/${options.groupId}/ids/${id}`,
+        `${endpoint}/groups/${privacy}/${options.groupId}/ids/${id}`,
         {
           method: "PUT",
           headers: headers,

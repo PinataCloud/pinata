@@ -80,7 +80,7 @@ export const updateGroup = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/ipfs/groups/${privacy}/${options.groupId}`, {
+    const request = await fetch(`${endpoint}/groups/${privacy}/${options.groupId}`, {
       method: "PUT",
       headers: headers,
       body: data,

@@ -70,7 +70,7 @@ export const deleteGroup = async (
   }
 
   try {
-    const request = await fetch(`${endpoint}/ipfs/groups/${privacy}/${options.groupId}`, {
+    const request = await fetch(`${endpoint}/groups/${privacy}/${options.groupId}`, {
       method: "DELETE",
       headers: headers,
     });
