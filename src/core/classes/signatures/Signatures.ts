@@ -6,12 +6,12 @@ import { PublicSignatures } from "./PublicSignatures";
 export class Signatures {
   config: PinataConfig | undefined;
   public: PublicSignatures;
-  private: PrivateSignatures
+  //private: PrivateSignatures
 
   constructor(config?: PinataConfig) {
     this.config = formatConfig(config);
     this.public = new PublicSignatures(config)
-    this.private = new PrivateSignatures(config)
+    // this.private = new PrivateSignatures(config)
   }
 
   updateConfig(newConfig: PinataConfig): void {
