@@ -1,5 +1,5 @@
 import { formatConfig } from "../../../utils/format-config";
-import { createSignedUploadURL, uploadBase64, uploadFile, uploadJson, uploadUrl } from "../../functions";
+import { createSignedUploadURL, uploadBase64, uploadFile, uploadFileArray, uploadJson, uploadUrl } from "../../functions";
 import { FileObject, PinataConfig, SignedUploadUrlOptions, UploadOptions, UploadResponse } from "../../types";
 import { UploadBuilder } from "./UploadBuilder";
 
@@ -26,12 +26,17 @@ export class PrivateUpload {
     );
   }
 
-  // fileArray(
-  // 	files: FileObject[],
-  // 	options?: UploadOptions,
-  // ): UploadBuilder<UploadResponse> {
-  // 	return new UploadBuilder(this.config, uploadFileArray, files, options);
-  // }
+  fileArray(
+    files: FileObject[],
+    options?: UploadOptions,
+  ): UploadBuilder<UploadResponse> {
+    return new UploadBuilder(
+      this.config,
+      (config, file, options) => uploadFileArray(config, file, "private", options),
+      files,
+      options
+    );
+  }
 
   base64(
     base64String: string,
