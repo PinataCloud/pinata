@@ -47,6 +47,7 @@ import {
 export const uploadFileArray = async (
   config: PinataConfig | undefined,
   files: File[],
+  network: "public" | "private",
   options?: UploadOptions,
 ) => {
   if (!config) {
@@ -56,31 +57,25 @@ export const uploadFileArray = async (
   const jwt: string | undefined = options?.keys || config?.pinataJwt;
 
   const folder = options?.metadata?.name || "folder_from_sdk";
+
   const data = new FormData();
 
   for (const file of Array.from(files)) {
-    data.append("file", file, `${folder}/${file.name}`);
+    const path = file.webkitRelativePath || `${folder}/${file.name}`;
+    data.append("file", file, path);
   }
+
   data.append("name", folder);
+
+  data.append("network", network);
+
   if (options?.groupId) {
     data.append("group_id", options.groupId);
   }
 
-  // data.append(
-  // 	"pinataMetadata",
-  // 	JSON.stringify({
-  // 		name: folder,
-  // 		keyvalues: options?.metadata?.keyValues,
-  // 	}),
-  // );
-
-  // data.append(
-  // 	"pinataOptions",
-  // 	JSON.stringify({
-  // 		cidVersion: options?.cidVersion,
-  // 		groupId: options?.groupId,
-  // 	}),
-  // );
+  if (options?.metadata?.keyvalues) {
+    data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+  }
 
   let headers: Record<string, string>;
 
@@ -127,6 +122,30 @@ export const uploadFileArray = async (
 
     const res = await request.json();
     const resData: UploadResponse = res.data;
+
+    if (options?.vectorize) {
+      const vectorReq = await fetch(
+        `${endpoint}/vectorize/files/${resData.id}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        },
+      );
+      if (vectorReq.ok) {
+        resData.vectorized = true;
+        return resData;
+      } else {
+        const errorData = await vectorReq.text();
+        throw new NetworkError(
+          `HTTP error during vectorization: ${errorData}`,
+          vectorReq.status,
+          errorData,
+        );
+      }
+    }
+
     return resData;
   } catch (error) {
     if (error instanceof PinataError) {
