@@ -1,13 +1,19 @@
-import type * as IsIPFS from "is-ipfs";
 import { ContainsCIDResponse } from "../core/types";
 
-let isIPFSModule: typeof IsIPFS;
+function isValidCIDv0(cid: string): boolean {
+  // CIDv0 is a 46-character base58-encoded string starting with "Qm"
+  return /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(cid);
+}
 
-async function getIsIPFS() {
-  if (!isIPFSModule) {
-    isIPFSModule = await import("is-ipfs");
-  }
-  return isIPFSModule;
+function isValidCIDv1(cid: string): boolean {
+  // CIDv1 typically starts with "b" and uses base32 encoding
+  return /^b[a-z2-7]{58,}$/.test(cid);
+}
+
+function isCID(str: string): boolean {
+  // Remove any leading/trailing whitespace
+  str = str.trim();
+  return isValidCIDv0(str) || isValidCIDv1(str);
 }
 
 export async function containsCID(input: string): Promise<ContainsCIDResponse> {
@@ -15,12 +21,10 @@ export async function containsCID(input: string): Promise<ContainsCIDResponse> {
     throw new Error("Input is not a string");
   }
 
-  const isIPFS = await getIsIPFS();
-
   // Helper function to check if a string starts with a CID
   const startsWithCID = (str: string) => {
     const parts = str.split("/");
-    return isIPFS.cid(parts[0]) ? parts[0] : null;
+    return isCID(parts[0]) ? parts[0] : null;
   };
 
   // Check if the input itself is a CID or starts with a CID
@@ -57,7 +61,7 @@ export async function containsCID(input: string): Promise<ContainsCIDResponse> {
   // Check for CID in subdomain
   const subdomains = url.hostname.split(".");
   for (const subdomain of subdomains) {
-    if (isIPFS.cid(subdomain)) {
+    if (isCID(subdomain)) {
       return {
         containsCid: true,
         cid: subdomain,
