@@ -104,7 +104,15 @@ export const uploadFile = async (
     });
     const url = urlReq.headers.get("Location");
     if (!url) {
-      throw new NetworkError("Upload URL not provided", urlReq.status, "");
+      const errorData = await urlReq.text()
+      throw new NetworkError("Upload URL not provided", urlReq.status, {
+        error: errorData,
+        code: 'HTTP_ERROR',
+        metadata: {
+          requestUrl: urlReq.url,
+          requestHeaders: urlReq.headers
+        }
+      });
     }
 
     const chunkSize = 50 * 1024 * 1024; // 50MB in bytes
@@ -129,7 +137,13 @@ export const uploadFile = async (
         throw new NetworkError(
           `HTTP error during chunk upload: ${errorData}`,
           uploadReq.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: uploadReq.url
+            }
+          },
         );
       }
 
@@ -170,7 +184,13 @@ export const uploadFile = async (
           throw new NetworkError(
             `HTTP error during vectorization: ${errorData}`,
             vectorReq.status,
-            errorData,
+            {
+              error: errorData,
+              code: 'HTTP_ERROR',
+              metadata: {
+                requestUrl: vectorReq.url
+              }
+            },
           );
         }
       }
@@ -221,13 +241,25 @@ export const uploadFile = async (
           throw new AuthenticationError(
             `Authentication failed: ${errorData}`,
             request.status,
-            errorData,
+            {
+              error: errorData,
+              code: 'AUTH_ERROR',
+              metadata: {
+                requestUrl: request.url
+              }
+            },
           );
         }
         throw new NetworkError(
           `HTTP error: ${errorData}`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
 
@@ -261,13 +293,25 @@ export const uploadFile = async (
         throw new AuthenticationError(
           `Authentication failed: ${errorData}`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'AUTH_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
       throw new NetworkError(
         `HTTP error: ${errorData}`,
         request.status,
-        errorData,
+        {
+          error: errorData,
+          code: 'HTTP_ERROR',
+          metadata: {
+            requestUrl: request.url
+          }
+        },
       );
     }
     const res = await request.json();
@@ -290,7 +334,13 @@ export const uploadFile = async (
         throw new NetworkError(
           `HTTP error during vectorization: ${errorData}`,
           vectorReq.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
     }

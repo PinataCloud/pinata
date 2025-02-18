@@ -90,20 +90,38 @@ export const swapHistory = async (
         throw new AuthenticationError(
           `Authentication failed: ${errorData}`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'AUTH_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
       if (request.status === 404) {
         throw new PinataError(
           "CID does not have history",
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
       throw new NetworkError(
         `HTTP error: ${errorData}`,
         request.status,
-        errorData,
+        {
+          error: errorData,
+          code: 'HTTP_ERROR',
+          metadata: {
+            requestUrl: request.url
+          }
+        },
       );
     }
 

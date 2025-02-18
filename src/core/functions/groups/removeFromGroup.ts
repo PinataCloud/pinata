@@ -100,13 +100,25 @@ export const removeFromGroup = async (
           throw new AuthenticationError(
             `Authentication failed: ${errorData}`,
             response.status,
-            errorData,
+            {
+              error: errorData,
+              code: 'AUTH_ERROR',
+              metadata: {
+                requestUrl: response.url
+              }
+            },
           );
         }
         throw new NetworkError(
           `HTTP error: ${errorData}`,
           response.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: response.url
+            }
+          },
         );
       }
 

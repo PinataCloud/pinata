@@ -112,13 +112,25 @@ export const uploadJson = async <T extends JsonBody>(
           throw new AuthenticationError(
             `Authentication failed: ${errorData}`,
             request.status,
-            errorData,
+            {
+              error: errorData,
+              code: 'AUTH_ERROR',
+              metadata: {
+                requestUrl: request.url
+              }
+            },
           );
         }
         throw new NetworkError(
           `HTTP error: ${errorData}`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
 
@@ -151,13 +163,25 @@ export const uploadJson = async <T extends JsonBody>(
         throw new AuthenticationError(
           `Authentication failed: ${errorData}`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'AUTH_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
       throw new NetworkError(
         `HTTP error: ${errorData}`,
         request.status,
-        errorData,
+        {
+          error: errorData,
+          code: 'HTTP_ERROR',
+          metadata: {
+            requestUrl: request.url
+          }
+        },
       );
     }
 
@@ -181,7 +205,13 @@ export const uploadJson = async <T extends JsonBody>(
         throw new NetworkError(
           `HTTP error during vectorization: ${errorData}`,
           vectorReq.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
     }

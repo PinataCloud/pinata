@@ -92,20 +92,38 @@ export const addSignature = async (
         throw new AuthenticationError(
           `Authentication failed: ${errorData}`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'AUTH_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
       if (request.status === 403) {
         throw new PinataError(
           "Unauthorized signing, you must be the original owner of the file and it must not have a signature",
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'HTTP_ERROR',
+            metadata: {
+              requestUrl: request.url
+            }
+          },
         );
       }
       throw new NetworkError(
         `HTTP error: ${errorData}`,
         request.status,
-        errorData,
+        {
+          error: errorData,
+          code: 'HTTP_ERROR',
+          metadata: {
+            requestUrl: request.url
+          }
+        },
       );
     }
 

@@ -76,29 +76,41 @@ export const deleteSwap = async (
       const errorData = await request.text();
       if (request.status === 401 || request.status === 403) {
         throw new AuthenticationError(
-          `Authentication failed: ${errorData}`,
+          `Authentication failed`,
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'AUTH_ERROR'
+          }
         );
       }
       if (request.status === 403) {
         throw new PinataError(
           "Unauthorized CID Swap Deletion",
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'UNAUTHORIZED'
+          }
         );
       }
       if (request.status === 404) {
         throw new PinataError(
           "CID not pinned to account",
           request.status,
-          errorData,
+          {
+            error: errorData,
+            code: 'NOT_FOUND'
+          }
         );
       }
       throw new NetworkError(
-        `HTTP error: ${errorData}`,
+        `HTTP error occurred`,
         request.status,
-        errorData,
+        {
+          error: errorData,
+          code: 'NETWORK_ERROR'
+        }
       );
     }
 
@@ -108,8 +120,20 @@ export const deleteSwap = async (
       throw error;
     }
     if (error instanceof Error) {
-      throw new PinataError(`Error processing deleteSwap: ${error.message}`);
+      throw new PinataError(
+        `Error processing deleteSwap: ${error.message}`,
+        undefined,
+        {
+          code: 'DELETE_SWAP_ERROR'
+        }
+      );
     }
-    throw new PinataError("An unknown error occurred while deleting swap");
+    throw new PinataError(
+      "An unknown error occurred while deleting swap",
+      undefined,
+      {
+        code: 'UNKNOWN_ERROR'
+      }
+    );
   }
 };
