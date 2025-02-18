@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { pinata } from "./utils/config"
+import { NetworkError } from "../../../dist"
 
 function App() {
   const [selectedFile, setSelectedFile]: any = useState();
@@ -11,8 +12,9 @@ function App() {
     try {
       const upload = await pinata.upload.private.file(selectedFile)
       console.log(upload);
-    } catch (error) {
-      console.log(error);
+    } catch (e) {
+      const error = e as NetworkError
+      console.log(error.details?.metadata);
     }
   };
 
