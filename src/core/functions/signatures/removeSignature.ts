@@ -1,32 +1,3 @@
-/**
- * Removes the signature associated with a specific Content Identifier (CID) from Pinata.
- *
- * This function allows you to delete the cryptographic signature associated with a file
- * identified by its CID. It's useful for managing ownership claims or updating the
- * authenticity status of content stored on IPFS via Pinata.
- *
- * @async
- * @function removeSignature
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {string} cid - The Content Identifier (CID) of the file whose signature is to be removed.
- * @returns {Promise<string>} A promise that resolves to "OK" if the signature was successfully removed.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the signature removal process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const signature = await pinata.signatures.delete("QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU"
- )
- */
-
 import type { PinataConfig } from "../../types";
 
 import {

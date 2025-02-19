@@ -1,33 +1,3 @@
-/**
- * Unpins multiple files from Pinata and IPFS.
- *
- * This function allows you to remove pins for multiple files from your Pinata account.
- * Unpinning a file means that Pinata will no longer guarantee its availability on IPFS,
- * although the content may still be available if pinned by other IPFS nodes.
- *
- * @async
- * @function unpinFile
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {string[]} files - An array of IPFS hashes (CIDs) of the files to unpin.
- * @returns {Promise<DeleteResponse[]>} A promise that resolves to an array of objects, each containing the status of the unpin operation for each file.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the unpinning process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const unpin = await pinata.unpin([
- *   "bafkreih5aznjvttude6c3wbvqeebb6rlx5wkbzyppv7garjiubll2ceym4"
- * ])
- */
-
 import type { PinataConfig, DeleteResponse } from "../../types";
 import {
 	PinataError,

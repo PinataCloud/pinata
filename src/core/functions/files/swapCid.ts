@@ -1,36 +1,3 @@
-/**
- * Swaps a CID (Content Identifier) with a new one in Pinata.
- *
- * This function allows you to replace an existing CID with a new one in your Pinata account.
- * It's useful for updating content while maintaining the same access point or reference.
- *
- * @async
- * @function swapCid
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {SwapCidOptions} options - The options for swapping the CID.
- * @param {string} options.cid - The original CID to be replaced.
- * @param {string} options.swapCid - The new CID to replace the original one.
- * @returns {Promise<SwapCidResponse>} A promise that resolves to an object containing details of the CID swap operation.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {PinataError} If the swap operation is unauthorized or if the original CID is not found in the account.
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the CID swap process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const swapResult = await pinata.gateways.swapCid({
- *   cid: "QmOldCid123",
- *   swapCid: "QmNewCid456"
- * });
- */
-
 import type {
 	SwapCidOptions,
 	SwapCidResponse,

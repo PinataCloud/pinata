@@ -1,30 +1,3 @@
-/**
- * Retrieves the total storage usage in bytes for all files pinned to Pinata by the authenticated user.
- *
- * This function makes a request to the Pinata API to fetch the total storage size
- * of all files that the user has pinned to their account. This can be useful for
- * monitoring account usage, managing storage limits, and planning for capacity.
- *
- * @async
- * @function totalStorageUsage
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @returns {Promise<number>} A promise that resolves to the total storage usage in bytes.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the retrieval process.
- *
- * @example
- * const config = { pinataJwt: 'your-jwt-token' };
- * try {
- *   const totalBytes = await totalStorageUsage(config);
- *   console.log(`Total storage usage: ${totalBytes} bytes`);
- *   console.log(`Total storage usage: ${totalBytes / (1024 * 1024)} MB`);
- * } catch (error) {
- *   console.error('Error getting total storage usage:', error);
- * }
- */
-
 import type { PinataConfig, UserPinnedDataResponse } from "../../types";
 import {
 	PinataError,

@@ -1,33 +1,3 @@
-/**
- * Retrieves information about a specific group from Pinata.
- *
- * This function fetches details about a group in your Pinata account using its ID.
- * It provides information such as the group's name, creation date, and last update time.
- *
- * @async
- * @function getGroup
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {GetGroupOptions} options - The options for retrieving a group.
- * @param {string} options.groupId - The ID of the group to retrieve.
- * @returns {Promise<GroupResponseItem>} A promise that resolves to an object containing the group's details.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the group retrieval process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const groups = await pinata.groups.get({
- *	groupId: "3778c10d-452e-4def-8299-ee6bc548bdb0",
- * });
- */
-
 import type {
 	PinataConfig,
 	GroupResponseItem,

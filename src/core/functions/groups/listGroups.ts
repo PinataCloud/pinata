@@ -1,35 +1,3 @@
-/**
- * Retrieves a list of groups from Pinata.
- *
- * This function fetches a list of groups associated with your Pinata account.
- * It supports pagination and filtering by name.
- *
- * @async
- * @function listGroups
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {GroupQueryOptions} [options] - Optional query parameters to filter and paginate the results.
- * @param {number} [options.offset] - The number of items to skip before starting to collect the result set.
- * @param {string} [options.nameContains] - Filter groups by name (case-insensitive partial match).
- * @param {number} [options.limit] - The numbers of items to return.
- * @returns {Promise<GroupResponseItem[]>} A promise that resolves to an array of group objects.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the group listing process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const groups = await pinata.groups
- *   .list()
- *   .name("Greetings");
- */
-
 import type {
 	PinataConfig,
 	GroupResponseItem,

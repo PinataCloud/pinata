@@ -1,33 +1,3 @@
-/**
- * Creates a new group in Pinata for organizing pinned content.
- *
- * This function allows you to create a new group in your Pinata account.
- * Groups can be used to organize and manage your pinned content more effectively.
- *
- * @async
- * @function createGroup
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {GroupOptions} options - The options for creating a new group.
- * @param {string} options.name - The name of the group to be created.
- * @returns {Promise<GroupResponseItem>} A promise that resolves to an object containing details of the created group.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the group creation process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const group = await pinata.groups.create({
- *	name: "My New Group",
- * });
- */
-
 import type {
 	PinataConfig,
 	GroupOptions,

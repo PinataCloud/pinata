@@ -1,31 +1,3 @@
-/**
- * Deletes a CID swap
- *
- * This function allows you to remove a CID swap configuration from your Pinata account.
- * It's useful for reverting a CID swap or cleaning up outdated swap configurations.
- *
- * @async
- * @function deleteSwap
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {string} cid - The CID of the swap configuration to be deleted.
- * @returns {Promise<string>} A promise that resolves to a string indicating the result of the deletion operation.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {PinataError} If the deletion is unauthorized or if the CID is not found in the account.
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the deletion process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const deleteResult = await pinata.gateways.deleteSwap("QmSomeCid123");
- */
-
 import type { SwapCidResponse, PinataConfig } from "../../types";
 
 import {

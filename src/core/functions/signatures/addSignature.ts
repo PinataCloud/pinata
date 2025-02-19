@@ -1,36 +1,3 @@
-/**
- * Adds a signature to a specific Content Identifier (CID) on Pinata.
- *
- * This function allows you to add a cryptographic signature to a file identified by its CID.
- * It's useful for verifying ownership or authenticity of content stored on IPFS via Pinata.
- *
- * @async
- * @function addSignature
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {SignatureOptions} options - Options for adding the signature.
- * @param {string} options.cid - The Content Identifier (CID) of the file to be signed.
- * @param {string} options.signature - The cryptographic signature to be added.
- * @returns {Promise<SignatureResponse>} A promise that resolves to an object containing the signature details.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {PinataError} If the user is unauthorized to sign the file or if the file already has a signature.
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the signature addition process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const signature = await pinata.signatures.add({
- *	cid: "QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU",
- *	signature: "0x1ba6c2a8412dc9b0be37b013ea5bddd97251dab4d435cc9c4c7bcf331d4017ca2de07485ad6a15ce60d3700cee802787bc7ede0c112c7843f702bb1e71b750911b"
- * })
- */
-
 import type {
 	SignatureOptions,
 	PinataConfig,

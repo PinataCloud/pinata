@@ -1,36 +1,3 @@
-/**
- * Retrieves the swap history for a specific CID (Content Identifier) in Pinata.
- *
- * This function allows you to fetch the history of CID swaps for a given CID and domain.
- * It's useful for tracking changes and updates to content over time.
- *
- * @async
- * @function swapHistory
- * @param {PinataConfig | undefined} config - The Pinata configuration object containing the JWT.
- * @param {SwapHistoryOptions} options - The options for retrieving swap history.
- * @param {string} options.cid - The CID for which to retrieve swap history.
- * @param {string} options.domain - The gateway domain that has the hot swaps plugin installed.
- * @returns {Promise<SwapCidResponse[]>} A promise that resolves to an array of objects, each containing details of a CID swap operation.
- * @throws {ValidationError} If the Pinata configuration or JWT is missing.
- * @throws {AuthenticationError} If the authentication fails (e.g., invalid JWT).
- * @throws {PinataError} If the CID does not have any swap history.
- * @throws {NetworkError} If there's a network-related error during the API request.
- * @throws {PinataError} For any other errors that occur during the retrieval process.
- *
- * @example
- * import { PinataSDK } from "pinata";
- *
- * const pinata = new PinataSDK({
- *   pinataJwt: process.env.PINATA_JWT!,
- *   pinataGateway: "example-gateway.mypinata.cloud",
- * });
- *
- * const swapHistory = await pinata.gateways.swapHistory({
- *   cid: "QmSomeCid123",
- *   domain: "example.mypinata.cloud"
- * });
- */
-
 import type {
 	SwapCidResponse,
 	PinataConfig,
