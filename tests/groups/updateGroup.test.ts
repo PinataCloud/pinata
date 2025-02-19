@@ -1,211 +1,234 @@
-import { updateGroup } from "../../src/core/groups/updateGroup";
+import { updateGroup } from "../../src/core/functions/groups/updateGroup";
 import type {
-	PinataConfig,
-	UpdateGroupOptions,
-	GroupResponseItem,
+  PinataConfig,
+  UpdateGroupOptions,
+  GroupResponseItem,
 } from "../../src";
 import {
-	PinataError,
-	NetworkError,
-	AuthenticationError,
-	ValidationError,
+  PinataError,
+  NetworkError,
+  AuthenticationError,
+  ValidationError,
 } from "../../src/utils/custom-errors";
 
 describe("updateGroup function", () => {
-	let originalFetch: typeof fetch;
+  let originalFetch: typeof fetch;
 
-	beforeEach(() => {
-		originalFetch = global.fetch;
-	});
+  beforeEach(() => {
+    originalFetch = global.fetch;
+  });
 
-	afterEach(() => {
-		global.fetch = originalFetch;
-		jest.clearAllMocks();
-	});
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.clearAllMocks();
+  });
 
-	const mockConfig: PinataConfig = {
-		pinataJwt: "test_jwt",
-		pinataGateway: "https://test.mypinata.cloud",
-	};
+  const mockConfig: PinataConfig = {
+    pinataJwt: "test_jwt",
+    pinataGateway: "https://test.mypinata.cloud",
+  };
 
-	const mockOptions: UpdateGroupOptions = {
-		groupId: "test-group-id",
-		name: "Updated Group Name",
-	};
+  const mockOptions: UpdateGroupOptions = {
+    groupId: "test-group-id",
+    name: "Updated Group Name",
+  };
 
-	const mockResponse: GroupResponseItem = {
-		id: "test-group-id",
-		name: "Updated Group Name",
-		is_public: false,
-		createdAt: "2023-07-26T12:00:00Z",
-	};
+  const mockResponse: GroupResponseItem = {
+    id: "test-group-id",
+    name: "Updated Group Name",
+    is_public: false,
+    createdAt: "2023-07-26T12:00:00Z",
+  };
 
-	it("should update group successfully", async () => {
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
-		});
+  it("should update public group successfully", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+    });
 
-		const result = await updateGroup(mockConfig, mockOptions);
+    const result = await updateGroup(mockConfig, mockOptions, "public");
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups/test-group-id",
-			{
-				method: "PUT",
-				headers: {
-					Source: "sdk/updateGroup",
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${mockConfig.pinataJwt}`,
-				},
-				body: JSON.stringify({ name: mockOptions.name, is_public: undefined }),
-			},
-		);
-		expect(result).toEqual(mockResponse);
-	});
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.pinata.cloud/v3/groups/public/test-group-id",
+      {
+        method: "PUT",
+        headers: {
+          Source: "sdk/updateGroup",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${mockConfig.pinataJwt}`,
+        },
+        body: JSON.stringify({ name: mockOptions.name, is_public: undefined }),
+      },
+    );
+    expect(result).toEqual(mockResponse);
+  });
 
-	it("should throw ValidationError if config is missing", async () => {
-		await expect(updateGroup(undefined, mockOptions)).rejects.toThrow(
-			ValidationError,
-		);
-	});
+  it("should update private group successfully", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+    });
 
-	it("should throw AuthenticationError on 401 response", async () => {
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: false,
-			status: 401,
-			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
-		});
+    const result = await updateGroup(mockConfig, mockOptions, "private");
 
-		await expect(updateGroup(mockConfig, mockOptions)).rejects.toThrow(
-			AuthenticationError,
-		);
-	});
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.pinata.cloud/v3/groups/private/test-group-id",
+      {
+        method: "PUT",
+        headers: {
+          Source: "sdk/updateGroup",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${mockConfig.pinataJwt}`,
+        },
+        body: JSON.stringify({ name: mockOptions.name, is_public: undefined }),
+      },
+    );
+    expect(result).toEqual(mockResponse);
+  });
 
-	it("should throw NetworkError on non-401 error response", async () => {
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: false,
-			status: 500,
-			text: jest.fn().mockResolvedValueOnce("Server Error"),
-		});
+  it("should throw ValidationError if config is missing", async () => {
+    await expect(updateGroup(undefined, mockOptions, "public")).rejects.toThrow(
+      ValidationError,
+    );
+  });
 
-		await expect(updateGroup(mockConfig, mockOptions)).rejects.toThrow(
-			NetworkError,
-		);
-	});
+  it("should throw AuthenticationError on 401 response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: jest.fn().mockResolvedValueOnce("Unauthorized"),
+    });
 
-	it("should throw PinataError on unexpected errors", async () => {
-		global.fetch = jest
-			.fn()
-			.mockRejectedValueOnce(new Error("Unexpected error"));
+    await expect(updateGroup(mockConfig, mockOptions, "public")).rejects.toThrow(
+      AuthenticationError,
+    );
+  });
 
-		await expect(updateGroup(mockConfig, mockOptions)).rejects.toThrow(
-			PinataError,
-		);
-	});
+  it("should throw NetworkError on non-401 error response", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: jest.fn().mockResolvedValueOnce("Server Error"),
+    });
 
-	it("should handle updating to an empty name", async () => {
-		const emptyNameOptions: UpdateGroupOptions = {
-			groupId: "test-group-id",
-			name: "",
-		};
+    await expect(updateGroup(mockConfig, mockOptions, "public")).rejects.toThrow(
+      NetworkError,
+    );
+  });
 
-		const emptyNameResponse: GroupResponseItem = {
-			...mockResponse,
-			name: "",
-		};
+  it("should throw PinataError on unexpected errors", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("Unexpected error"));
 
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ data: emptyNameResponse }),
-		});
+    await expect(updateGroup(mockConfig, mockOptions, "public")).rejects.toThrow(
+      PinataError,
+    );
+  });
 
-		const result = await updateGroup(mockConfig, emptyNameOptions);
+  it("should handle updating to an empty name", async () => {
+    const emptyNameOptions: UpdateGroupOptions = {
+      groupId: "test-group-id",
+      name: "",
+    };
 
-		expect(result.name).toBe("");
-	});
+    const emptyNameResponse: GroupResponseItem = {
+      ...mockResponse,
+      name: "",
+    };
 
-	it("should handle updating with a very long name", async () => {
-		const longName = "A".repeat(1000);
-		const longNameOptions: UpdateGroupOptions = {
-			groupId: "test-group-id",
-			name: longName,
-		};
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ data: emptyNameResponse }),
+    });
 
-		const longNameResponse: GroupResponseItem = {
-			...mockResponse,
-			name: longName,
-		};
+    const result = await updateGroup(mockConfig, emptyNameOptions, "public");
 
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ data: longNameResponse }),
-		});
+    expect(result.name).toBe("");
+  });
 
-		const result = await updateGroup(mockConfig, longNameOptions);
+  it("should handle updating with a very long name", async () => {
+    const longName = "A".repeat(1000);
+    const longNameOptions: UpdateGroupOptions = {
+      groupId: "test-group-id",
+      name: longName,
+    };
 
-		expect(result.name).toBe(longName);
-	});
+    const longNameResponse: GroupResponseItem = {
+      ...mockResponse,
+      name: longName,
+    };
 
-	it("should handle updating a non-existent group", async () => {
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: false,
-			status: 404,
-			text: jest.fn().mockResolvedValueOnce("Group not found"),
-		});
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ data: longNameResponse }),
+    });
 
-		await expect(
-			updateGroup(mockConfig, { ...mockOptions, groupId: "non-existent-id" }),
-		).rejects.toThrow(NetworkError);
-	});
+    const result = await updateGroup(mockConfig, longNameOptions, "public");
 
-	it("should use correct groupId in URL", async () => {
-		const customGroupIdOptions: UpdateGroupOptions = {
-			groupId: "custom-group-123",
-			name: "Custom Group Name",
-		};
+    expect(result.name).toBe(longName);
+  });
 
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: true,
-			json: jest.fn().mockResolvedValueOnce({
-				data: {
-					...mockResponse,
-					id: customGroupIdOptions.groupId,
-				},
-			}),
-		});
+  it("should handle updating a non-existent group", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: jest.fn().mockResolvedValueOnce("Group not found"),
+    });
 
-		await updateGroup(mockConfig, customGroupIdOptions);
+    await expect(
+      updateGroup(mockConfig, { ...mockOptions, groupId: "non-existent-id" }, "public"),
+    ).rejects.toThrow(NetworkError);
+  });
 
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups/custom-group-123",
-			expect.any(Object),
-		);
-	});
+  it("should use correct groupId in URL", async () => {
+    const customGroupIdOptions: UpdateGroupOptions = {
+      groupId: "custom-group-123",
+      name: "Custom Group Name",
+    };
 
-	it("should handle updating isPublic flag", async () => {
-		const publicGroupOptions: UpdateGroupOptions = {
-			groupId: "test-group-id",
-			isPublic: true,
-		};
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({
+        data: {
+          ...mockResponse,
+          id: customGroupIdOptions.groupId,
+        },
+      }),
+    });
 
-		const publicGroupResponse: GroupResponseItem = {
-			...mockResponse,
-			is_public: true,
-		};
+    await updateGroup(mockConfig, customGroupIdOptions, "public");
 
-		global.fetch = jest.fn().mockResolvedValueOnce({
-			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ data: publicGroupResponse }),
-		});
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.pinata.cloud/v3/groups/public/custom-group-123",
+      expect.any(Object),
+    );
+  });
 
-		const result = await updateGroup(mockConfig, publicGroupOptions);
+  it("should handle updating isPublic flag", async () => {
+    const publicGroupOptions: UpdateGroupOptions = {
+      groupId: "test-group-id",
+      isPublic: true,
+    };
 
-		expect(result.is_public).toBe(true);
-		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups/test-group-id",
-			expect.objectContaining({
-				body: JSON.stringify({ name: undefined, is_public: true }),
-			}),
-		);
-	});
+    const publicGroupResponse: GroupResponseItem = {
+      ...mockResponse,
+      is_public: true,
+    };
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ data: publicGroupResponse }),
+    });
+
+    const result = await updateGroup(mockConfig, publicGroupOptions, "public");
+
+    expect(result.is_public).toBe(true);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.pinata.cloud/v3/groups/public/test-group-id",
+      expect.objectContaining({
+        body: JSON.stringify({ name: undefined, is_public: true }),
+      }),
+    );
+  });
 });

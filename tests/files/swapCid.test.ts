@@ -1,9 +1,8 @@
-import { listFiles } from "../../src/core/functions/files/list";
+import { swapCid } from "../../src/core/functions/files/swapCid";
 import type {
   PinataConfig,
-  FileListItem,
-  FileListQuery,
-  FileListResponse,
+  SwapCidOptions,
+  SwapCidResponse,
 } from "../../src/core/types";
 import {
   PinataError,
@@ -12,7 +11,7 @@ import {
   ValidationError,
 } from "../../src/utils/custom-errors";
 
-describe("listFiles function", () => {
+describe("swapCid function", () => {
   describe("public network", () => {
     let originalFetch: typeof fetch;
 
@@ -29,75 +28,45 @@ describe("listFiles function", () => {
       pinataGateway: "test.cloud",
     };
 
-    const mockFileListItem: FileListItem = {
-      id: "test-id",
-      name: "test-file",
-      cid: "Qm...",
-      size: 1234,
-      number_of_files: 1,
-      mime_type: "text/plain",
-      keyvalues: {},
-      group_id: "test-group",
+    const mockSwapCidOptions: SwapCidOptions = {
+      cid: "QmOldHash",
+      swapCid: "QmNewHash",
+    };
+
+    const mockSwapCidResponse: SwapCidResponse = {
+      mapped_cid: "QmNewHash",
       created_at: "2023-07-26T12:00:00Z",
     };
 
-    it("should list files successfully", async () => {
-      const mockResponse: FileListResponse = {
-        files: [mockFileListItem],
-        next_page_token: "next_token",
-      };
+    it("should swap CID successfully", async () => {
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+        json: jest.fn().mockResolvedValueOnce({ data: mockSwapCidResponse }),
       });
 
-      const result = await listFiles(mockConfig, "public");
+      const result = await swapCid(mockConfig, mockSwapCidOptions, "public");
 
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://api.pinata.cloud/v3/files/public?",
+        `https://api.pinata.cloud/v3/files/public/swap/${mockSwapCidOptions.cid}`,
         {
-          method: "GET",
+          method: "PUT",
           headers: {
-            Source: "sdk/listFiles",
             Authorization: `Bearer ${mockConfig.pinataJwt}`,
+            "Content-Type": "application/json",
+            Source: "sdk/swapCid",
           },
+          body: JSON.stringify({
+            swap_cid: mockSwapCidOptions.swapCid,
+          }),
         },
       );
-      expect(result).toEqual(mockResponse);
-    });
-
-    it("should handle all query parameters correctly", async () => {
-      const mockQuery: FileListQuery = {
-        limit: 10,
-        pageToken: "test-token",
-        cidPending: true,
-        name: "test-name",
-        group: "test-group",
-        mimeType: "text/plain",
-        cid: "Qm...",
-        order: "ASC",
-        metadata: { key1: "value1", key2: "value2" },
-      };
-
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
-      });
-
-      await listFiles(mockConfig, "public", mockQuery);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "limit=10&name=test-name&group=test-group&cid=Qm...&mimeType=text%2Fplain&order=ASC&pageToken=test-token&cidPending=true&keyvalues%5Bkey1%5D=value1&keyvalues%5Bkey2%5D=value2",
-        ),
-        expect.any(Object),
-      );
+      expect(result).toEqual(mockSwapCidResponse);
     });
 
     it("should throw ValidationError if config is missing", async () => {
-      await expect(listFiles(undefined, "public")).rejects.toThrow(ValidationError);
+      await expect(swapCid(undefined, mockSwapCidOptions, "public")).rejects.toThrow(
+        ValidationError,
+      );
     });
 
     it("should throw AuthenticationError on 401 response", async () => {
@@ -107,7 +76,9 @@ describe("listFiles function", () => {
         text: jest.fn().mockResolvedValueOnce("Unauthorized"),
       });
 
-      await expect(listFiles(mockConfig, "public")).rejects.toThrow(AuthenticationError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "public")).rejects.toThrow(
+        AuthenticationError,
+      );
     });
 
     it("should throw NetworkError on non-401 error response", async () => {
@@ -117,7 +88,9 @@ describe("listFiles function", () => {
         text: jest.fn().mockResolvedValueOnce("Server Error"),
       });
 
-      await expect(listFiles(mockConfig, "public")).rejects.toThrow(NetworkError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "public")).rejects.toThrow(
+        NetworkError,
+      );
     });
 
     it("should throw PinataError on fetch failure", async () => {
@@ -125,7 +98,9 @@ describe("listFiles function", () => {
         .fn()
         .mockRejectedValueOnce(new Error("Network failure"));
 
-      await expect(listFiles(mockConfig, "public")).rejects.toThrow(PinataError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "public")).rejects.toThrow(
+        PinataError,
+      );
     });
 
     it("should throw PinataError on unexpected errors", async () => {
@@ -133,7 +108,9 @@ describe("listFiles function", () => {
         throw new Error("Unexpected error");
       });
 
-      await expect(listFiles(mockConfig, "public")).rejects.toThrow(PinataError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "public")).rejects.toThrow(
+        PinataError,
+      );
     });
 
     it("should use custom endpoint if provided", async () => {
@@ -144,15 +121,13 @@ describe("listFiles function", () => {
 
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
+        json: jest.fn().mockResolvedValueOnce({ data: mockSwapCidResponse }),
       });
 
-      await listFiles(customConfig, "public");
+      await swapCid(customConfig, mockSwapCidOptions, "public");
 
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://custom.api.pinata.cloud/files/public?",
+        `https://custom.api.pinata.cloud/files/public/swap/${mockSwapCidOptions.cid}`,
         expect.any(Object),
       );
     });
@@ -165,12 +140,10 @@ describe("listFiles function", () => {
 
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
+        json: jest.fn().mockResolvedValueOnce({ data: mockSwapCidResponse }),
       });
 
-      await listFiles(customConfig, "public");
+      await swapCid(customConfig, mockSwapCidOptions, "public");
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -199,75 +172,45 @@ describe("listFiles function", () => {
       pinataGateway: "test.cloud",
     };
 
-    const mockFileListItem: FileListItem = {
-      id: "test-id",
-      name: "test-file",
-      cid: "Qm...",
-      size: 1234,
-      number_of_files: 1,
-      mime_type: "text/plain",
-      keyvalues: {},
-      group_id: "test-group",
+    const mockSwapCidOptions: SwapCidOptions = {
+      cid: "QmOldHash",
+      swapCid: "QmNewHash",
+    };
+
+    const mockSwapCidResponse: SwapCidResponse = {
+      mapped_cid: "QmNewHash",
       created_at: "2023-07-26T12:00:00Z",
     };
 
-    it("should list files successfully", async () => {
-      const mockResponse: FileListResponse = {
-        files: [mockFileListItem],
-        next_page_token: "next_token",
-      };
+    it("should swap CID successfully", async () => {
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+        json: jest.fn().mockResolvedValueOnce({ data: mockSwapCidResponse }),
       });
 
-      const result = await listFiles(mockConfig, "private");
+      const result = await swapCid(mockConfig, mockSwapCidOptions, "private");
 
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://api.pinata.cloud/v3/files/private?",
+        `https://api.pinata.cloud/v3/files/private/swap/${mockSwapCidOptions.cid}`,
         {
-          method: "GET",
+          method: "PUT",
           headers: {
-            Source: "sdk/listFiles",
             Authorization: `Bearer ${mockConfig.pinataJwt}`,
+            "Content-Type": "application/json",
+            Source: "sdk/swapCid",
           },
+          body: JSON.stringify({
+            swap_cid: mockSwapCidOptions.swapCid,
+          }),
         },
       );
-      expect(result).toEqual(mockResponse);
-    });
-
-    it("should handle all query parameters correctly", async () => {
-      const mockQuery: FileListQuery = {
-        limit: 10,
-        pageToken: "test-token",
-        cidPending: true,
-        name: "test-name",
-        group: "test-group",
-        mimeType: "text/plain",
-        cid: "Qm...",
-        order: "ASC",
-        metadata: { key1: "value1", key2: "value2" },
-      };
-
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
-      });
-
-      await listFiles(mockConfig, "private", mockQuery);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "limit=10&name=test-name&group=test-group&cid=Qm...&mimeType=text%2Fplain&order=ASC&pageToken=test-token&cidPending=true&keyvalues%5Bkey1%5D=value1&keyvalues%5Bkey2%5D=value2",
-        ),
-        expect.any(Object),
-      );
+      expect(result).toEqual(mockSwapCidResponse);
     });
 
     it("should throw ValidationError if config is missing", async () => {
-      await expect(listFiles(undefined, "private")).rejects.toThrow(ValidationError);
+      await expect(swapCid(undefined, mockSwapCidOptions, "private")).rejects.toThrow(
+        ValidationError,
+      );
     });
 
     it("should throw AuthenticationError on 401 response", async () => {
@@ -277,7 +220,9 @@ describe("listFiles function", () => {
         text: jest.fn().mockResolvedValueOnce("Unauthorized"),
       });
 
-      await expect(listFiles(mockConfig, "private")).rejects.toThrow(AuthenticationError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "private")).rejects.toThrow(
+        AuthenticationError,
+      );
     });
 
     it("should throw NetworkError on non-401 error response", async () => {
@@ -287,7 +232,9 @@ describe("listFiles function", () => {
         text: jest.fn().mockResolvedValueOnce("Server Error"),
       });
 
-      await expect(listFiles(mockConfig, "private")).rejects.toThrow(NetworkError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "private")).rejects.toThrow(
+        NetworkError,
+      );
     });
 
     it("should throw PinataError on fetch failure", async () => {
@@ -295,7 +242,9 @@ describe("listFiles function", () => {
         .fn()
         .mockRejectedValueOnce(new Error("Network failure"));
 
-      await expect(listFiles(mockConfig, "private")).rejects.toThrow(PinataError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "private")).rejects.toThrow(
+        PinataError,
+      );
     });
 
     it("should throw PinataError on unexpected errors", async () => {
@@ -303,7 +252,9 @@ describe("listFiles function", () => {
         throw new Error("Unexpected error");
       });
 
-      await expect(listFiles(mockConfig, "private")).rejects.toThrow(PinataError);
+      await expect(swapCid(mockConfig, mockSwapCidOptions, "private")).rejects.toThrow(
+        PinataError,
+      );
     });
 
     it("should use custom endpoint if provided", async () => {
@@ -314,15 +265,13 @@ describe("listFiles function", () => {
 
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
+        json: jest.fn().mockResolvedValueOnce({ data: mockSwapCidResponse }),
       });
 
-      await listFiles(customConfig, "private");
+      await swapCid(customConfig, mockSwapCidOptions, "private");
 
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://custom.api.pinata.cloud/files/private?",
+        `https://custom.api.pinata.cloud/files/private/swap/${mockSwapCidOptions.cid}`,
         expect.any(Object),
       );
     });
@@ -335,12 +284,10 @@ describe("listFiles function", () => {
 
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce({ data: { files: [], next_page_token: "" } }),
+        json: jest.fn().mockResolvedValueOnce({ data: mockSwapCidResponse }),
       });
 
-      await listFiles(customConfig, "private");
+      await swapCid(customConfig, mockSwapCidOptions, "private");
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.any(String),
