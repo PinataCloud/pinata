@@ -3,18 +3,19 @@ import { pinata } from "./utils/config"
 import { NetworkError } from "../../../dist"
 
 function App() {
-  const [selectedFile, setSelectedFile]: any = useState();
-  const changeHandler = (event: any) => {
-    setSelectedFile(event.target.files[0]);
+  const [selectedFile, setSelectedFile] = useState()<File>;
+
+  const changeHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFile(event.target?.files?.[0]);
   };
 
   const handleSubmission = async () => {
     try {
-      const upload = await pinata.upload.private.file(selectedFile)
+      const upload = await pinata.upload.public.file(selectedFile)
       console.log(upload);
-    } catch (e) {
-      const error = e as NetworkError
-      console.log(error)
+    } catch (error) {
+      const e = error as NetworkError
+      console.log(e.details?.metadata)
     }
   };
 
