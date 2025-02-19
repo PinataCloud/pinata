@@ -37,7 +37,7 @@ export type OptimizeImageOptions = {
   metadata?: "keep" | "copyright" | "none";
 };
 
-export type SignedUrlOptions = {
+export type AccessLinkOptions = {
   cid: string;
   date?: number;
   expires: number;

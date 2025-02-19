@@ -1,7 +1,7 @@
-import { createSignedURL } from "../../src/core/functions/gateway/createSignedURL";
+import { createAccessLink } from "../../src/core/functions";
 import type {
   PinataConfig,
-  SignedUrlOptions,
+  AccessLinkOptions,
   OptimizeImageOptions,
 } from "../../src";
 import {
@@ -11,7 +11,7 @@ import {
   ValidationError,
 } from "../../src/utils/custom-errors";
 
-describe("createSignedURL function", () => {
+describe("createAccessLink function", () => {
   let originalFetch: typeof fetch;
 
   beforeEach(() => {
@@ -29,7 +29,7 @@ describe("createSignedURL function", () => {
     endpointUrl: "https://custom.api.pinata.cloud/v3",
   };
 
-  const mockOptions: SignedUrlOptions = {
+  const mockOptions: AccessLinkOptions = {
     cid: "QmTest...",
     expires: 3600,
     date: 1234567890,
@@ -56,7 +56,7 @@ describe("createSignedURL function", () => {
       json: () => Promise.resolve({ data: mockSignedUrl }),
     });
 
-    const result = await createSignedURL(
+    const result = await createAccessLink(
       mockConfig,
       mockOptions,
       mockImageOpts,
@@ -78,7 +78,7 @@ describe("createSignedURL function", () => {
 
   it("should throw ValidationError if config is missing", async () => {
     await expect(
-      createSignedURL(undefined, mockOptions, mockImageOpts),
+      createAccessLink(undefined, mockOptions, mockImageOpts),
     ).rejects.toThrow(ValidationError);
   });
 
@@ -90,7 +90,7 @@ describe("createSignedURL function", () => {
     });
 
     await expect(
-      createSignedURL(mockConfig, mockOptions, mockImageOpts),
+      createAccessLink(mockConfig, mockOptions, mockImageOpts),
     ).rejects.toThrow(AuthenticationError);
   });
 
@@ -102,7 +102,7 @@ describe("createSignedURL function", () => {
     });
 
     await expect(
-      createSignedURL(mockConfig, mockOptions, mockImageOpts),
+      createAccessLink(mockConfig, mockOptions, mockImageOpts),
     ).rejects.toThrow(NetworkError);
   });
 
@@ -112,7 +112,7 @@ describe("createSignedURL function", () => {
       .mockRejectedValueOnce(new Error("Unexpected error"));
 
     await expect(
-      createSignedURL(mockConfig, mockOptions, mockImageOpts),
+      createAccessLink(mockConfig, mockOptions, mockImageOpts),
     ).rejects.toThrow(PinataError);
   });
 
@@ -122,7 +122,7 @@ describe("createSignedURL function", () => {
       json: () => Promise.resolve({ data: "signed_url" }),
     });
 
-    await createSignedURL(mockConfig, mockOptions, mockImageOpts);
+    await createAccessLink(mockConfig, mockOptions, mockImageOpts);
 
     expect(global.fetch).toHaveBeenCalledWith(
       "https://custom.api.pinata.cloud/v3/files/private/download_link",
@@ -144,7 +144,7 @@ describe("createSignedURL function", () => {
       json: () => Promise.resolve({ data: "signed_url" }),
     });
 
-    await createSignedURL(customConfig, mockOptions, mockImageOpts);
+    await createAccessLink(customConfig, mockOptions, mockImageOpts);
 
     expect(global.fetch).toHaveBeenCalledWith(
       "https://custom.endpoint.com/v3/files/private/download_link",
@@ -160,7 +160,7 @@ describe("createSignedURL function", () => {
       json: () => Promise.resolve({ data: "signed_url" }),
     });
 
-    await createSignedURL(mockConfig, optionsWithoutDate, mockImageOpts);
+    await createAccessLink(mockConfig, optionsWithoutDate, mockImageOpts);
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.any(String),
@@ -180,7 +180,7 @@ describe("createSignedURL function", () => {
       json: () => Promise.resolve({ data: "signed_url" }),
     });
 
-    await createSignedURL(mockConfig, customGatewayOptions, mockImageOpts);
+    await createAccessLink(mockConfig, customGatewayOptions, mockImageOpts);
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.any(String),

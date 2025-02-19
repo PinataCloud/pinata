@@ -14,7 +14,7 @@ function App() {
       console.log(upload);
     } catch (e) {
       const error = e as NetworkError
-      console.log(error.details?.metadata);
+      console.log(error)
     }
   };
 

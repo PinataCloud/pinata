@@ -1,3 +1,3 @@
 export * from "./getCid"
 export * from "./convertIPFSUrl"
-export * from "./createSignedURL"
+export * from "./createAccessLink"

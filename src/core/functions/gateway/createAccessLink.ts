@@ -1,7 +1,7 @@
 import type {
   PinataConfig,
   OptimizeImageOptions,
-  SignedUrlOptions,
+  AccessLinkOptions,
 } from "../../types";
 import {
   PinataError,
@@ -10,9 +10,9 @@ import {
   ValidationError,
 } from "../../../utils/custom-errors";
 
-export const createSignedURL = async (
+export const createAccessLink = async (
   config: PinataConfig | undefined,
-  options: SignedUrlOptions,
+  options: AccessLinkOptions,
   imgOpts: OptimizeImageOptions,
 ): Promise<string> => {
   if (!config) {

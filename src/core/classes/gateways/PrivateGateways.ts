@@ -1,5 +1,5 @@
-import type { PinataConfig, SignedUrlOptions } from "../../types";
-import { OptimizeImageGetCid, OptimizeImageCreateSignedURL } from "./";
+import type { PinataConfig, AccessLinkOptions } from "../../types";
+import { OptimizeImageGetCid, OptimizeImageCreateAccessLink } from "./";
 
 export class PrivateGateways {
   private config: PinataConfig | undefined;
@@ -12,7 +12,7 @@ export class PrivateGateways {
     return new OptimizeImageGetCid(this.config, cid, "files");
   }
 
-  createSignedURL(options: SignedUrlOptions): OptimizeImageCreateSignedURL {
-    return new OptimizeImageCreateSignedURL(this.config, options);
+  createAccessLink(options: AccessLinkOptions): OptimizeImageCreateAccessLink {
+    return new OptimizeImageCreateAccessLink(this.config, options);
   }
 }
