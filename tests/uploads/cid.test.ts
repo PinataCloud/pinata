@@ -1,8 +1,8 @@
-import { uploadFile } from "../../src/core/functions";
+import { uploadCid } from "../../src/core/functions";
 import type {
 	PinataConfig,
-	UploadOptions,
-	UploadResponse,
+	UploadCIDOptions,
+	PinByCIDResponse,
 	PinataMetadata,
 } from "../../src";
 import {
@@ -12,7 +12,7 @@ import {
 	ValidationError,
 } from "../../src/utils/custom-errors";
 
-describe("uploadFile function", () => {
+describe("uploadCid function", () => {
 	let originalFetch: typeof fetch;
 
 	beforeEach(() => {
@@ -29,115 +29,120 @@ describe("uploadFile function", () => {
 		pinataGateway: "https://test.mypinata.cloud",
 	};
 
-	const mockFile = new File(["test content"], "test.txt", {
-		type: "text/plain",
-	});
+	const mockCid = "QmTest123";
 
-	const mockResponse: UploadResponse = {
+	const mockResponse: PinByCIDResponse = {
 		id: "testId",
-		name: "test.txt",
 		cid: "QmTest123",
-		size: 123,
-		created_at: "2023-01-01T00:00:00Z",
-		number_of_files: 1,
-		mime_type: "text/plain",
-		user_id: "testUserId",
-		group_id: null,
-		keyvalues: {
-			env: "dev",
-		},
-		vectorized: false,
-		network: "private",
+		name: "test.txt",
+		status: "prechecking",
 	};
 
-	it("should upload file to public network successfully", async () => {
+	it("should pin CID successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+			json: jest.fn().mockResolvedValueOnce({
+				id: "testId",
+				ipfsHash: "QmTest123",
+				name: "test.txt",
+				status: "prechecking",
+			}),
 		});
 
-		const result = await uploadFile(mockConfig, mockFile, "public");
+		const result = await uploadCid(mockConfig, mockCid);
 
 		expect(result).toEqual(mockResponse);
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://uploads.pinata.cloud/v3/files",
+			"https://api.pinata.cloud/pinning/pinByHash",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
-					Source: "sdk/file",
+					Source: "sdk/cid",
 					Authorization: "Bearer test-jwt",
+					"Content-Type": "application/json",
 				},
-				body: expect.any(FormData),
 			}),
 		);
 	});
 
-	it("should handle upload options for private network", async () => {
+	it("should handle upload options with metadata", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom File Name",
 			keyvalues: {
 				key1: "value1",
 			},
 		};
-		const mockOptions: UploadOptions = {
+		const mockOptions: UploadCIDOptions = {
 			metadata: mockMetadata,
+			peerAddresses: ["peer1", "peer2"],
 			groupId: "test-group",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({
+				id: "testId",
+				ipfsHash: "QmTest123",
+				name: "Custom File Name",
+				status: "prechecking",
+			}),
 		});
 
-		await uploadFile(mockConfig, mockFile, "private", mockOptions);
+		await uploadCid(mockConfig, mockCid, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://uploads.pinata.cloud/v3/files",
+			"https://api.pinata.cloud/pinning/pinByHash",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
-					Source: "sdk/file",
+					Source: "sdk/cid",
 					Authorization: "Bearer test-jwt",
+					"Content-Type": "application/json",
 				},
-				body: expect.any(FormData),
+				body: JSON.stringify({
+					hashToPin: mockCid,
+					pinataMetadata: mockMetadata,
+					pinataOptions: {
+						hostNodes: mockOptions.peerAddresses,
+						groupId: mockOptions.groupId,
+					},
+				}),
 			}),
 		);
-
-		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
-		const formData = fetchCall[1].body as FormData;
-
-		expect(formData.get("name")).toBe("Custom File Name");
-		expect(formData.get("group_id")).toBe("test-group");
-		expect(formData.get("keyvalues")).toBe(JSON.stringify({ key1: "value1" }));
-		expect(formData.get("network")).toBe("private");
 	});
 
-	it("should use custom JWT if provided in options for public network", async () => {
+	it("should use custom JWT if provided in options", async () => {
 		const customJwt = "custom-jwt";
-		const mockOptions: UploadOptions = {
+		const mockOptions: UploadCIDOptions = {
 			keys: customJwt,
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce(mockResponse),
+			json: jest.fn().mockResolvedValueOnce({
+				id: "testId",
+				ipfsHash: "QmTest123",
+				name: mockCid,
+				status: "prechecking",
+			}),
 		});
 
-		await uploadFile(mockConfig, mockFile, "public", mockOptions);
+		await uploadCid(mockConfig, mockCid, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://uploads.pinata.cloud/v3/files",
+			"https://api.pinata.cloud/pinning/pinByHash",
 			expect.objectContaining({
 				headers: {
-					Source: "sdk/file",
+					Source: "sdk/cid",
 					Authorization: `Bearer ${customJwt}`,
+					"Content-Type": "application/json",
 				},
 			}),
 		);
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(uploadFile(undefined, mockFile, "public")).rejects.toThrow(
+		await expect(uploadCid(undefined, mockCid)).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -149,7 +154,7 @@ describe("uploadFile function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(uploadFile(mockConfig, mockFile, "private")).rejects.toThrow(
+		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(
 			AuthenticationError,
 		);
 	});
@@ -161,9 +166,7 @@ describe("uploadFile function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(uploadFile(mockConfig, mockFile, "public")).rejects.toThrow(
-			NetworkError,
-		);
+		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(NetworkError);
 	});
 
 	it("should throw PinataError on fetch failure", async () => {
@@ -171,8 +174,6 @@ describe("uploadFile function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Network failure"));
 
-		await expect(uploadFile(mockConfig, mockFile, "private")).rejects.toThrow(
-			PinataError,
-		);
+		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(PinataError);
 	});
 });

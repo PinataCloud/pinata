@@ -4,3 +4,4 @@ export * from "./file";
 export * from "./fileArray";
 export * from "./json";
 export * from "./url";
+export * from "./cid";

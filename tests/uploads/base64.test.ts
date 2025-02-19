@@ -42,8 +42,11 @@ describe("uploadBase64 function", () => {
 		mime_type: "image/png",
 		user_id: "testUserId",
 		group_id: null,
-		is_duplicate: null,
-		vectorized: null,
+		keyvalues: {
+			env: "test",
+		},
+		vectorized: false,
+		network: "public",
 	};
 
 	it("should upload base64 successfully to public network", async () => {

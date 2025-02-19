@@ -29,8 +29,9 @@ describe("uploadUrl function", () => {
 		mime_type: "image/jpeg",
 		user_id: "test-user-id",
 		group_id: null,
-		is_duplicate: null,
-		vectorized: null,
+		keyvalues: {},
+		vectorized: false,
+		network: "public",
 	};
 
 	beforeEach(() => {
