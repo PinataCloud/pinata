@@ -1,2 +1,2 @@
-export * from "./Upload"
-export * from "./UploadBuilder"
+export * from "./Upload";
+export * from "./UploadBuilder";

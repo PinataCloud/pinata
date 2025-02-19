@@ -1,2 +1,2 @@
-export * from './analyticsDateInterval';
-export * from './analyticsTopUsage';
+export * from "./analyticsDateInterval";
+export * from "./analyticsTopUsage";

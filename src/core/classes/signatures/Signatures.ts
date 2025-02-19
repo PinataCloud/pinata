@@ -4,18 +4,17 @@ import { PrivateSignatures } from "./PrivateSignatures";
 import { PublicSignatures } from "./PublicSignatures";
 
 export class Signatures {
-  config: PinataConfig | undefined;
-  public: PublicSignatures;
-  //private: PrivateSignatures
+	config: PinataConfig | undefined;
+	public: PublicSignatures;
+	//private: PrivateSignatures
 
-  constructor(config?: PinataConfig) {
-    this.config = formatConfig(config);
-    this.public = new PublicSignatures(config)
-    // this.private = new PrivateSignatures(config)
-  }
+	constructor(config?: PinataConfig) {
+		this.config = formatConfig(config);
+		this.public = new PublicSignatures(config);
+		// this.private = new PrivateSignatures(config)
+	}
 
-  updateConfig(newConfig: PinataConfig): void {
-    this.config = newConfig;
-  }
-
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
 }

@@ -3,21 +3,21 @@ import { pinnedFileCount, totalStorageUsage } from "../../functions";
 import { PinataConfig } from "../../types";
 
 export class Usage {
-  config: PinataConfig | undefined;
+	config: PinataConfig | undefined;
 
-  constructor(config?: PinataConfig) {
-    this.config = formatConfig(config);
-  }
+	constructor(config?: PinataConfig) {
+		this.config = formatConfig(config);
+	}
 
-  updateConfig(newConfig: PinataConfig): void {
-    this.config = newConfig;
-  }
+	updateConfig(newConfig: PinataConfig): void {
+		this.config = newConfig;
+	}
 
-  pinnedFileCount(): Promise<number> {
-    return pinnedFileCount(this.config);
-  }
+	pinnedFileCount(): Promise<number> {
+		return pinnedFileCount(this.config);
+	}
 
-  totalStorageSize(): Promise<number> {
-    return totalStorageUsage(this.config);
-  }
+	totalStorageSize(): Promise<number> {
+		return totalStorageUsage(this.config);
+	}
 }
