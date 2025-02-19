@@ -31,3 +31,17 @@ export type SignedUploadUrlOptions = {
 	keyvalues?: Record<string, string>;
 	vectorize?: boolean;
 };
+
+export type UploadCIDOptions = {
+	metadata?: PinataMetadata;
+	peerAddresses?: string[];
+	keys?: string;
+	groupId?: string;
+};
+
+export type PinByCIDResponse = {
+	id: string;
+	cid: string;
+	status: "prechecking" | "retrieving";
+	name: string;
+};

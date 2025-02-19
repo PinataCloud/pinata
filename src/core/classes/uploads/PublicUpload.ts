@@ -7,12 +7,15 @@ import {
 	uploadJson,
 	uploadUrl,
 } from "../../functions";
+import { uploadCid } from "../../functions/uploads/cid";
 import {
 	FileObject,
 	PinataConfig,
 	SignedUploadUrlOptions,
 	UploadOptions,
 	UploadResponse,
+	UploadCIDOptions,
+	PinByCIDResponse,
 } from "../../types";
 import { UploadBuilder } from "./UploadBuilder";
 
@@ -79,6 +82,18 @@ export class PublicUpload {
 			this.config,
 			(config, data, options) => uploadJson(config, data, "public", options),
 			data,
+			options,
+		);
+	}
+
+	cid(
+		cid: string,
+		options?: UploadCIDOptions,
+	): UploadBuilder<PinByCIDResponse> {
+		return new UploadBuilder(
+			this.config,
+			(config, cid, options) => uploadCid(config, cid, options),
+			cid,
 			options,
 		);
 	}

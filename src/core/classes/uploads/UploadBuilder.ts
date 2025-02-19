@@ -12,6 +12,7 @@ export class UploadBuilder<T> {
 	private groupId: string | undefined;
 	private vector: boolean | undefined;
 	private uploadUrl: string | undefined;
+	private peerAddresses: string[] | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -56,6 +57,11 @@ export class UploadBuilder<T> {
 		return this;
 	}
 
+	peerAddress(peerAddresses: string[]): UploadBuilder<T> {
+		this.peerAddresses = peerAddresses;
+		return this;
+	}
+
 	then<TResult1 = T, TResult2 = never>(
 		onfulfilled?:
 			| ((value: T) => TResult1 | PromiseLike<TResult1>)
@@ -81,6 +87,9 @@ export class UploadBuilder<T> {
 		}
 		if (this.uploadUrl) {
 			options.url = this.uploadUrl;
+		}
+		if (this.peerAddresses && "peerAddresses" in options) {
+			options.peerAddresses = this.peerAddresses;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
