@@ -54,7 +54,7 @@ export type FileListQuery = {
 	pageToken?: string;
 };
 
-export type PinJobQuery = {
+export type PinQueueQuery = {
 	sort?: "ASC" | "DSC";
 	status?:
 		| "prechecking"
@@ -66,12 +66,13 @@ export type PinJobQuery = {
 		| "bad_host_node";
 	ipfs_pin_hash?: string;
 	limit?: number;
-	offset?: number;
+	pageToken?: string;
 };
 
-export type PinJobItem = {
+export type PinQueueItem = {
 	id: string;
-	ipfs_pin_hash: string;
+	cid?: string;
+	ipfs_pin_hash?: string;
 	date_queued: string;
 	name: string;
 	status: string;
@@ -86,8 +87,9 @@ export type PinJobItem = {
 	};
 };
 
-export type PinJobResponse = {
-	rows: PinJobItem[];
+export type PinQueueResponse = {
+	rows: PinQueueItem[];
+	next_page_token: string;
 };
 
 export type SwapCidOptions = {

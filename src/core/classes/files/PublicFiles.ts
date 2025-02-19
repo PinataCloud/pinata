@@ -24,6 +24,7 @@ import {
 	GetCIDResponse,
 } from "../../types";
 import { FilterFiles } from "./FilterFiles";
+import { FilterQueue } from "./FilterQueue";
 
 export class PublicFiles {
 	private config: PinataConfig | undefined;
@@ -72,5 +73,9 @@ export class PublicFiles {
 
 	deleteVectors(fileId: string): Promise<VectorizeFileResponse> {
 		return deleteFileVectors(this.config, fileId);
+	}
+
+	queue(): FilterQueue {
+		return new FilterQueue(this.config);
 	}
 }

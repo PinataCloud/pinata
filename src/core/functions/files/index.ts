@@ -9,3 +9,4 @@ export * from "./totalStorageUsage";
 export * from "./updateFile";
 export * from "./vectorizeFile";
 export * from "./vectorizeQuery";
+export * from "./queue";
