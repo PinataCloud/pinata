@@ -5,9 +5,6 @@ import {
 	swapCid,
 	swapHistory,
 	deleteSwap,
-	vectorizeFile,
-	vectorizeQuery,
-	deleteFileVectors,
 } from "../../functions";
 import { getFile } from "../../functions/files/getFile";
 import {
@@ -18,10 +15,6 @@ import {
 	SwapCidOptions,
 	SwapCidResponse,
 	SwapHistoryOptions,
-	VectorizeFileResponse,
-	VectorizeQuery,
-	VectorizeQueryResponse,
-	GetCIDResponse,
 } from "../../types";
 import { FilterFiles } from "./FilterFiles";
 import { FilterQueue } from "./FilterQueue";
@@ -59,20 +52,6 @@ export class PublicFiles {
 
 	deleteSwap(cid: string): Promise<string> {
 		return deleteSwap(this.config, cid, "public");
-	}
-
-	vectorize(fileId: string): Promise<VectorizeFileResponse> {
-		return vectorizeFile(this.config, fileId);
-	}
-
-	queryVectors(
-		options: VectorizeQuery,
-	): Promise<VectorizeQueryResponse | GetCIDResponse> {
-		return vectorizeQuery(this.config, options);
-	}
-
-	deleteVectors(fileId: string): Promise<VectorizeFileResponse> {
-		return deleteFileVectors(this.config, fileId);
 	}
 
 	queue(): FilterQueue {
