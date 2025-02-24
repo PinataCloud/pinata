@@ -1,14 +1,13 @@
 import { PinataSDK } from "../../src/core/pinataSDK";
-import * as testAuthenticationModule from "../../src/core/authentication/testAuthentication";
+import { testAuthentication } from "../../src/core/functions";
 
-jest.mock("../../src/core/authentication/testAuthentication");
+jest.mock("../../src/core/functions");
 
 describe("PinataSDK", () => {
 	let pinata: PinataSDK;
-	const mockTestAuthentication =
-		testAuthenticationModule.testAuthentication as jest.MockedFunction<
-			typeof testAuthenticationModule.testAuthentication
-		>;
+	const mockTestAuthentication = testAuthentication as jest.MockedFunction<
+		typeof testAuthentication
+	>;
 
 	beforeEach(() => {
 		pinata = new PinataSDK({

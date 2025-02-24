@@ -1,4 +1,4 @@
-import { listKeys } from "../../src/core/keys/listKeys";
+import { listKeys } from "../../src/core/functions";
 import type {
 	PinataConfig,
 	KeyListQuery,

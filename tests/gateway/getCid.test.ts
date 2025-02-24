@@ -1,4 +1,4 @@
-import { getCid } from "../../src/core/gateway/getCid";
+import { getCid } from "../../src/core/functions/gateway/getCid";
 import type {
 	PinataConfig,
 	GetCIDResponse,
@@ -28,68 +28,122 @@ describe("getCid function", () => {
 		pinataGateway: "https://test.mypinata.cloud",
 	};
 
-	it("should retrieve JSON data successfully", async () => {
-		const mockResponse = { key: "value" };
-		global.fetch = jest
-			.fn()
-			.mockResolvedValueOnce({
-				json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
-			})
-			.mockResolvedValueOnce({
+	describe("public network", () => {
+		it("should retrieve JSON data successfully", async () => {
+			const mockResponse = { key: "value" };
+			global.fetch = jest.fn().mockResolvedValueOnce({
 				ok: true,
 				headers: new Headers({ "content-type": "application/json" }),
 				json: jest.fn().mockResolvedValueOnce(mockResponse),
 			});
 
-		const result = await getCid(mockConfig, "QmTest...");
+			const result = await getCid(mockConfig, "QmTest...", "ipfs");
 
-		expect(result).toEqual({
-			data: mockResponse,
-			contentType: "application/json",
+			expect(result).toEqual({
+				data: mockResponse,
+				contentType: "application/json",
+			});
 		});
-	});
 
-	it("should retrieve text data successfully", async () => {
-		const mockResponse = "Hello, world!";
-		global.fetch = jest
-			.fn()
-			.mockResolvedValueOnce({
-				json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
-			})
-			.mockResolvedValueOnce({
+		it("should retrieve text data successfully", async () => {
+			const mockResponse = "Hello, world!";
+			global.fetch = jest.fn().mockResolvedValueOnce({
 				ok: true,
 				headers: new Headers({ "content-type": "text/plain" }),
 				text: jest.fn().mockResolvedValueOnce(mockResponse),
 			});
 
-		const result = await getCid(mockConfig, "QmTest...");
+			const result = await getCid(mockConfig, "QmTest...", "ipfs");
 
-		expect(result).toEqual({
-			data: mockResponse,
-			contentType: "text/plain",
+			expect(result).toEqual({
+				data: mockResponse,
+				contentType: "text/plain",
+			});
 		});
-	});
 
-	it("should retrieve blob data successfully", async () => {
-		const mockBlob = new Blob(["test data"], {
-			type: "application/octet-stream",
-		});
-		global.fetch = jest
-			.fn()
-			.mockResolvedValueOnce({
-				json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
-			})
-			.mockResolvedValueOnce({
+		it("should retrieve blob data successfully", async () => {
+			const mockBlob = new Blob(["test data"], {
+				type: "application/octet-stream",
+			});
+			global.fetch = jest.fn().mockResolvedValueOnce({
 				ok: true,
 				headers: new Headers({ "content-type": "application/octet-stream" }),
 				blob: jest.fn().mockResolvedValueOnce(mockBlob),
 			});
 
-		const result = await getCid(mockConfig, "QmTest...");
+			const result = await getCid(mockConfig, "QmTest...", "ipfs");
 
-		expect(result).toEqual({
-			data: mockBlob,
-			contentType: "application/octet-stream",
+			expect(result).toEqual({
+				data: mockBlob,
+				contentType: "application/octet-stream",
+			});
+		});
+	});
+
+	describe("private network", () => {
+		it("should retrieve JSON data successfully", async () => {
+			const mockResponse = { key: "value" };
+			global.fetch = jest
+				.fn()
+				.mockResolvedValueOnce({
+					json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
+				})
+				.mockResolvedValueOnce({
+					ok: true,
+					headers: new Headers({ "content-type": "application/json" }),
+					json: jest.fn().mockResolvedValueOnce(mockResponse),
+				});
+
+			const result = await getCid(mockConfig, "QmTest...", "files");
+
+			expect(result).toEqual({
+				data: mockResponse,
+				contentType: "application/json",
+			});
+		});
+
+		it("should retrieve text data successfully", async () => {
+			const mockResponse = "Hello, world!";
+			global.fetch = jest
+				.fn()
+				.mockResolvedValueOnce({
+					json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
+				})
+				.mockResolvedValueOnce({
+					ok: true,
+					headers: new Headers({ "content-type": "text/plain" }),
+					text: jest.fn().mockResolvedValueOnce(mockResponse),
+				});
+
+			const result = await getCid(mockConfig, "QmTest...", "files");
+
+			expect(result).toEqual({
+				data: mockResponse,
+				contentType: "text/plain",
+			});
+		});
+
+		it("should retrieve blob data successfully", async () => {
+			const mockBlob = new Blob(["test data"], {
+				type: "application/octet-stream",
+			});
+			global.fetch = jest
+				.fn()
+				.mockResolvedValueOnce({
+					json: jest.fn().mockResolvedValueOnce({ data: "signed_url" }),
+				})
+				.mockResolvedValueOnce({
+					ok: true,
+					headers: new Headers({ "content-type": "application/octet-stream" }),
+					blob: jest.fn().mockResolvedValueOnce(mockBlob),
+				});
+
+			const result = await getCid(mockConfig, "QmTest...", "files");
+
+			expect(result).toEqual({
+				data: mockBlob,
+				contentType: "application/octet-stream",
+			});
 		});
 	});
 
@@ -173,7 +227,7 @@ describe("getCid function", () => {
 				blob: jest.fn().mockResolvedValueOnce(mockBlob),
 			});
 
-		const result = await getCid(mockConfig, "QmTest...", {
+		const result = await getCid(mockConfig, "QmTest...", undefined, {
 			width: 100,
 			height: 100,
 			quality: 80,

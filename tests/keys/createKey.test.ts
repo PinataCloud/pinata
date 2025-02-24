@@ -1,4 +1,4 @@
-import { createKey } from "../../src/core/keys/createKey";
+import { createKey } from "../../src/core/functions";
 import type { PinataConfig, KeyOptions, KeyResponse } from "../../src";
 import {
 	PinataError,

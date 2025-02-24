@@ -1,4 +1,4 @@
-import { testAuthentication } from "../../src/core/authentication/testAuthentication";
+import { testAuthentication } from "../../src/core/functions/authentication/testAuthentication";
 import type { PinataConfig } from "../../src";
 import {
 	PinataError,

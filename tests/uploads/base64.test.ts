@@ -1,4 +1,4 @@
-import { uploadBase64 } from "../../src/core/uploads/base64";
+import { uploadBase64 } from "../../src/core/functions";
 import type {
 	PinataConfig,
 	UploadOptions,
@@ -40,17 +40,43 @@ describe("uploadBase64 function", () => {
 		created_at: "2023-01-01T00:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/png",
-		user_id: "testUserId",
 		group_id: null,
+		keyvalues: {
+			env: "test",
+		},
+		vectorized: false,
+		network: "public",
 	};
 
-	it("should upload base64 successfully", async () => {
+	it("should upload base64 successfully to public network", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
-		const result = await uploadBase64(mockConfig, mockBase64String);
+		const result = await uploadBase64(mockConfig, mockBase64String, "public");
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://uploads.pinata.cloud/v3/files",
+			expect.objectContaining({
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+					Source: "sdk/base64",
+				},
+				body: expect.any(FormData),
+			}),
+		);
+		expect(result).toEqual(mockResponse);
+	});
+
+	it("should upload base64 successfully to private network", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await uploadBase64(mockConfig, mockBase64String, "private");
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",
@@ -67,9 +93,9 @@ describe("uploadBase64 function", () => {
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(uploadBase64(undefined, mockBase64String)).rejects.toThrow(
-			ValidationError,
-		);
+		await expect(
+			uploadBase64(undefined, mockBase64String, "public"),
+		).rejects.toThrow(ValidationError);
 	});
 
 	it("should throw AuthenticationError on 401 response", async () => {
@@ -79,9 +105,9 @@ describe("uploadBase64 function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(uploadBase64(mockConfig, mockBase64String)).rejects.toThrow(
-			AuthenticationError,
-		);
+		await expect(
+			uploadBase64(mockConfig, mockBase64String, "public"),
+		).rejects.toThrow(AuthenticationError);
 	});
 
 	it("should throw NetworkError on non-401 error response", async () => {
@@ -91,9 +117,9 @@ describe("uploadBase64 function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(uploadBase64(mockConfig, mockBase64String)).rejects.toThrow(
-			NetworkError,
-		);
+		await expect(
+			uploadBase64(mockConfig, mockBase64String, "public"),
+		).rejects.toThrow(NetworkError);
 	});
 
 	it("should handle upload options", async () => {
@@ -114,7 +140,7 @@ describe("uploadBase64 function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadBase64(mockConfig, mockBase64String, mockOptions);
+		await uploadBase64(mockConfig, mockBase64String, "public", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",
@@ -142,7 +168,7 @@ describe("uploadBase64 function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadBase64(mockConfig, mockBase64String, mockOptions);
+		await uploadBase64(mockConfig, mockBase64String, "public", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",

@@ -1,4 +1,4 @@
-import { uploadFile } from "../../src/core/uploads/file";
+import { uploadFile } from "../../src/core/functions";
 import type {
 	PinataConfig,
 	UploadOptions,
@@ -41,17 +41,21 @@ describe("uploadFile function", () => {
 		created_at: "2023-01-01T00:00:00Z",
 		number_of_files: 1,
 		mime_type: "text/plain",
-		user_id: "testUserId",
 		group_id: null,
+		keyvalues: {
+			env: "dev",
+		},
+		vectorized: false,
+		network: "private",
 	};
 
-	it("should upload file successfully", async () => {
+	it("should upload file to public network successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
-		const result = await uploadFile(mockConfig, mockFile);
+		const result = await uploadFile(mockConfig, mockFile, "public");
 
 		expect(result).toEqual(mockResponse);
 		expect(global.fetch).toHaveBeenCalledWith(
@@ -67,7 +71,7 @@ describe("uploadFile function", () => {
 		);
 	});
 
-	it("should handle upload options", async () => {
+	it("should handle upload options for private network", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom File Name",
 			keyvalues: {
@@ -84,7 +88,7 @@ describe("uploadFile function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadFile(mockConfig, mockFile, mockOptions);
+		await uploadFile(mockConfig, mockFile, "private", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",
@@ -104,9 +108,10 @@ describe("uploadFile function", () => {
 		expect(formData.get("name")).toBe("Custom File Name");
 		expect(formData.get("group_id")).toBe("test-group");
 		expect(formData.get("keyvalues")).toBe(JSON.stringify({ key1: "value1" }));
+		expect(formData.get("network")).toBe("private");
 	});
 
-	it("should use custom JWT if provided in options", async () => {
+	it("should use custom JWT if provided in options for public network", async () => {
 		const customJwt = "custom-jwt";
 		const mockOptions: UploadOptions = {
 			keys: customJwt,
@@ -117,7 +122,7 @@ describe("uploadFile function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadFile(mockConfig, mockFile, mockOptions);
+		await uploadFile(mockConfig, mockFile, "public", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",
@@ -131,7 +136,7 @@ describe("uploadFile function", () => {
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(uploadFile(undefined, mockFile)).rejects.toThrow(
+		await expect(uploadFile(undefined, mockFile, "public")).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -143,7 +148,7 @@ describe("uploadFile function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(uploadFile(mockConfig, mockFile)).rejects.toThrow(
+		await expect(uploadFile(mockConfig, mockFile, "private")).rejects.toThrow(
 			AuthenticationError,
 		);
 	});
@@ -155,7 +160,7 @@ describe("uploadFile function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(uploadFile(mockConfig, mockFile)).rejects.toThrow(
+		await expect(uploadFile(mockConfig, mockFile, "public")).rejects.toThrow(
 			NetworkError,
 		);
 	});
@@ -165,6 +170,8 @@ describe("uploadFile function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Network failure"));
 
-		await expect(uploadFile(mockConfig, mockFile)).rejects.toThrow(PinataError);
+		await expect(uploadFile(mockConfig, mockFile, "private")).rejects.toThrow(
+			PinataError,
+		);
 	});
 });

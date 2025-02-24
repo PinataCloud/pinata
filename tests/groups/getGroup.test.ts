@@ -1,4 +1,4 @@
-import { getGroup } from "../../src/core/groups/getGroup";
+import { getGroup } from "../../src/core/functions/groups/getGroup";
 import type {
 	PinataConfig,
 	GetGroupOptions,
@@ -32,7 +32,36 @@ describe("getGroup function", () => {
 		groupId: "test-group-id",
 	};
 
-	it("should get a group successfully", async () => {
+	it("should get a public group successfully", async () => {
+		const mockResponse: GroupResponseItem = {
+			id: "test-group-id",
+			name: "Test Group",
+			is_public: true,
+			createdAt: "2023-07-26T12:00:00Z",
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await getGroup(mockConfig, mockOptions, "public");
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/groups/public/test-group-id",
+			{
+				method: "GET",
+				headers: {
+					Source: "sdk/getGroup",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				},
+			},
+		);
+		expect(result).toEqual(mockResponse);
+	});
+
+	it("should get a private group successfully", async () => {
 		const mockResponse: GroupResponseItem = {
 			id: "test-group-id",
 			name: "Test Group",
@@ -45,10 +74,10 @@ describe("getGroup function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
-		const result = await getGroup(mockConfig, mockOptions);
+		const result = await getGroup(mockConfig, mockOptions, "private");
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups/test-group-id",
+			"https://api.pinata.cloud/v3/groups/private/test-group-id",
 			{
 				method: "GET",
 				headers: {
@@ -62,7 +91,7 @@ describe("getGroup function", () => {
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(getGroup(undefined, mockOptions)).rejects.toThrow(
+		await expect(getGroup(undefined, mockOptions, "public")).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -74,7 +103,7 @@ describe("getGroup function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(getGroup(mockConfig, mockOptions)).rejects.toThrow(
+		await expect(getGroup(mockConfig, mockOptions, "public")).rejects.toThrow(
 			AuthenticationError,
 		);
 	});
@@ -86,7 +115,7 @@ describe("getGroup function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(getGroup(mockConfig, mockOptions)).rejects.toThrow(
+		await expect(getGroup(mockConfig, mockOptions, "public")).rejects.toThrow(
 			NetworkError,
 		);
 	});
@@ -96,7 +125,7 @@ describe("getGroup function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Unexpected error"));
 
-		await expect(getGroup(mockConfig, mockOptions)).rejects.toThrow(
+		await expect(getGroup(mockConfig, mockOptions, "public")).rejects.toThrow(
 			PinataError,
 		);
 	});
@@ -109,7 +138,7 @@ describe("getGroup function", () => {
 		});
 
 		await expect(
-			getGroup(mockConfig, { groupId: "non-existent-id" }),
+			getGroup(mockConfig, { groupId: "non-existent-id" }, "public"),
 		).rejects.toThrow(NetworkError);
 	});
 
@@ -130,10 +159,10 @@ describe("getGroup function", () => {
 			}),
 		});
 
-		await getGroup(mockConfig, specialIdOptions);
+		await getGroup(mockConfig, specialIdOptions, "private");
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			`https://api.pinata.cloud/v3/files/groups/${specialIdOptions.groupId}`,
+			`https://api.pinata.cloud/v3/groups/private/${specialIdOptions.groupId}`,
 			expect.any(Object),
 		);
 	});
@@ -143,9 +172,9 @@ describe("getGroup function", () => {
 			groupId: "",
 		};
 
-		await expect(getGroup(mockConfig, emptyIdOptions)).rejects.toThrow(
-			PinataError,
-		);
+		await expect(
+			getGroup(mockConfig, emptyIdOptions, "public"),
+		).rejects.toThrow(PinataError);
 	});
 
 	it("should handle a group with no name", async () => {
@@ -161,7 +190,7 @@ describe("getGroup function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponseNoName }),
 		});
 
-		const result = await getGroup(mockConfig, mockOptions);
+		const result = await getGroup(mockConfig, mockOptions, "private");
 
 		expect(result.name).toBe("");
 	});

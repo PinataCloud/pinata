@@ -1,4 +1,4 @@
-import { revokeKeys } from "../../src/core/keys/revokeKeys";
+import { revokeKeys } from "../../src/core/functions";
 import type { PinataConfig, RevokeKeyResponse } from "../../src";
 import {
 	PinataError,

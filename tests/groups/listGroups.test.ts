@@ -1,4 +1,4 @@
-import { listGroups } from "../../src/core/groups/listGroups";
+import { listGroups } from "../../src/core/functions/groups/listGroups";
 import type {
 	PinataConfig,
 	GroupResponseItem,
@@ -47,16 +47,16 @@ describe("listGroups function", () => {
 		next_page_token: "next_token",
 	};
 
-	it("should list groups successfully without options", async () => {
+	it("should list public groups successfully without options", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
-		const result = await listGroups(mockConfig);
+		const result = await listGroups(mockConfig, "public");
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups?",
+			"https://api.pinata.cloud/v3/groups/public?",
 			{
 				method: "GET",
 				headers: {
@@ -69,7 +69,29 @@ describe("listGroups function", () => {
 		expect(result).toEqual(mockGroupsResponse);
 	});
 
-	it("should list groups with query options", async () => {
+	it("should list private groups successfully without options", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
+		});
+
+		const result = await listGroups(mockConfig, "private");
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/groups/private?",
+			{
+				method: "GET",
+				headers: {
+					Source: "sdk/listGroups",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				},
+			},
+		);
+		expect(result).toEqual(mockGroupsResponse);
+	});
+
+	it("should list public groups with query options", async () => {
 		const options: GroupQueryOptions = {
 			limit: 5,
 			name: "Test",
@@ -82,16 +104,39 @@ describe("listGroups function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
-		await listGroups(mockConfig, options);
+		await listGroups(mockConfig, "public", options);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups?pageToken=token&isPublic=true&name=Test&limit=5",
+			"https://api.pinata.cloud/v3/groups/public?pageToken=token&isPublic=true&name=Test&limit=5",
+			expect.any(Object),
+		);
+	});
+
+	it("should list private groups with query options", async () => {
+		const options: GroupQueryOptions = {
+			limit: 5,
+			name: "Test",
+			pageToken: "token",
+			isPublic: true,
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
+		});
+
+		await listGroups(mockConfig, "private", options);
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/groups/private?pageToken=token&isPublic=true&name=Test&limit=5",
 			expect.any(Object),
 		);
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(listGroups(undefined)).rejects.toThrow(ValidationError);
+		await expect(listGroups(undefined, "public")).rejects.toThrow(
+			ValidationError,
+		);
 	});
 
 	it("should throw AuthenticationError on 401 response", async () => {
@@ -101,7 +146,9 @@ describe("listGroups function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(listGroups(mockConfig)).rejects.toThrow(AuthenticationError);
+		await expect(listGroups(mockConfig, "public")).rejects.toThrow(
+			AuthenticationError,
+		);
 	});
 
 	it("should throw NetworkError on non-401 error response", async () => {
@@ -111,7 +158,9 @@ describe("listGroups function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(listGroups(mockConfig)).rejects.toThrow(NetworkError);
+		await expect(listGroups(mockConfig, "public")).rejects.toThrow(
+			NetworkError,
+		);
 	});
 
 	it("should throw PinataError on unexpected errors", async () => {
@@ -119,7 +168,7 @@ describe("listGroups function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Unexpected error"));
 
-		await expect(listGroups(mockConfig)).rejects.toThrow(PinataError);
+		await expect(listGroups(mockConfig, "public")).rejects.toThrow(PinataError);
 	});
 
 	it("should handle empty group list", async () => {
@@ -130,7 +179,7 @@ describe("listGroups function", () => {
 				.mockResolvedValueOnce({ data: { groups: [], next_page_token: null } }),
 		});
 
-		const result = await listGroups(mockConfig);
+		const result = await listGroups(mockConfig, "public");
 
 		expect(result).toEqual({ groups: [], next_page_token: null });
 	});
@@ -146,7 +195,7 @@ describe("listGroups function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
-		await listGroups(mockConfig, options);
+		await listGroups(mockConfig, "public", options);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			expect.not.stringContaining("nameContains"),
@@ -164,10 +213,10 @@ describe("listGroups function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
-		await listGroups(mockConfig, options);
+		await listGroups(mockConfig, "public", options);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			`https://api.pinata.cloud/v3/files/groups?limit=${options.limit}`,
+			`https://api.pinata.cloud/v3/groups/public?limit=${options.limit}`,
 			expect.any(Object),
 		);
 	});
@@ -183,10 +232,10 @@ describe("listGroups function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockGroupsResponse }),
 		});
 
-		await listGroups(customConfig);
+		await listGroups(customConfig, "public");
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://custom.api.pinata.cloud/files/groups?",
+			"https://custom.api.pinata.cloud/groups/public?",
 			expect.any(Object),
 		);
 	});

@@ -1,4 +1,4 @@
-import { createGroup } from "../../src/core/groups/createGroup";
+import { createGroup } from "../../src/core/functions/groups/createGroup";
 import type { PinataConfig, GroupOptions, GroupResponseItem } from "../../src";
 import {
 	PinataError,
@@ -28,7 +28,7 @@ describe("createGroup function", () => {
 		name: "Test Group",
 	};
 
-	it("should create a group successfully", async () => {
+	it("should create a public network group successfully", async () => {
 		const mockResponse: GroupResponseItem = {
 			id: "group-123",
 			is_public: false,
@@ -41,10 +41,43 @@ describe("createGroup function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
-		const result = await createGroup(mockConfig, mockOptions);
+		const result = await createGroup(mockConfig, mockOptions, "public");
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups",
+			"https://api.pinata.cloud/v3/groups/public",
+			{
+				method: "POST",
+				headers: {
+					Source: "sdk/createGroup",
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				},
+				body: JSON.stringify({
+					name: mockOptions.name,
+					is_public: undefined,
+				}),
+			},
+		);
+		expect(result).toEqual(mockResponse);
+	});
+
+	it("should create a private network group successfully", async () => {
+		const mockResponse: GroupResponseItem = {
+			id: "group-123",
+			is_public: false,
+			name: "Test Group",
+			createdAt: "2023-07-26T12:00:00Z",
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await createGroup(mockConfig, mockOptions, "private");
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/groups/private",
 			{
 				method: "POST",
 				headers: {
@@ -62,7 +95,7 @@ describe("createGroup function", () => {
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(createGroup(undefined, mockOptions)).rejects.toThrow(
+		await expect(createGroup(undefined, mockOptions, "public")).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -74,9 +107,9 @@ describe("createGroup function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(createGroup(mockConfig, mockOptions)).rejects.toThrow(
-			AuthenticationError,
-		);
+		await expect(
+			createGroup(mockConfig, mockOptions, "public"),
+		).rejects.toThrow(AuthenticationError);
 	});
 
 	it("should throw NetworkError on non-401 error response", async () => {
@@ -86,9 +119,9 @@ describe("createGroup function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(createGroup(mockConfig, mockOptions)).rejects.toThrow(
-			NetworkError,
-		);
+		await expect(
+			createGroup(mockConfig, mockOptions, "public"),
+		).rejects.toThrow(NetworkError);
 	});
 
 	it("should throw PinataError on unexpected errors", async () => {
@@ -96,9 +129,9 @@ describe("createGroup function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Unexpected error"));
 
-		await expect(createGroup(mockConfig, mockOptions)).rejects.toThrow(
-			PinataError,
-		);
+		await expect(
+			createGroup(mockConfig, mockOptions, "public"),
+		).rejects.toThrow(PinataError);
 	});
 
 	it("should handle group creation with a very long name", async () => {
@@ -118,7 +151,7 @@ describe("createGroup function", () => {
 			}),
 		});
 
-		const result = await createGroup(mockConfig, longNameOptions);
+		const result = await createGroup(mockConfig, longNameOptions, "public");
 
 		expect(result.name).toEqual(longNameOptions.name);
 	});
@@ -140,7 +173,7 @@ describe("createGroup function", () => {
 			}),
 		});
 
-		const result = await createGroup(mockConfig, specialNameOptions);
+		const result = await createGroup(mockConfig, specialNameOptions, "public");
 
 		expect(result.name).toEqual(specialNameOptions.name);
 	});
@@ -162,7 +195,7 @@ describe("createGroup function", () => {
 			}),
 		});
 
-		const result = await createGroup(mockConfig, emptyNameOptions);
+		const result = await createGroup(mockConfig, emptyNameOptions, "public");
 
 		expect(result.name).toEqual("");
 	});
@@ -185,10 +218,10 @@ describe("createGroup function", () => {
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
-		const result = await createGroup(mockConfig, publicGroupOptions);
+		const result = await createGroup(mockConfig, publicGroupOptions, "public");
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/v3/files/groups",
+			"https://api.pinata.cloud/v3/groups/public",
 			{
 				method: "POST",
 				headers: {

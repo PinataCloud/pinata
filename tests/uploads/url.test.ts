@@ -1,4 +1,4 @@
-import { uploadUrl } from "../../src/core/uploads/url";
+import { uploadUrl } from "../../src/core/functions";
 import type {
 	PinataConfig,
 	UploadOptions,
@@ -27,15 +27,17 @@ describe("uploadUrl function", () => {
 		created_at: "2023-04-01T12:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/jpeg",
-		user_id: "test-user-id",
 		group_id: null,
+		keyvalues: {},
+		vectorized: false,
+		network: "public",
 	};
 
 	beforeEach(() => {
 		jest.resetAllMocks();
 	});
 
-	it("should upload URL successfully", async () => {
+	it("should upload URL to public network successfully", async () => {
 		global.fetch = jest
 			.fn()
 			.mockResolvedValueOnce({
@@ -47,7 +49,7 @@ describe("uploadUrl function", () => {
 				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
-		const result = await uploadUrl(mockConfig, mockUrl);
+		const result = await uploadUrl(mockConfig, mockUrl, "public");
 
 		expect(result).toEqual(mockResponse);
 		expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -64,6 +66,26 @@ describe("uploadUrl function", () => {
 				body: expect.any(FormData),
 			}),
 		);
+	});
+
+	it("should upload URL to private network successfully", async () => {
+		global.fetch = jest
+			.fn()
+			.mockResolvedValueOnce({
+				ok: true,
+				arrayBuffer: jest.fn().mockResolvedValueOnce(new ArrayBuffer(8)),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+			});
+
+		const result = await uploadUrl(mockConfig, mockUrl, "private");
+
+		expect(result).toEqual(mockResponse);
+		expect(global.fetch).toHaveBeenCalledTimes(2);
+		const formData = (global.fetch as jest.Mock).mock.calls[1][1].body;
+		expect(formData.get("network")).toBe("private");
 	});
 
 	it("should handle upload options", async () => {
@@ -89,7 +111,7 @@ describe("uploadUrl function", () => {
 				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
-		await uploadUrl(mockConfig, mockUrl, mockOptions);
+		await uploadUrl(mockConfig, mockUrl, "public", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledTimes(2);
 		const formData = (global.fetch as jest.Mock).mock.calls[1][1].body;
@@ -116,7 +138,7 @@ describe("uploadUrl function", () => {
 				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
-		await uploadUrl(mockConfig, mockUrl, mockOptions);
+		await uploadUrl(mockConfig, mockUrl, "public", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledTimes(2);
 		expect(global.fetch).toHaveBeenNthCalledWith(
@@ -143,7 +165,7 @@ describe("uploadUrl function", () => {
 				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 			});
 
-		await uploadUrl(mockConfig, mockUrl);
+		await uploadUrl(mockConfig, mockUrl, "public");
 
 		expect(global.fetch).toHaveBeenCalledTimes(2);
 		const formData = (global.fetch as jest.Mock).mock.calls[1][1].body;
@@ -151,7 +173,7 @@ describe("uploadUrl function", () => {
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(uploadUrl(undefined, mockUrl)).rejects.toThrow(
+		await expect(uploadUrl(undefined, mockUrl, "public")).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -163,7 +185,9 @@ describe("uploadUrl function", () => {
 			text: jest.fn().mockResolvedValueOnce("Not Found"),
 		});
 
-		await expect(uploadUrl(mockConfig, mockUrl)).rejects.toThrow(NetworkError);
+		await expect(uploadUrl(mockConfig, mockUrl, "public")).rejects.toThrow(
+			NetworkError,
+		);
 	});
 
 	it("should throw AuthenticationError on 401 response from Pinata", async () => {
@@ -179,7 +203,7 @@ describe("uploadUrl function", () => {
 				text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 			});
 
-		await expect(uploadUrl(mockConfig, mockUrl)).rejects.toThrow(
+		await expect(uploadUrl(mockConfig, mockUrl, "public")).rejects.toThrow(
 			AuthenticationError,
 		);
 	});
@@ -197,6 +221,8 @@ describe("uploadUrl function", () => {
 				text: jest.fn().mockResolvedValueOnce("Server Error"),
 			});
 
-		await expect(uploadUrl(mockConfig, mockUrl)).rejects.toThrow(NetworkError);
+		await expect(uploadUrl(mockConfig, mockUrl, "public")).rejects.toThrow(
+			NetworkError,
+		);
 	});
 });

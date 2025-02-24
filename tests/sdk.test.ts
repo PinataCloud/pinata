@@ -1,5 +1,5 @@
 import { PinataSDK } from "../src/core/pinataSDK";
-import type { PinataConfig, AuthTestResponse } from "../src";
+import type { PinataConfig } from "../src";
 import {
 	PinataError,
 	NetworkError,
@@ -24,9 +24,8 @@ describe("PinataSDK", () => {
 		pinataGateway: "https://test.mypinata.cloud",
 	};
 
-	const mockAuthTestResponse: AuthTestResponse = {
-		message: "Congratulations! You are communicating with the Pinata API!",
-	};
+	const mockAuthTestResponse =
+		"Congratulations! You are communicating with the Pinata API!";
 
 	it("should initialize PinataSDK with config", () => {
 		const sdk = new PinataSDK(mockConfig);

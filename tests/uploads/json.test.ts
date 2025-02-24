@@ -1,4 +1,4 @@
-import { uploadJson } from "../../src/core/uploads/json";
+import { uploadJson } from "../../src/core/functions";
 import type {
 	PinataConfig,
 	UploadOptions,
@@ -34,21 +34,45 @@ describe("uploadJson function", () => {
 		created_at: "2023-04-01T12:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/jpeg",
-		user_id: "test-user-id",
 		group_id: null,
+		keyvalues: {},
+		vectorized: false,
+		network: "public",
 	};
 
 	beforeEach(() => {
 		jest.resetAllMocks();
 	});
 
-	it("should upload JSON successfully", async () => {
+	it("should upload JSON successfully to public network", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
 		});
 
-		const result = await uploadJson(mockConfig, mockJsonData);
+		const result = await uploadJson(mockConfig, mockJsonData, "public");
+
+		expect(result).toEqual(mockResponse);
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://uploads.pinata.cloud/v3/files",
+			expect.objectContaining({
+				method: "POST",
+				headers: {
+					Source: "sdk/json",
+					Authorization: "Bearer test-jwt",
+				},
+				body: expect.any(FormData),
+			}),
+		);
+	});
+
+	it("should upload JSON successfully to private network", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await uploadJson(mockConfig, mockJsonData, "private");
 
 		expect(result).toEqual(mockResponse);
 		expect(global.fetch).toHaveBeenCalledWith(
@@ -81,7 +105,7 @@ describe("uploadJson function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadJson(mockConfig, mockJsonData, mockOptions);
+		await uploadJson(mockConfig, mockJsonData, "private", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",
@@ -112,7 +136,7 @@ describe("uploadJson function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadJson(mockConfig, mockJsonData, mockOptions);
+		await uploadJson(mockConfig, mockJsonData, "public", mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			"https://uploads.pinata.cloud/v3/files",
@@ -131,14 +155,14 @@ describe("uploadJson function", () => {
 			json: jest.fn().mockResolvedValueOnce(mockResponse),
 		});
 
-		await uploadJson(mockConfig, mockJsonData);
+		await uploadJson(mockConfig, mockJsonData, "public");
 
 		const formData = (global.fetch as jest.Mock).mock.calls[0][1].body;
 		expect(formData.get("name")).toBe("data.json");
 	});
 
 	it("should throw ValidationError if config is missing", async () => {
-		await expect(uploadJson(undefined, mockJsonData)).rejects.toThrow(
+		await expect(uploadJson(undefined, mockJsonData, "public")).rejects.toThrow(
 			ValidationError,
 		);
 	});
@@ -150,9 +174,9 @@ describe("uploadJson function", () => {
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
 		});
 
-		await expect(uploadJson(mockConfig, mockJsonData)).rejects.toThrow(
-			AuthenticationError,
-		);
+		await expect(
+			uploadJson(mockConfig, mockJsonData, "public"),
+		).rejects.toThrow(AuthenticationError);
 	});
 
 	it("should throw NetworkError on non-401 error response", async () => {
@@ -162,9 +186,9 @@ describe("uploadJson function", () => {
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
 		});
 
-		await expect(uploadJson(mockConfig, mockJsonData)).rejects.toThrow(
-			NetworkError,
-		);
+		await expect(
+			uploadJson(mockConfig, mockJsonData, "public"),
+		).rejects.toThrow(NetworkError);
 	});
 
 	it("should throw PinataError on fetch failure", async () => {
@@ -172,8 +196,8 @@ describe("uploadJson function", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("Network failure"));
 
-		await expect(uploadJson(mockConfig, mockJsonData)).rejects.toThrow(
-			PinataError,
-		);
+		await expect(
+			uploadJson(mockConfig, mockJsonData, "public"),
+		).rejects.toThrow(PinataError);
 	});
 });
