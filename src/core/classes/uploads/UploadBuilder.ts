@@ -7,7 +7,7 @@ export class UploadBuilder<T> {
 		...args: any[]
 	) => Promise<T>;
 	private args: any[];
-	private metadata: PinataMetadata | undefined;
+	private metadata: PinataMetadata | undefined = {};
 	private keys: string | undefined;
 	private groupId: string | undefined;
 	private vector: boolean | undefined;
@@ -27,8 +27,20 @@ export class UploadBuilder<T> {
 		this.args = args;
 	}
 
-	addMetadata(metadata: PinataMetadata): UploadBuilder<T> {
-		this.metadata = metadata;
+	// Replace addMetadata with these two methods:
+	name(name: string): UploadBuilder<T> {
+		if (!this.metadata) {
+			this.metadata = {};
+		}
+		this.metadata.name = name;
+		return this;
+	}
+
+	keyvalues(keyvalues: Record<string, string>): UploadBuilder<T> {
+		if (!this.metadata) {
+			this.metadata = {};
+		}
+		this.metadata.keyvalues = keyvalues;
 		return this;
 	}
 
