@@ -28,17 +28,35 @@ export const uploadFileArray = async (
 		data.append("file", file, path);
 	}
 
-	data.append("name", folder);
+	// Reserved for later release
+	// data.append("name", folder);
 
-	data.append("network", network);
+	// data.append("network", network);
 
-	if (options?.groupId) {
-		data.append("group_id", options.groupId);
-	}
+	// if (options?.groupId) {
+	//   data.append("group_id", options.groupId);
+	// }
 
-	if (options?.metadata?.keyvalues) {
-		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
-	}
+	// if (options?.metadata?.keyvalues) {
+	//   data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+	// }
+
+	// Legacy
+	data.append(
+		"pinataMetadata",
+		JSON.stringify({
+			name: folder,
+			keyvalues: options?.metadata?.keyvalues,
+		}),
+	);
+
+	data.append(
+		"pinataOptions",
+		JSON.stringify({
+			groupId: options?.groupId,
+			cidVersion: 1,
+		}),
+	);
 
 	let headers: Record<string, string>;
 
@@ -53,15 +71,22 @@ export const uploadFileArray = async (
 			Source: "sdk/fileArray",
 		};
 	}
-
-	let endpoint: string = "https://uploads.pinata.cloud/v3";
+	// Reserved for later release
+	//let endpoint: string = "https://uploads.pinata.cloud/v3";
+	let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
 
 	if (config.uploadUrl) {
 		endpoint = config.uploadUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/files`, {
+		// Reserved for later release
+		// const request = await fetch(`${endpoint}/files`, {
+		// 	method: "POST",
+		// 	headers: headers,
+		// 	body: data,
+		// });
+		const request = await fetch(`${endpoint}`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -92,36 +117,49 @@ export const uploadFileArray = async (
 		}
 
 		const res = await request.json();
-		const resData: UploadResponse = res.data;
 
-		if (options?.vectorize) {
-			const vectorReq = await fetch(
-				`${endpoint}/vectorize/files/${resData.id}`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${jwt}`,
-					},
-				},
-			);
-			if (vectorReq.ok) {
-				resData.vectorized = true;
-				return resData;
-			} else {
-				const errorData = await vectorReq.text();
-				throw new NetworkError(
-					`HTTP error during vectorization: ${errorData}`,
-					vectorReq.status,
-					{
-						error: errorData,
-						code: "HTTP_ERROR",
-						metadata: {
-							requestUrl: request.url,
-						},
-					},
-				);
-			}
-		}
+		const resData: UploadResponse = {
+			id: res.ID,
+			name: res.Name,
+			cid: res.IpfsHash,
+			size: res.PinSize,
+			created_at: res.Timestamp,
+			number_of_files: res.NumberOfFiles,
+			mime_type: res.MimeType,
+			group_id: res.GroupId,
+			keyvalues: res.Keyvalues,
+			vectorized: false,
+			network: "public",
+		};
+
+		// if (options?.vectorize) {
+		//   const vectorReq = await fetch(
+		//     `${endpoint}/vectorize/files/${resData.id}`,
+		//     {
+		//       method: "POST",
+		//       headers: {
+		//         Authorization: `Bearer ${jwt}`,
+		//       },
+		//     },
+		//   );
+		//   if (vectorReq.ok) {
+		//     resData.vectorized = true;
+		//     return resData;
+		//   } else {
+		//     const errorData = await vectorReq.text();
+		//     throw new NetworkError(
+		//       `HTTP error during vectorization: ${errorData}`,
+		//       vectorReq.status,
+		//       {
+		//         error: errorData,
+		//         code: "HTTP_ERROR",
+		//         metadata: {
+		//           requestUrl: request.url,
+		//         },
+		//       },
+		//     );
+		//   }
+		// }
 
 		return resData;
 	} catch (error) {

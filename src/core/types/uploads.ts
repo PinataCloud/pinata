@@ -8,7 +8,6 @@ export type UploadResponse = {
 	created_at: string;
 	number_of_files: number;
 	mime_type: string;
-	user_id: string;
 	group_id: string | null;
 	keyvalues: {
 		[key: string]: string;

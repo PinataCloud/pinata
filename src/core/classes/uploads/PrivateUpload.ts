@@ -39,18 +39,19 @@ export class PrivateUpload {
 		);
 	}
 
-	fileArray(
-		files: FileObject[],
-		options?: UploadOptions,
-	): UploadBuilder<UploadResponse> {
-		return new UploadBuilder(
-			this.config,
-			(config, file, options) =>
-				uploadFileArray(config, file, "private", options),
-			files,
-			options,
-		);
-	}
+	// Reserved for future release
+	// fileArray(
+	// 	files: FileObject[],
+	// 	options?: UploadOptions,
+	// ): UploadBuilder<UploadResponse> {
+	// 	return new UploadBuilder(
+	// 		this.config,
+	// 		(config, file, options) =>
+	// 			uploadFileArray(config, file, "private", options),
+	// 		files,
+	// 		options,
+	// 	);
+	// }
 
 	base64(
 		base64String: string,
