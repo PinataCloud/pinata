@@ -27,7 +27,6 @@ describe("uploadUrl function", () => {
 		created_at: "2023-04-01T12:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/jpeg",
-		user_id: "test-user-id",
 		group_id: null,
 		keyvalues: {},
 		vectorized: false,

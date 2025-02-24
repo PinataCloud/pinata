@@ -40,7 +40,6 @@ describe("uploadBase64 function", () => {
 		created_at: "2023-01-01T00:00:00Z",
 		number_of_files: 1,
 		mime_type: "image/png",
-		user_id: "testUserId",
 		group_id: null,
 		keyvalues: {
 			env: "test",
