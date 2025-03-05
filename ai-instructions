@@ -27,6 +27,7 @@
   - Authorization: Bearer PINATA_JWT
 
   Request Body (multipart/form-data):
+  - network (string, optional): "public" or "private", defaults to "private"
   - file (File, required): File to upload
   - name (string, optional): Custom name
   - group_id (string, optional): Group ID
@@ -50,13 +51,19 @@
   }
 
   List Files
-  GET /files
+  GET /files/{network}
+  Parameters:
+  - network (path parameter): "public" or "private"
+
   Query Parameters:
   - name (string): Filter by name
   - group (string): Filter by group_id
   - mimeType (string): Filter by MIME type
   - cid (string): Filter by CID
+  - cidPending (boolean): Return only files waiting for a CID
+  - metadata (object): Filter by key values in file metadata
   - limit (integer): Result limit
+  - order (string): Sort results by creation date with "ASC" or "DESC"
   - pageToken (string): Pagination token
 
   Response Body:
@@ -82,7 +89,10 @@
   }
 
   Get File by ID
-  GET /files/{id}
+  GET /files/{network}/{id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): File ID
 
   Response Body:
   {
@@ -102,7 +112,11 @@
   }
 
   Update File
-  PUT /files/{id}
+  PUT /files/{network}/{id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): File ID
+
   Request Body:
   {
     "name": "Updated Name",
@@ -129,16 +143,18 @@
   }
 
   Delete File
-  DELETE /files/{id}
+  DELETE /files/{network}/{id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): File ID
 
   Response Body:
   {
     "data": null
   }
 
-  Get Signed URL
-  Used for accessing private files
-  POST /files/sign
+  Create Download Link (Private Files Only)
+  POST /files/private/download_link
   Request Body:
   {
     "url": "https://example.mypinata.cloud/files/bafybeifq444z4b7yqzcyz4a5gspb2rpyfcdxp3mrfpigmllh52ld5tyzwm",
@@ -157,7 +173,10 @@
   Groups are used for organizing files but also for optionally making files public
 
   Create Group
-  POST /files/groups
+  POST /groups/{network}
+  Parameters:
+  - network (path parameter): "public" or "private"
+
   Request Body:
   {
     "name": "My Group",
@@ -175,11 +194,15 @@
   }
 
   List Groups
-  GET /files/groups
+  GET /groups/{network}
+  Parameters:
+  - network (path parameter): "public" or "private"
+
   Query Parameters:
   - name (string): Filter by name
   - isPublic (boolean): Filter by public status
   - limit (integer): Result limit
+  - pageToken (string): Pagination token
 
   Response Body:
   {
@@ -197,7 +220,10 @@
   }
 
   Get Group
-  GET /files/groups/{id}
+  GET /groups/{network}/{id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): Group ID
 
   Response Body:
   {
@@ -210,7 +236,11 @@
   }
 
   Update Group
-  PUT /files/groups/{id}
+  PUT /groups/{network}/{id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): Group ID
+
   Request Body:
   {
     "name": "Updated Name",
@@ -228,7 +258,10 @@
   }
 
   Delete Group
-  DELETE /files/groups/{id}
+  DELETE /groups/{network}/{id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): Group ID
 
   Response Body:
   {
@@ -236,7 +269,11 @@
   }
 
   Add File to Group
-  PUT /files/groups/{id}/ids/{file_id}
+  PUT /groups/{network}/{id}/ids/{file_id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): Group ID
+  - file_id (path parameter): File ID
 
   Response Body:
   {
@@ -244,7 +281,11 @@
   }
 
   Remove File from Group
-  DELETE /files/groups/{id}/ids/{file_id}
+  DELETE /groups/{network}/{id}/ids/{file_id}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - id (path parameter): Group ID
+  - file_id (path parameter): File ID
 
   Response Body:
   {
@@ -254,7 +295,11 @@
   Swaps API
 
   Add Swap
-  PUT /files/swap/{cid}
+  PUT /files/{network}/swap/{cid}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - cid (path parameter): Original CID
+
   Request Body:
   {
     "swap_cid": "bafkreig4zcnmqa23zff3ye7tuef6wrlq3aimffzm22axfeh3ddmawzlzz4"
@@ -269,7 +314,11 @@
   }
 
   Get Swap History
-  GET /files/swap/{cid}
+  GET /files/{network}/swap/{cid}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - cid (path parameter): Original CID
+
   Query Parameters:
   - domain (string, required): Gateway domain with Hot Swaps plugin
 
@@ -284,7 +333,57 @@
   }
 
   Remove Swap
-  DELETE /files/swap/{cid}
+  DELETE /files/{network}/swap/{cid}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - cid (path parameter): Original CID
+
+  Response Body:
+  {
+    "data": null
+  }
+
+  Signatures API
+
+  Get Signature for a CID
+  GET /files/{network}/signature/{cid}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - cid (path parameter): Target CID
+
+  Response Body:
+  {
+    "data": {
+      "cid": "QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU",
+      "signature": "0x1ba6c2a8412dc9b0be37b013ea5bddd97251dab4d435cc9c4c7bcf331d4017ca2de07485ad6a15ce60d3700cee802787bc7ede0c112c7843f702bb1e71b750911b"
+    }
+  }
+
+  Add Signature to CID
+  POST /files/{network}/signature/{cid}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - cid (path parameter): Target CID
+
+  Request Body:
+  {
+    "address": "0xbC18447255e86f7f6c01C25e82636dDc587Ef9dc",
+    "signature": "0x1ba6c2a8412dc9b0be37b013ea5bddd97251dab4d435cc9c4c7bcf331d4017ca2de07485ad6a15ce60d3700cee802787bc7ede0c112c7843f702bb1e71b750911b"
+  }
+
+  Response Body:
+  {
+    "data": {
+      "cid": "QmXGeVy9dVwfuFJmvbzz8y4dYK1TdxXbDGzwbNuyZ5xXSU",
+      "signature": "0x1ba6c2a8412dc9b0be37b013ea5bddd97251dab4d435cc9c4c7bcf331d4017ca2de07485ad6a15ce60d3700cee802787bc7ede0c112c7843f702bb1e71b750911b"
+    }
+  }
+
+  Remove Signature from CID
+  DELETE /files/{network}/signature/{cid}
+  Parameters:
+  - network (path parameter): "public" or "private"
+  - cid (path parameter): Target CID
 
   Response Body:
   {
@@ -349,7 +448,6 @@ Response:
             "id": "d4ea5a38-4e0a-4126-8fd4-7534d258a995",
             "name": "My API Key",
             "key": "6270c5f4ed520756d498effbb6eb4b5f",
-            "secret": "secretkey",
             "max_uses": 2,
             "uses": 2,
             "user_id": "32bd7147-51d5-4df2-8771-7aeb9dcac7a2",
@@ -389,7 +487,6 @@ Response: "Revoked"
   - 500: Internal Server Error
 
   Remember to handle errors appropriately and implement retries for network failures. Always use environment variables for API keys and validate inputs before making API calls.
-
   Instructions for SDK
   1. INITIALIZATION & CONFIGURATION
 
@@ -403,27 +500,33 @@ Response: "Revoked"
   const pinata = new PinataSDK({
     pinataJwt: string,          // Required JWT token
     pinataGateway?: string,     // Optional gateway domain
-    customHeaders?: Record<string, string>,
+    pinataGatewayKey?: string,  // Optional gateway key
   });
 
   Response:
   type PinataConfig = {
-    pinataJwt: string;
+    pinataJwt?: string;
     pinataGateway?: string;
-    customHeaders?: Record<string, string>;
+    pinataGatewayKey?: string;
   }
 
   2. FILE OPERATIONS
   Upload Methods:
 
   // Single file upload
-  pinata.upload.file(File)
-    .group(groupId)        // Optional
-    .addMetadata({         // Optional
-      name: string,
-      keyvalues: Record<string, string>
+  pinata.upload.public.file(File)
+    .name("file name")      // Optional
+    .keyvalues({            // Optional
+      key: "value"
     })
-    .key(apiKey)          // Optional
+    .key(apiKey)            // Optional
+    .group(groupId)         // Optional
+    .vectorize()            // Optional AI vectorization
+    .url(signedUrl)         // Optional
+
+  // Private file upload
+  pinata.upload.private.file(File)
+    // Same options as public.file()
 
   Response:
   type UploadResponse = {
@@ -431,46 +534,70 @@ Response: "Revoked"
     name: string;
     cid: string;
     size: number;
+    created_at: string;
     number_of_files: number;
     mime_type: string;
-    user_id: string;
     group_id: string | null;
+    keyvalues: {
+      [key: string]: string;
+    };
+    vectorized: boolean;
+    network: string;
   }
 
-  // Multiple files
-  pinata.upload.fileArray([File, File, ...])
-
-  Response: Same as single file upload
+  // Multiple files upload (public only)
+  pinata.upload.public.fileArray([File, File, ...])
+    // Same options as file()
 
   // JSON content
-  pinata.upload.json(JsonObject)
-
-  Response: Same as single file upload
+  pinata.upload.public.json(JsonObject)
+  pinata.upload.private.json(JsonObject)
+    // Same options as file()
 
   // Base64 content
-  pinata.upload.base64(string)
-
-  Response: Same as single file upload
+  pinata.upload.public.base64(string)
+  pinata.upload.private.base64(string)
+    // Same options as file()
 
   // URL content
-  pinata.upload.url(string)
+  pinata.upload.public.url(string)
+  pinata.upload.private.url(string)
+    // Same options as file()
 
-  Response: Same as single file upload
+  // CID upload (public only)
+  pinata.upload.public.cid(string)
+    .peerAddress(string[])  // Optional
+    // + other options
+
+  // Create signed upload URL
+  pinata.upload.public.createSignedURL({
+    expires: number,
+    date?: number,
+    groupId?: string,
+    name?: string,
+    keyvalues?: Record<string, string>
+  })
+  pinata.upload.private.createSignedURL({
+    // Same options
+  })
 
   File Management:
-  typescript
-  // List files
-  pinata.files.list()
+  // List public files
+  pinata.files.public.list()
     .name(string)         // Filter by name
     .group(string)        // Filter by group
     .noGroup(boolean)     // Filter ungrouped
-    .cid(string)         // Filter by CID
-    .metadata(Record<string, string>) // Filter by metadata
-    .mimeType(string)    // Filter by type
-    .order("ASC"|"DESC") // Sort order
-    .limit(number)       // Results limit
-    .cidPending(boolean) // Filter pending
-    .pageToken(string)   // Pagination
+    .cid(string)          // Filter by CID
+    .keyvalues(Record<string, string>) // Filter by metadata
+    .mimeType(string)     // Filter by type
+    .order("ASC"|"DESC")  // Sort order
+    .limit(number)        // Results limit
+    .cidPending(boolean)  // Filter pending
+    .pageToken(string)    // Pagination
+
+  // List private files
+  pinata.files.private.list()
+    // Same options as public.list()
 
   Response:
   type FileListResponse = {
@@ -478,8 +605,15 @@ Response: "Revoked"
     next_page_token: string;
   }
 
+  // Get file by ID
+  pinata.files.public.get(id)
+  pinata.files.private.get(id)
+
+  Response: FileListItem
+
   // Delete files
-  pinata.files.delete([fileId, fileId, ...])
+  pinata.files.public.delete([fileId, fileId, ...])
+  pinata.files.private.delete([fileId, fileId, ...])
 
   Response:
   type DeleteResponse = {
@@ -488,27 +622,24 @@ Response: "Revoked"
   }[]
 
   // Update file
-  pinata.files.update({
+  pinata.files.public.update({
     id: string,
-    name?: string
+    name?: string,
+    keyvalues?: Record<string, string>
+  })
+  pinata.files.private.update({
+    // Same options
   })
 
-  Response:
-  type FileListItem = {
-    id: string;
-    name: string | null;
-    cid: string;
-    size: number;
-    number_of_files: number;
-    mime_type: string;
-    group_id: string | null;
-    created_at: string;
-  }
+  Response: FileListItem
 
   // Hot Swaps
-  pinata.files.addSwap({
+  pinata.files.public.addSwap({
     cid: string,
     swapCid: string
+  })
+  pinata.files.private.addSwap({
+    // Same options
   })
 
   Response:
@@ -517,26 +648,64 @@ Response: "Revoked"
     created_at: string;
   }
 
-  pinata.files.deleteSwap(cid)
+  pinata.files.public.deleteSwap(cid)
+  pinata.files.private.deleteSwap(cid)
 
-  Response: null
+  Response: string
 
-  pinata.files.getSwapHistory({
+  pinata.files.public.getSwapHistory({
     cid: string,
     domain: string
+  })
+  pinata.files.private.getSwapHistory({
+    // Same options
   })
 
   Response: SwapCidResponse[]
 
+  // Queue management (public only)
+  pinata.files.public.queue()
+    .cid(string)          // Filter by CID
+    .status(string)       // Filter by status
+    .pageLimit(number)    // Limit results
+    .sort("ASC"|"DSC")    // Sort order
+    .pageToken(string)    // Pagination
+
+  Response:
+  type PinQueueResponse = {
+    rows: PinQueueItem[];
+    next_page_token: string;
+  }
+
+  // Vectorization (private only)
+  pinata.files.private.vectorize(fileId)
+  pinata.files.private.deleteVectors(fileId)
+  pinata.files.private.queryVectors({
+    groupId: string,
+    query: string,
+    returnFile?: boolean
+  })
+
   3. GATEWAY OPERATIONS
-  // Retrieve file
-  pinata.gateways.get(cid)
+  // Retrieve public file by CID
+  pinata.gateways.public.get(cid)
     .optimizeImage({      // Optional image optimization
       width?: number,
       height?: number,
-      format?: "auto"|"webp",
-      // ... other options
+      dpr?: number,
+      fit?: "scaleDown" | "contain" | "cover" | "crop" | "pad",
+      gravity?: "auto" | "side" | string,
+      quality?: number,
+      format?: "auto" | "webp",
+      animation?: boolean,
+      sharpen?: number,
+      onError?: boolean,
+      metadata?: "keep" | "copyright" | "none"
     })
+
+  // Retrieve private file
+  pinata.gateways.private.get(cid)
+    // Same options as public.get()
 
   Response:
   type GetCIDResponse = {
@@ -544,23 +713,34 @@ Response: "Revoked"
     contentType: ContentType;
   }
 
-  // Create signed URL
-  pinata.gateways.createSignedURL({
+  // Convert IPFS URLs
+  pinata.gateways.public.convert(url, gatewayPrefix?)
+
+  Response: string
+
+  // Create access link for private files
+  pinata.gateways.private.createAccessLink({
     cid: string,
     expires: number,
     date?: number,
     gateway?: string
   })
+    .optimizeImage({      // Optional image optimization
+      // Same options as get().optimizeImage()
+    })
 
   Response: string
 
-
   4. GROUP MANAGEMENT
-  typescript
-  // Create group
-  pinata.groups.create({
+  // Public groups
+  pinata.groups.public.create({
     name: string,
     isPublic?: boolean
+  })
+
+  // Private groups
+  pinata.groups.private.create({
+    // Same options
   })
 
   Response:
@@ -568,15 +748,18 @@ Response: "Revoked"
     id: string;
     is_public: boolean;
     name: string;
-    created_at: string;
+    createdAt: string;
   }
 
   // List groups
-  pinata.groups.list()
+  pinata.groups.public.list()
     .name(string)
     .isPublic(boolean)
     .limit(number)
     .pageToken(string)
+
+  pinata.groups.private.list()
+    // Same options
 
   Response:
   type GroupListResponse = {
@@ -585,28 +768,36 @@ Response: "Revoked"
   }
 
   // Get group
-  pinata.groups.get({groupId: string})
+  pinata.groups.public.get({groupId: string})
+  pinata.groups.private.get({groupId: string})
 
   Response: GroupResponseItem
 
   // Update group
-  pinata.groups.update({
+  pinata.groups.public.update({
     groupId: string,
     name?: string,
     isPublic?: boolean
+  })
+  pinata.groups.private.update({
+    // Same options
   })
 
   Response: GroupResponseItem
 
   // Delete group
-  pinata.groups.delete({groupId: string})
+  pinata.groups.public.delete({groupId: string})
+  pinata.groups.private.delete({groupId: string})
 
-  Response: null
+  Response: string
 
   // Manage files in group
-  pinata.groups.addFiles({
+  pinata.groups.public.addFiles({
     groupId: string,
     files: string[]
+  })
+  pinata.groups.private.addFiles({
+    // Same options
   })
 
   Response:
@@ -615,15 +806,17 @@ Response: "Revoked"
     status: string;
   }[]
 
-  pinata.groups.removeFiles({
+  pinata.groups.public.removeFiles({
     groupId: string,
     files: string[]
+  })
+  pinata.groups.private.removeFiles({
+    // Same options
   })
 
   Response: Same as addFiles
 
   5. API KEY MANAGEMENT
-  typescript
   // Create key
   pinata.keys.create({
     keyName: string,
@@ -655,14 +848,24 @@ Response: "Revoked"
   pinata.keys.list()
     .name(string)
     .revoked(boolean)
+    .limitedUse(boolean)
     .exhausted(boolean)
     .offset(number)
 
   Response:
-  type KeyListResponse = {
-    keys: KeyListItem[];
-    count: number;
-  }
+  type KeyListItem = {
+    id: string;
+    name: string;
+    key: string;
+    secret: string;
+    max_uses: number;
+    uses: number;
+    user_id: string;
+    scopes: KeyScopes;
+    revoked: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }[]
 
   // Revoke keys
   pinata.keys.revoke([keyString, keyString, ...])
@@ -673,21 +876,90 @@ Response: "Revoked"
     status: string;
   }[]
 
-  6. AUTHENTICATION TESTING
-  typescript
-  pinata.testAuthentication()
+  6. ANALYTICS
+  // Analyze requests
+  pinata.analytics.requests
+    .from(domain)                    // Required
+    .days(number)                    // Set timeframe
+    .customDates(start, end)         // Alternative timeframe
+    .cid(cid)                        // Filter by CID
+    .fileName(name)                  // Group by filename
+    .userAgent(agent)                // Group by user agent
+    .country(country)                // Group by country
+    .region(region)                  // Group by region
+    .referer(referer)                // Group by referer
+    .limit(number)                   // Limit results
+    .sort("asc"|"desc")              // Sort order
+
+  // Analyze bandwidth
+  pinata.analytics.bandwidth
+    // Same options as requests
 
   Response:
-  type AuthTestResponse = {
-    message: string;
+  type TopAnalyticsResponse = {
+    data: TopAnalyticsItem[];
   }
 
+  type TopAnalyticsItem = {
+    value: string;
+    requests: number;
+    bandwidth: number;
+  }
+
+  // Time-based analytics
+  pinata.analytics.summary({
+    domain: string,                  // Required
+    start: string,                   // Required (YYYY-MM-DD)
+    end: string,                     // Required (YYYY-MM-DD)
+    interval: "day"|"week"           // Required
+  })
+    .sortBy("requests"|"bandwidth")  // Optional
+    // ...other filters like cid(), fileName(), etc.
+
+  Response:
+  type TimeIntervalAnalyticsResponse = {
+    total_requests: number;
+    total_bandwidth: number;
+    time_periods: TimePeriodItem[];
+  }
+
+  7. SIGNATURES
+  // Add signature
+  pinata.signatures.public.add({
+    cid: string,
+    signature: string,
+    address: string
+  })
+
+  Response:
+  type SignatureResponse = {
+    cid: string;
+    signature: string;
+  }
+
+  // Get signature
+  pinata.signatures.public.get(cid)
+
+  Response: SignatureResponse
+
+  // Delete signature
+  pinata.signatures.public.delete(cid)
+
+  Response: string
+
+  9. AUTHENTICATION TESTING
+  // Test authentication
+  pinata.testAuthentication()
+
+  Response: string
+
   Remember these key implementation details:
-  - All methods are promise-based
+  - All methods are promise-based and can be awaited
   - Most list operations support auto-pagination with for-await
   - Methods can be chained for filtering/options
-  - Files can have metadata attached
+  - Files can have metadata attached through name() and keyvalues()
   - Gateway operations support image optimization
+  - Analytics provides insights on gateway usage
   - All operations are fully typed with TypeScript
 
   When helping developers:
