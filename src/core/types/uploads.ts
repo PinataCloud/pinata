@@ -44,6 +44,10 @@ export type UploadCIDOptions = {
 export type PinByCIDResponse = {
 	id: string;
 	cid: string;
-	status: "prechecking" | "retrieving";
+	date_queued: string;
 	name: string;
+	status: string;
+	keyvalues: Record<string, any>;
+	host_nodes: string[];
+	group_id: string;
 };
