@@ -2,7 +2,98 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2025-03-17
+
+### 🚀 Features
+
+- Added method for deleting pin by CID requests
+
+### ⚙️ Miscellaneous Tasks
+
+- Package.json fix
+- Update README
+- Updated cid.ts with new endpoint and response
+- Dependency cleanup
+- Updated pin by cid queue method
+- Updated pin by CID requests
+- Updated path for convertToDesiredGateway
+- Updated types for pin by cid response
+- Updated unit tests
+- Version bump
+
+## [2.0.1] - 2025-03-06
+
+### ⚙️ Miscellaneous Tasks
+
+- Version bump
+- Version bump
+
+## [2.0.0] - 2025-03-06
+
+### 🚀 Features
+
+- Added IPFS gateway retrieval and updated classes
+- Added get file by id
+- Add react example
+- Added pin by cid
+
+### 🐛 Bug Fixes
+
+- Updated metadata param to keyvalues
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Refacted next app to use signed urls for uploads
+- Refactored to use barrel files
+- Refactored list files
+- Updated delete files
+- Refactored files.update
+- Started work on refactoring groups, updated listGroups
+- Refactored creating groups"
+- Refactored get group by id
+- Refactored add files to group"
+- Refactored removing files froup groups
+- Refactored update group
+- Refactored delete group
+- Refactored uploads to public and private
+- Removed /ipfs path
+- Refactored signatures
+- Removed private signatures
+- Refactored signed url link
+- Refactored swaps
+- Small detail changes for upload file
+- Added file array support
+- Added filearray upload to private class
+- Refactored error handling
+- Testing error handling
+- Removed is-ipfs dependency
+- Updated tests
+- Refactored createSignedURL to createAccessLink
+- Updated next starter
+- Updated react example
+- Updated formatting
+- Update github action
+- Update github action node version
+- Updated upload response type
+- Updated tests, fixed export for uploads
+- Added queue
+- Removed jsdoc
+- Added minimum node version requirement
+- Added release workflow
+- Updated format config export
+- Added formatting
+- Removed vectors from public files
+- Updated folder uploads
+- Updated addMetadata to just name and keyvalues
+- Updated tests
+- Update AI Docs
+
 ## [1.10.1] - 2024-12-16
+
+### 🚀 Features
+
+- Added presigned upload urls
 
 ### 🐛 Bug Fixes
 
@@ -12,16 +103,7 @@ All notable changes to this project will be documented in this file.
 
 - Updated resumable uploads to accept presigned urls
 - Version bump
-
-## [1.10.0] - 2024-12-16
-
-### 🚀 Features
-
-- Added presigned upload urls
-
-### ⚙️ Miscellaneous Tasks
-
-- Updated resumable uploads to accept presigned urls
+- Updated changelog
 - Version bump
 
 ## [1.9.1] - 2024-12-06
