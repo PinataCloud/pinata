@@ -48,7 +48,7 @@ export type PinByCIDResponse = {
 	date_queued: string;
 	name: string;
 	status: string;
-	keyvalues: Record<string, any>;
-	host_nodes: string[];
-	group_id: string;
+	keyvalues: Record<string, any> | null;
+	host_nodes: string[] | null;
+	group_id: string | null;
 };
