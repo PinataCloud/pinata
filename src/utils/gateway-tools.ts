@@ -98,7 +98,7 @@ export async function convertToDesiredGateway(
 	}
 
 	if (!sourceUrl.startsWith("https") && !sourceUrl.startsWith("ipfs://")) {
-		return `${desiredGatewayPrefix}/files/${sourceUrl}`;
+		return `${desiredGatewayPrefix}/ipfs/${sourceUrl}`;
 	}
 
 	const urlObj = new URL(sourceUrl);
@@ -106,7 +106,7 @@ export async function convertToDesiredGateway(
 
 	//case 1 - the ipfs://cid path
 	if (sourceUrl.startsWith(`ipfs://${results.cid}`)) {
-		return `${desiredGatewayPrefix}/files/${results.cid}${path}`;
+		return `${desiredGatewayPrefix}/ipfs/${results.cid}${path}`;
 	}
 
 	//case 2 - the /ipfs/cid path (this should cover ipfs://ipfs/cid as well)
@@ -121,7 +121,7 @@ export async function convertToDesiredGateway(
 
 	//case 4 - the CID is in the subdomain
 	if (urlObj.hostname.includes(results.cid!)) {
-		return `${desiredGatewayPrefix}/files/${results.cid}${path}`;
+		return `${desiredGatewayPrefix}/ipfs/${results.cid}${path}`;
 	}
 
 	//this is the fallback if no supported patterns are provided
