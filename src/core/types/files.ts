@@ -64,7 +64,7 @@ export type PinQueueQuery = {
 		| "over_max_size"
 		| "invalid_object"
 		| "bad_host_node";
-	ipfs_pin_hash?: string;
+	cid?: string;
 	limit?: number;
 	pageToken?: string;
 };

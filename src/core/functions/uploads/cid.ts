@@ -38,26 +38,24 @@ export const uploadCid = async (
 		};
 	}
 
-	const data = JSON.stringify({
-		hashToPin: cid,
-		pinataMetadata: {
-			name: options?.metadata ? options?.metadata?.name : cid,
-			keyvalues: options?.metadata?.keyvalues,
-		},
-		pinataOptions: {
-			hostNodes: options?.peerAddresses ? options.peerAddresses : "",
-			groupId: options?.groupId,
-		},
-	});
+	const requestBody: Record<string, any> = {
+		cid: cid,
+		name: options?.metadata ? options?.metadata?.name : cid,
+		keyvalues: options?.metadata?.keyvalues,
+		group_id: options?.groupId,
+		host_nodes: options?.peerAddresses,
+	};
 
-	let endpoint: string = "https://api.pinata.cloud";
+	const data = JSON.stringify(requestBody);
+
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
 	try {
-		const request = await fetch(`${endpoint}/pinning/pinByHash`, {
+		const request = await fetch(`${endpoint}/files/public/pin_by_cid`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -88,12 +86,7 @@ export const uploadCid = async (
 		}
 
 		const res = await request.json();
-		const resData: PinByCIDResponse = {
-			id: res.id,
-			cid: res.ipfsHash,
-			name: res.name,
-			status: res.status,
-		};
+		const resData: PinByCIDResponse = res.data;
 		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {

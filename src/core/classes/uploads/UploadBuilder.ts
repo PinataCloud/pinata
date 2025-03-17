@@ -100,7 +100,7 @@ export class UploadBuilder<T> {
 		if (this.uploadUrl) {
 			options.url = this.uploadUrl;
 		}
-		if (this.peerAddresses && "peerAddresses" in options) {
+		if (this.peerAddresses) {
 			options.peerAddresses = this.peerAddresses;
 		}
 		this.args[this.args.length - 1] = options;

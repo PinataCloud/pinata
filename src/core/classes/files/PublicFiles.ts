@@ -5,6 +5,7 @@ import {
 	swapCid,
 	swapHistory,
 	deleteSwap,
+	deletePinRequest,
 } from "../../functions";
 import { getFile } from "../../functions/files/getFile";
 import {
@@ -56,5 +57,9 @@ export class PublicFiles {
 
 	queue(): FilterQueue {
 		return new FilterQueue(this.config);
+	}
+
+	deletePinRequest(requestId: string): Promise<string> {
+		return deletePinRequest(this.config, requestId);
 	}
 }
