@@ -4,9 +4,6 @@
 
 The new all-in-one Pinata SDK
 
-> [!IMPORTANT]
-> The `v1.*.*` release is a breaking change and does not support IPFS. Please use the [`pinata-web3`](https://github.com/PinataCloud/pinata-web3) SDK.
-
 ## Quickstart
 
 [View the full documentation here](https://docs.pinata.cloud/sdk-beta/getting-started)
@@ -45,7 +42,7 @@ const pinata = new PinataSDK({
 async function main() {
   try {
     const file = new File(["hello"], "Testing.txt", { type: "text/plain" });
-    const upload = await pinata.upload.file(file);
+    const upload = await pinata.upload.public.file(file);
     console.log(upload);
   } catch (error) {
     console.log(error);
@@ -59,14 +56,17 @@ This will return an object like the following:
 
 ```typescript
 {
-    id: "349f1bb2-5d59-4cab-9966-e94c028a05b7",
-    name: "file.txt",
-    cid: "bafybeihgxdzljxb26q6nf3r3eifqeedsvt2eubqtskghpme66cgjyw4fra",
-    size: 4682779,
-    number_of_files: 1,
-    mime_type: "text/plain",
-    user_id: "7a484d2c-4219-4f80-9d9d-86b42461e71a",
-    group_id: null
+  id: "0195a5c4-242f-7c01-bee8-f34a9e8e804b",
+  user_id: "87ef31fe-519b-4ffe-90d9-987771247827",
+  group_id: null,
+  name: "hello.txt",
+  cid: "bafkreid7qoywk77r7rj3slobqfekdvs57qwuwh5d2z3sqsw52iabe3mqne",
+  created_at: "2025-03-17T20:20:50.057Z",
+  size: 12,
+  number_of_files: 1,
+  mime_type: "text/plain",
+  vectorized: false,
+  network: "public",
 }
 ```
 
@@ -84,7 +84,7 @@ const pinata = new PinataSDK({
 
 async function main() {
   try {
-    const data = await pinata.gateways.get("bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq");
+    const data = await pinata.gateways.public.get("bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq");
     console.log(data)
   } catch (error) {
     console.log(error);
