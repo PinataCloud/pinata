@@ -10,3 +10,4 @@ export * from "./updateFile";
 export * from "./vectorizeFile";
 export * from "./vectorizeQuery";
 export * from "./queue";
+export * from "./deletePinRequest";

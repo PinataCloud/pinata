@@ -30,8 +30,7 @@ describe("queue function", () => {
 
 	const mockQueueItem: PinQueueItem = {
 		id: "test-id",
-		cid: undefined,
-		ipfs_pin_hash: "Qm...",
+		cid: "Qm...",
 		date_queued: "2023-07-26T12:00:00Z",
 		name: "test-file",
 		status: "retrieving",
@@ -50,8 +49,10 @@ describe("queue function", () => {
 
 	it("should list queue items successfully", async () => {
 		const mockResponse = {
-			rows: [mockQueueItem],
-			nextPageToken: "next_token",
+			data: {
+				rows: [mockQueueItem],
+				next_page_token: "next_token",
+			},
 		};
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
@@ -61,7 +62,7 @@ describe("queue function", () => {
 		const result = await queue(mockConfig);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinJobs?includesCount=false",
+			"https://api.pinata.cloud/v3/files/public/pin_by_cid?includesCount=false",
 			{
 				method: "GET",
 				headers: {
@@ -71,14 +72,8 @@ describe("queue function", () => {
 			},
 		);
 		expect(result).toEqual({
-			rows: [
-				{
-					...mockQueueItem,
-					cid: mockQueueItem.ipfs_pin_hash,
-					ipfs_pin_hash: undefined,
-				},
-			],
-			next_page_token: "",
+			rows: [mockQueueItem],
+			next_page_token: "next_token",
 		});
 	});
 
@@ -87,19 +82,24 @@ describe("queue function", () => {
 			limit: 10,
 			status: "retrieving",
 			sort: "ASC",
-			ipfs_pin_hash: "Qm...",
+			cid: "Qm...",
 		};
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ rows: [], next_page_token: "" }),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					rows: [],
+					next_page_token: "",
+				},
+			}),
 		});
 
 		await queue(mockConfig, mockQuery);
 
 		expect(global.fetch).toHaveBeenCalledWith(
 			expect.stringContaining(
-				"includesCount=false&ipfs_pin_hash=Qm...&status=retrieving&sort=ASC&limit=10",
+				"includesCount=false&cid=Qm...&status=retrieving&sort=ASC&limit=10",
 			),
 			expect.any(Object),
 		);
@@ -153,13 +153,18 @@ describe("queue function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ rows: [], next_page_token: "" }),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					rows: [],
+					next_page_token: "",
+				},
+			}),
 		});
 
 		await queue(customConfig);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://custom.api.pinata.cloud/pinning/pinJobs?includesCount=false",
+			"https://custom.api.pinata.cloud/files/public/pin_by_cid?includesCount=false",
 			expect.any(Object),
 		);
 	});
@@ -172,7 +177,12 @@ describe("queue function", () => {
 
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
-			json: jest.fn().mockResolvedValueOnce({ rows: [], next_page_token: "" }),
+			json: jest.fn().mockResolvedValueOnce({
+				data: {
+					rows: [],
+					next_page_token: "",
+				},
+			}),
 		});
 
 		await queue(customConfig);

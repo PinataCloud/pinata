@@ -23,6 +23,7 @@ export type UploadOptions = {
 	groupId?: string;
 	vectorize?: boolean;
 	url?: string;
+	peerAddresses?: string[];
 };
 
 export type SignedUploadUrlOptions = {
@@ -44,6 +45,10 @@ export type UploadCIDOptions = {
 export type PinByCIDResponse = {
 	id: string;
 	cid: string;
-	status: "prechecking" | "retrieving";
+	date_queued: string;
 	name: string;
+	status: string;
+	keyvalues: Record<string, any> | null;
+	host_nodes: string[] | null;
+	group_id: string | null;
 };
