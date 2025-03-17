@@ -12,6 +12,8 @@ import {
 	ValidationError,
 } from "../../src/utils/custom-errors";
 
+const DATE = new Date().toISOString();
+
 describe("uploadCid function", () => {
 	let originalFetch: typeof fetch;
 
@@ -36,16 +38,26 @@ describe("uploadCid function", () => {
 		cid: "QmTest123",
 		name: "test.txt",
 		status: "prechecking",
+		date_queued: DATE,
+		keyvalues: {},
+		host_nodes: [],
+		group_id: null,
 	};
 
 	it("should pin CID successfully", async () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({
-				id: "testId",
-				ipfsHash: "QmTest123",
-				name: "test.txt",
-				status: "prechecking",
+				data: {
+					id: "testId",
+					cid: "QmTest123",
+					name: "test.txt",
+					status: "prechecking",
+					date_queued: DATE,
+					keyvalues: {},
+					host_nodes: [],
+					group_id: null,
+				},
 			}),
 		});
 
@@ -53,7 +65,7 @@ describe("uploadCid function", () => {
 
 		expect(result).toEqual(mockResponse);
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinByHash",
+			"https://api.pinata.cloud/v3/files/public/pin_by_cid",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
@@ -61,6 +73,13 @@ describe("uploadCid function", () => {
 					Authorization: "Bearer test-jwt",
 					"Content-Type": "application/json",
 				},
+				body: JSON.stringify({
+					cid: mockCid,
+					name: mockCid,
+					keyvalues: undefined,
+					group_id: undefined,
+					host_nodes: undefined,
+				}),
 			}),
 		);
 	});
@@ -81,17 +100,23 @@ describe("uploadCid function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({
-				id: "testId",
-				ipfsHash: "QmTest123",
-				name: "Custom File Name",
-				status: "prechecking",
+				data: {
+					id: "testId",
+					cid: "QmTest123",
+					name: "Custom File Name",
+					status: "prechecking",
+					date_queued: DATE,
+					keyvalues: { key1: "value1" },
+					host_nodes: ["peer1", "peer2"],
+					group_id: "test-group",
+				},
 			}),
 		});
 
 		await uploadCid(mockConfig, mockCid, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinByHash",
+			"https://api.pinata.cloud/v3/files/public/pin_by_cid",
 			expect.objectContaining({
 				method: "POST",
 				headers: {
@@ -100,12 +125,11 @@ describe("uploadCid function", () => {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					hashToPin: mockCid,
-					pinataMetadata: mockMetadata,
-					pinataOptions: {
-						hostNodes: mockOptions.peerAddresses,
-						groupId: mockOptions.groupId,
-					},
+					cid: mockCid,
+					name: "Custom File Name",
+					keyvalues: mockMetadata.keyvalues,
+					group_id: mockOptions.groupId,
+					host_nodes: mockOptions.peerAddresses,
 				}),
 			}),
 		);
@@ -120,17 +144,23 @@ describe("uploadCid function", () => {
 		global.fetch = jest.fn().mockResolvedValueOnce({
 			ok: true,
 			json: jest.fn().mockResolvedValueOnce({
-				id: "testId",
-				ipfsHash: "QmTest123",
-				name: mockCid,
-				status: "prechecking",
+				data: {
+					id: "testId",
+					cid: "QmTest123",
+					name: mockCid,
+					status: "prechecking",
+					date_queued: DATE,
+					keyvalues: {},
+					host_nodes: [],
+					group_id: null,
+				},
 			}),
 		});
 
 		await uploadCid(mockConfig, mockCid, mockOptions);
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://api.pinata.cloud/pinning/pinByHash",
+			"https://api.pinata.cloud/v3/files/public/pin_by_cid",
 			expect.objectContaining({
 				headers: {
 					Source: "sdk/cid",
@@ -152,6 +182,7 @@ describe("uploadCid function", () => {
 			ok: false,
 			status: 401,
 			text: jest.fn().mockResolvedValueOnce("Unauthorized"),
+			url: "https://api.pinata.cloud/v3/files/public/pin_by_cid",
 		});
 
 		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(
@@ -164,6 +195,7 @@ describe("uploadCid function", () => {
 			ok: false,
 			status: 500,
 			text: jest.fn().mockResolvedValueOnce("Server Error"),
+			url: "https://api.pinata.cloud/v3/files/public/pin_by_cid",
 		});
 
 		await expect(uploadCid(mockConfig, mockCid)).rejects.toThrow(NetworkError);
