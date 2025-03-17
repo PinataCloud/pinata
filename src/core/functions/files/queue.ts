@@ -24,21 +24,22 @@ export const queue = async (
 	});
 
 	if (options) {
-		const { ipfs_pin_hash: cid, status, sort, limit } = options;
+		const { cid, status, sort, limit, pageToken } = options;
 
-		if (cid) params.append("ipfs_pin_hash", cid.toString());
+		if (cid) params.append("cid", cid.toString());
 		if (status) params.append("status", status.toString());
 		if (sort) params.append("sort", sort.toString());
 		if (limit) params.append("limit", limit.toString());
+		if (pageToken) params.append("pageToken", pageToken.toString());
 	}
 
-	let endpoint: string = "https://api.pinata.cloud";
+	let endpoint: string = "https://api.pinata.cloud/v3";
 
 	if (config.endpointUrl) {
 		endpoint = config.endpointUrl;
 	}
 
-	const url = `${endpoint}/pinning/pinJobs?${params.toString()}`;
+	const url = `${endpoint}/files/public/pin_by_cid?${params.toString()}`;
 
 	let headers: Record<string, string>;
 
@@ -84,14 +85,7 @@ export const queue = async (
 			});
 		}
 		const res = await request.json();
-		const resData: PinQueueResponse = {
-			rows: res.rows.map((row: PinQueueItem) => ({
-				...row,
-				cid: row.ipfs_pin_hash,
-				ipfs_pin_hash: undefined,
-			})),
-			next_page_token: "", // Assuming API returns this
-		};
+		const resData: PinQueueResponse = res.data;
 		return resData;
 	} catch (error) {
 		if (error instanceof PinataError) {

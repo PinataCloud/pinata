@@ -21,7 +21,7 @@ export class FilterQueue {
 	}
 
 	cid(cid: string): FilterQueue {
-		this.query.ipfs_pin_hash = cid;
+		this.query.cid = cid;
 		return this;
 	}
 
