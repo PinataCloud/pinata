@@ -23,6 +23,7 @@ export type UploadOptions = {
 	groupId?: string;
 	vectorize?: boolean;
 	url?: string;
+	peerAddresses?: string[];
 };
 
 export type SignedUploadUrlOptions = {

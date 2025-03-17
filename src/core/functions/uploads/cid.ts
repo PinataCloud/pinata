@@ -43,11 +43,8 @@ export const uploadCid = async (
 		name: options?.metadata ? options?.metadata?.name : cid,
 		keyvalues: options?.metadata?.keyvalues,
 		group_id: options?.groupId,
+		host_nodes: options?.peerAddresses,
 	};
-
-	if (options?.peerAddresses) {
-		requestBody.host_nodes = options.peerAddresses;
-	}
 
 	const data = JSON.stringify(requestBody);
 
