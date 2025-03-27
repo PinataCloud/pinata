@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2025-03-27
+
+### 🐛 Bug Fixes
+
+- Added network param to getCid() in vectorizeQuery()
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Added backfilled status to pin by CID queue
+- Version bump
+
 ## [2.1.0] - 2025-03-17
 
 ### 🚀 Features
