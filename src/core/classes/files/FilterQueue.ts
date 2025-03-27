@@ -30,6 +30,7 @@ export class FilterQueue {
 			| "prechecking"
 			| "retrieving"
 			| "expired"
+			| "backfilled"
 			| "over_free_limit"
 			| "over_max_size"
 			| "invalid_object"
