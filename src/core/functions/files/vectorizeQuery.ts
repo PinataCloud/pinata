@@ -87,7 +87,7 @@ export const vectorizeQuery = async (
 				throw new PinataError(`No files returned in query to fetch`);
 			}
 			const cid = resData.matches[0].cid;
-			const fileRes: GetCIDResponse = await getCid(config, cid, undefined);
+			const fileRes: GetCIDResponse = await getCid(config, cid, "files");
 			return fileRes;
 		}
 
