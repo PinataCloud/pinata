@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.2] - 2025-03-28
+
+### 🐛 Bug Fixes
+
+- Changed accepted file from FileObject to just File
+
+### ⚙️ Miscellaneous Tasks
+
+- Update readme
+- Version bump
+
 ## [2.1.1] - 2025-03-27
 
 ### 🐛 Bug Fixes
