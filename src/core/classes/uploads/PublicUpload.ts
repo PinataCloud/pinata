@@ -30,10 +30,7 @@ export class PublicUpload {
 		this.config = newConfig;
 	}
 
-	file(
-		file: FileObject,
-		options?: UploadOptions,
-	): UploadBuilder<UploadResponse> {
+	file(file: File, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(
 			this.config,
 			(config, file, options) => uploadFile(config, file, "public", options),
@@ -43,7 +40,7 @@ export class PublicUpload {
 	}
 
 	fileArray(
-		files: FileObject[],
+		files: File[],
 		options?: UploadOptions,
 	): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(
