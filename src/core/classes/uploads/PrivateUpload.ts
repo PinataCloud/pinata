@@ -27,10 +27,7 @@ export class PrivateUpload {
 		this.config = newConfig;
 	}
 
-	file(
-		file: FileObject,
-		options?: UploadOptions,
-	): UploadBuilder<UploadResponse> {
+	file(file: File, options?: UploadOptions): UploadBuilder<UploadResponse> {
 		return new UploadBuilder(
 			this.config,
 			(config, file, options) => uploadFile(config, file, "private", options),
