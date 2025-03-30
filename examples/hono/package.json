@@ -1,0 +1,15 @@
+{
+  "name": "pinata-hono",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify"
+  },
+  "dependencies": {
+    "pinata": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "hono": "^4.7.5",
+    "wrangler": "^4.4.0"
+  }
+}
