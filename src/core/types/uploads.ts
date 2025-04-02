@@ -33,6 +33,8 @@ export type SignedUploadUrlOptions = {
 	name?: string;
 	keyvalues?: Record<string, string>;
 	vectorize?: boolean;
+	maxFileSize?: number;
+	mimeTypes?: string[];
 };
 
 export type UploadCIDOptions = {
