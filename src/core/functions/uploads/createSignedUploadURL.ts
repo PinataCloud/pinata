@@ -22,6 +22,8 @@ export const createSignedUploadURL = async (
 		filename?: string;
 		keyvalues?: Record<string, string>;
 		network?: "public" | "private";
+		max_file_size?: number;
+		allow_mime_types?: string[];
 	};
 
 	const date = options?.date || Math.floor(new Date().getTime() / 1000);
@@ -45,6 +47,14 @@ export const createSignedUploadURL = async (
 
 	if (network) {
 		payload.network = network;
+	}
+
+	if (options.maxFileSize) {
+		payload.max_file_size = options.maxFileSize;
+	}
+
+	if (options.mimeTypes) {
+		payload.allow_mime_types = options.mimeTypes;
 	}
 
 	let endpoint: string = "https://uploads.pinata.cloud/v3";
