@@ -1,7 +1,20 @@
 export type KeyPermissions = {
 	admin?: boolean;
 	endpoints?: Endpoints;
+	resources?: ResourcePermission[];
 };
+
+export type ResourcePermission =
+	| "org:read"
+	| "org:write"
+	| "org:files:read"
+	| "org:files:write"
+	| "org:groups:read"
+	| "org:groups:write"
+	| "org:gateways:read"
+	| "org:gateways:write"
+	| "org:analytics:read"
+	| "org:analytics:write";
 
 export type Endpoints = {
 	data?: DataEndponts;
