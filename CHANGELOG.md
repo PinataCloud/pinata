@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2025-04-03
+
+### 🚀 Features
+
+- Added maxFileSize and mimeTypes restrictions to createSignedUploadURL
+- Add new key resources
+
+### ⚙️ Miscellaneous Tasks
+
+- Refactored to pnpm workspace and added fresh examples
+- Version bump
+
+## [2.1.3] - 2025-03-28
+
+### 🐛 Bug Fixes
+
+- Missed one of the File object type replacements
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Version bump
+
 ## [2.1.2] - 2025-03-28
 
 ### 🐛 Bug Fixes
