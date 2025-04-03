@@ -26,37 +26,38 @@ export const uploadFileArray = async (
 	for (const file of Array.from(files)) {
 		const path = file.webkitRelativePath || `${folder}/${file.name}`;
 		data.append("file", file, path);
+		console.log(path);
 	}
 
-	// Reserved for later release
-	// data.append("name", folder);
+	//Reserved for later release
+	data.append("name", folder);
 
-	// data.append("network", network);
+	data.append("network", network);
 
-	// if (options?.groupId) {
-	//   data.append("group_id", options.groupId);
-	// }
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
 
-	// if (options?.metadata?.keyvalues) {
-	//   data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
-	// }
+	if (options?.metadata?.keyvalues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+	}
 
 	// Legacy
-	data.append(
-		"pinataMetadata",
-		JSON.stringify({
-			name: folder,
-			keyvalues: options?.metadata?.keyvalues,
-		}),
-	);
+	// data.append(
+	// 	"pinataMetadata",
+	// 	JSON.stringify({
+	// 		name: folder,
+	// 		keyvalues: options?.metadata?.keyvalues,
+	// 	}),
+	// );
 
-	data.append(
-		"pinataOptions",
-		JSON.stringify({
-			groupId: options?.groupId,
-			cidVersion: 1,
-		}),
-	);
+	// data.append(
+	// 	"pinataOptions",
+	// 	JSON.stringify({
+	// 		groupId: options?.groupId,
+	// 		cidVersion: 1,
+	// 	}),
+	// );
 
 	let headers: Record<string, string>;
 
@@ -72,25 +73,73 @@ export const uploadFileArray = async (
 		};
 	}
 	// Reserved for later release
-	//let endpoint: string = "https://uploads.pinata.cloud/v3";
-	let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
+	// let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
 
 	if (config.uploadUrl) {
 		endpoint = config.uploadUrl;
 	}
 
+	if (options?.url) {
+		try {
+			const request = await fetch(options.url, {
+				method: "POST",
+				headers: headers,
+				body: data,
+			});
+
+			if (!request.ok) {
+				const errorData = await request.text();
+				if (request.status === 401 || request.status === 403) {
+					throw new AuthenticationError(
+						`Authentication failed: ${errorData}`,
+						request.status,
+						{
+							error: errorData,
+							code: "AUTH_ERROR",
+							metadata: {
+								requestUrl: request.url,
+							},
+						},
+					);
+				}
+				throw new NetworkError(`HTTP error: ${errorData}`, request.status, {
+					error: errorData,
+					code: "HTTP_ERROR",
+					metadata: {
+						requestUrl: request.url,
+					},
+				});
+			}
+
+			const res = await request.json();
+			const resData: UploadResponse = res.data;
+			return resData;
+		} catch (error) {
+			if (error instanceof PinataError) {
+				throw error;
+			}
+			if (error instanceof Error) {
+				throw new PinataError(`Error processing base64: ${error.message}`);
+			}
+			throw new PinataError(
+				"An unknown error occurred while trying to upload base64",
+			);
+		}
+	}
+
 	try {
 		// Reserved for later release
-		// const request = await fetch(`${endpoint}/files`, {
-		// 	method: "POST",
-		// 	headers: headers,
-		// 	body: data,
-		// });
-		const request = await fetch(`${endpoint}`, {
+		const request = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: headers,
 			body: data,
 		});
+		// const request = await fetch(`${endpoint}`, {
+		//   method: "POST",
+		//   headers: headers,
+		//   body: data,
+		// });
 
 		if (!request.ok) {
 			const errorData = await request.text();
@@ -118,19 +167,21 @@ export const uploadFileArray = async (
 
 		const res = await request.json();
 
-		const resData: UploadResponse = {
-			id: res.ID,
-			name: res.Name,
-			cid: res.IpfsHash,
-			size: res.PinSize,
-			created_at: res.Timestamp,
-			number_of_files: res.NumberOfFiles,
-			mime_type: res.MimeType,
-			group_id: res.GroupId,
-			keyvalues: res.Keyvalues,
-			vectorized: false,
-			network: "public",
-		};
+		// const resData: UploadResponse = {
+		// 	id: res.ID,
+		// 	name: res.Name,
+		// 	cid: res.IpfsHash,
+		// 	size: res.PinSize,
+		// 	created_at: res.Timestamp,
+		// 	number_of_files: res.NumberOfFiles,
+		// 	mime_type: res.MimeType,
+		// 	group_id: res.GroupId,
+		// 	keyvalues: res.Keyvalues,
+		// 	vectorized: false,
+		// 	network: "public",
+		// };
+
+		const resData: UploadResponse = res.data;
 
 		// if (options?.vectorize) {
 		//   const vectorReq = await fetch(

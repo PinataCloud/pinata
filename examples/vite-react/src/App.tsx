@@ -11,18 +11,18 @@ const pinata = new PinataSDK({
 })
 
 function App() {
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[] | null>(null)
   const [uploadStatus, setUploadStatus] = useState('')
   const [link, setLink] = useState('')
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0])
+      setFiles(e.target.files)
     }
   }
 
   const handleUpload = async () => {
-    if (!file) return
+    if (!files) return
 
     try {
       setUploadStatus('Getting upload URL...')
@@ -36,8 +36,10 @@ function App() {
 
       setUploadStatus('Uploading file...')
 
+      console.log(files)
+
       const upload = await pinata.upload.public
-        .file(file)
+        .fileArray(files)
         .url(data.url)
 
       if (upload.cid) {
@@ -67,8 +69,13 @@ function App() {
       </div>
       <h1>Vite + React + Pinata</h1>
       <div className="card">
-        <input type="file" onChange={handleFileChange} />
-        <button onClick={handleUpload} disabled={!file}>
+        <input
+          type="file"
+          directory=""
+          webkitdirectory=""
+          onChange={handleFileChange}
+        />
+        <button onClick={handleUpload} disabled={!files}>
           Upload to Pinata
         </button>
         {uploadStatus && <p>{uploadStatus}</p>}
