@@ -42,23 +42,6 @@ export const uploadFileArray = async (
 		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
 	}
 
-	// Legacy
-	// data.append(
-	// 	"pinataMetadata",
-	// 	JSON.stringify({
-	// 		name: folder,
-	// 		keyvalues: options?.metadata?.keyvalues,
-	// 	}),
-	// );
-
-	// data.append(
-	// 	"pinataOptions",
-	// 	JSON.stringify({
-	// 		groupId: options?.groupId,
-	// 		cidVersion: 1,
-	// 	}),
-	// );
-
 	let headers: Record<string, string>;
 
 	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
@@ -74,7 +57,6 @@ export const uploadFileArray = async (
 	}
 	// Reserved for later release
 	let endpoint: string = "https://uploads.pinata.cloud/v3";
-	// let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
 
 	if (config.uploadUrl) {
 		endpoint = config.uploadUrl;
@@ -129,17 +111,11 @@ export const uploadFileArray = async (
 	}
 
 	try {
-		// Reserved for later release
 		const request = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: headers,
 			body: data,
 		});
-		// const request = await fetch(`${endpoint}`, {
-		//   method: "POST",
-		//   headers: headers,
-		//   body: data,
-		// });
 
 		if (!request.ok) {
 			const errorData = await request.text();
@@ -166,20 +142,6 @@ export const uploadFileArray = async (
 		}
 
 		const res = await request.json();
-
-		// const resData: UploadResponse = {
-		// 	id: res.ID,
-		// 	name: res.Name,
-		// 	cid: res.IpfsHash,
-		// 	size: res.PinSize,
-		// 	created_at: res.Timestamp,
-		// 	number_of_files: res.NumberOfFiles,
-		// 	mime_type: res.MimeType,
-		// 	group_id: res.GroupId,
-		// 	keyvalues: res.Keyvalues,
-		// 	vectorized: false,
-		// 	network: "public",
-		// };
 
 		const resData: UploadResponse = res.data;
 
