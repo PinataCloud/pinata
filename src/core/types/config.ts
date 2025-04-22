@@ -5,4 +5,5 @@ export type PinataConfig = {
 	customHeaders?: Record<string, string>;
 	endpointUrl?: string;
 	uploadUrl?: string;
+	legacyUploadUrl?: string;
 };
