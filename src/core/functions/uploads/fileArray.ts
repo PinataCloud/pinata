@@ -75,8 +75,8 @@ export const uploadFileArray = async (
 	//let endpoint: string = "https://uploads.pinata.cloud/v3";
 	let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
 
-	if (config.uploadUrl) {
-		endpoint = config.uploadUrl;
+	if (config.legacyUploadUrl) {
+		endpoint = config.legacyUploadUrl;
 	}
 
 	try {
