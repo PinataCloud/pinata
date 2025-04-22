@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog
+- Adds temporary config option for legacy upload endpoint
+- Removed dependencies
+- Version bump
+
 ## [2.2.0] - 2025-04-03
 
 ### 🚀 Features
