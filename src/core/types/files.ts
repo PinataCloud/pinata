@@ -89,7 +89,7 @@ export type PinQueueItem = {
 };
 
 export type PinQueueResponse = {
-	rows: PinQueueItem[];
+	jobs: PinQueueItem[];
 	next_page_token: string;
 };
 
