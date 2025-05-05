@@ -86,7 +86,7 @@ export class FilterQueue {
 	async *[Symbol.asyncIterator](): AsyncGenerator<PinQueueItem, void, unknown> {
 		while (true) {
 			const items = await this.fetchPage();
-			for (const item of items.rows) {
+			for (const item of items.jobs) {
 				yield item;
 			}
 			if (!this.currentPageToken) {
