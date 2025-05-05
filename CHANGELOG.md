@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [2.2.2] - 2025-05-05
+
+### 🐛 Bug Fixes
+
+- Fixed type for pin queue response
+- Fixed issue with class using rows in filter pin queue
+
+### ⚙️ Miscellaneous Tasks
+
+- Version bump
+
+## [2.2.1] - 2025-04-22
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -10,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Adds temporary config option for legacy upload endpoint
 - Removed dependencies
 - Version bump
+- Updated changelog
 
 ## [2.2.0] - 2025-04-03
 
