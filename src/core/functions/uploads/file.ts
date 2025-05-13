@@ -53,6 +53,10 @@ export const uploadFile = async (
 				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
 		}
 
+		if (options?.streamable) {
+			metadata + `,keyvalues ${btoa("true")}`;
+		}
+
 		let updatedEndpoint: string = `${endpoint}/files`;
 
 		if (options?.url) {
@@ -193,6 +197,10 @@ export const uploadFile = async (
 
 	if (options?.metadata?.keyvalues) {
 		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+	}
+
+	if (options?.streamable) {
+		data.append("streamable", "true");
 	}
 
 	if (options?.url) {

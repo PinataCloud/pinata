@@ -24,6 +24,7 @@ export const createSignedUploadURL = async (
 		network?: "public" | "private";
 		max_file_size?: number;
 		allow_mime_types?: string[];
+		streamable?: boolean;
 	};
 
 	const date = options?.date || Math.floor(new Date().getTime() / 1000);
@@ -47,6 +48,10 @@ export const createSignedUploadURL = async (
 
 	if (network) {
 		payload.network = network;
+	}
+
+	if (options.streamable) {
+		payload.streamable = options.streamable;
 	}
 
 	if (options.maxFileSize) {
