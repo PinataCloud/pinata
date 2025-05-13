@@ -12,6 +12,7 @@ export class UploadBuilder<T> {
 	private groupId: string | undefined;
 	private vector: boolean | undefined;
 	private uploadUrl: string | undefined;
+	private isStreamable: boolean | undefined;
 	private peerAddresses: string[] | undefined;
 
 	constructor(
@@ -69,6 +70,11 @@ export class UploadBuilder<T> {
 		return this;
 	}
 
+	streamable(): UploadBuilder<T> {
+		this.isStreamable = true;
+		return this;
+	}
+
 	peerAddress(peerAddresses: string[]): UploadBuilder<T> {
 		this.peerAddresses = peerAddresses;
 		return this;
@@ -99,6 +105,9 @@ export class UploadBuilder<T> {
 		}
 		if (this.uploadUrl) {
 			options.url = this.uploadUrl;
+		}
+		if (this.isStreamable) {
+			options.streamable = this.isStreamable;
 		}
 		if (this.peerAddresses) {
 			options.peerAddresses = this.peerAddresses;

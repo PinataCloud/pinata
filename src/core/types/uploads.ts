@@ -23,6 +23,7 @@ export type UploadOptions = {
 	groupId?: string;
 	vectorize?: boolean;
 	url?: string;
+	streamable?: boolean;
 	peerAddresses?: string[];
 };
 
@@ -35,6 +36,7 @@ export type SignedUploadUrlOptions = {
 	vectorize?: boolean;
 	maxFileSize?: number;
 	mimeTypes?: string[];
+	streamable?: boolean;
 };
 
 export type UploadCIDOptions = {
