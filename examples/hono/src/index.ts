@@ -14,7 +14,7 @@ app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
 
-app.get('/upload_url', async (c) => {
+app.get('/presigned_url', async (c) => {
 
   const pinata = new PinataSDK({
     pinataJwt: c.env.PINATA_JWT
