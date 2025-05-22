@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- Added react subpackage
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated examples to use react subpackage
+- Ran formatting
+- Version bump
+
+## [2.3.0] - 2025-05-13
+
+### 🚀 Features
+
+- Added streamable properties for uploads
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Version bump
+
 ## [2.2.2] - 2025-05-05
 
 ### 🐛 Bug Fixes
