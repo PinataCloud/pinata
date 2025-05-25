@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [2.4.1] - 2025-05-25
+
+### ⚙️ Miscellaneous Tasks
+
+- Removed extra react dependency
+- Version bump and update lock file
+
+## [2.4.0] - 2025-05-22
 
 ### 🚀 Features
 
@@ -13,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Updated examples to use react subpackage
 - Ran formatting
 - Version bump
+- Updated changelog
 
 ## [2.3.0] - 2025-05-13
 
