@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.2] - 2025-05-26
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Updated peerDependenciesMeta and version bump
+
 ## [2.4.1] - 2025-05-25
 
 ### ⚙️ Miscellaneous Tasks
