@@ -88,6 +88,7 @@ export const createSignedUploadURL = async (
 		const request = await fetch(`${endpoint}/files/sign`, {
 			method: "POST",
 			headers: headers,
+			cache: "no-store",
 			body: JSON.stringify(payload),
 		});
 
