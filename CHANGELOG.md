@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.3] - 2025-05-27
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Added no-store for creating signed urls
+- Version bump
+
 ## [2.4.2] - 2025-05-26
 
 ### ⚙️ Miscellaneous Tasks
