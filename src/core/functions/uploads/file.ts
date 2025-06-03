@@ -90,32 +90,57 @@ export const uploadFile = async (
 		let uploadReq: any;
 
 		for (let i = 0; i < totalChunks; i++) {
+			console.log("chunk 1");
 			const chunk = file.slice(offset, offset + chunkSize);
-			uploadReq = await fetch(url as string, {
-				method: "PATCH",
-				headers: {
-					"Content-Type": "application/offset+octet-stream",
-					"Upload-Offset": offset.toString(),
-					...headers,
-				},
-				body: chunk,
-			});
+			let uploadReq;
+			let retryCount = 0;
+			const maxRetries = 5;
 
-			if (!uploadReq.ok) {
-				const errorData = await uploadReq.text();
-				throw new NetworkError(
-					`HTTP error during chunk upload: ${errorData}`,
-					uploadReq.status,
-					{
-						error: errorData,
-						code: "HTTP_ERROR",
-						metadata: {
-							requestUrl: uploadReq.url,
+			while (retryCount <= maxRetries) {
+				try {
+					uploadReq = await fetch(url as string, {
+						method: "PATCH",
+						headers: {
+							"Content-Type": "application/offset+octet-stream",
+							"Upload-Offset": offset.toString(),
+							...headers,
 						},
-					},
-				);
-			}
+						body: chunk,
+					});
 
+					if (uploadReq.ok) {
+						break;
+					} else {
+						const errorData = await uploadReq.text();
+						throw new Error(`HTTP ${uploadReq.status}: ${errorData}`);
+					}
+				} catch (error) {
+					retryCount++;
+
+					if (retryCount > maxRetries) {
+						// All retries exhausted - throw final error
+						const errorData = uploadReq
+							? await uploadReq.text().catch(() => "Unknown error")
+							: error instanceof Error
+								? error.message
+								: String(error);
+						throw new NetworkError(
+							`HTTP error during chunk upload after ${maxRetries} retries: ${errorData}`,
+							uploadReq?.status || 0,
+							{
+								error: errorData,
+								code: "HTTP_ERROR",
+								metadata: {
+									requestUrl: uploadReq?.url || url,
+									retriesAttempted: maxRetries,
+								},
+							},
+						);
+					}
+					const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000); // Cap at 10 seconds
+					await new Promise((resolve) => setTimeout(resolve, delay));
+				}
+			}
 			offset += chunk.size;
 		}
 
