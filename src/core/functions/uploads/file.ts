@@ -91,36 +91,59 @@ export const uploadFile = async (
 
 		for (let i = 0; i < totalChunks; i++) {
 			const chunk = file.slice(offset, offset + chunkSize);
-			uploadReq = await fetch(url as string, {
-				method: "PATCH",
-				headers: {
-					"Content-Type": "application/offset+octet-stream",
-					"Upload-Offset": offset.toString(),
-					...headers,
-				},
-				body: chunk,
-			});
+			let retryCount = 0;
+			const maxRetries = 5;
 
-			if (!uploadReq.ok) {
-				const errorData = await uploadReq.text();
-				throw new NetworkError(
-					`HTTP error during chunk upload: ${errorData}`,
-					uploadReq.status,
-					{
-						error: errorData,
-						code: "HTTP_ERROR",
-						metadata: {
-							requestUrl: uploadReq.url,
+			while (retryCount <= maxRetries) {
+				try {
+					uploadReq = await fetch(url as string, {
+						method: "PATCH",
+						headers: {
+							"Content-Type": "application/offset+octet-stream",
+							"Upload-Offset": offset.toString(),
+							...headers,
 						},
-					},
-				);
-			}
+						body: chunk,
+					});
 
+					if (uploadReq.ok) {
+						break;
+					} else {
+						const errorData = await uploadReq.text();
+						throw new Error(`HTTP ${uploadReq.status}: ${errorData}`);
+					}
+				} catch (error) {
+					retryCount++;
+
+					if (retryCount > maxRetries) {
+						// All retries exhausted - throw final error
+						const errorData = uploadReq
+							? await uploadReq.text().catch(() => "Unknown error")
+							: error instanceof Error
+								? error.message
+								: String(error);
+						throw new NetworkError(
+							`HTTP error during chunk upload after ${maxRetries} retries: ${errorData}`,
+							uploadReq?.status || 0,
+							{
+								error: errorData,
+								code: "HTTP_ERROR",
+								metadata: {
+									requestUrl: uploadReq?.url || url,
+									retriesAttempted: maxRetries,
+								},
+							},
+						);
+					}
+					const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000); // Cap at 10 seconds
+					await new Promise((resolve) => setTimeout(resolve, delay));
+				}
+			}
 			offset += chunk.size;
 		}
 
 		if (uploadReq.status === 204) {
-			const fileId = getFileIdFromUrl(url);
+			const cid = uploadReq.headers.get("upload-cid");
 			let dataEndpoint: string;
 			if (config.endpointUrl) {
 				dataEndpoint = config.endpointUrl;
@@ -128,7 +151,7 @@ export const uploadFile = async (
 				dataEndpoint = "https://api.pinata.cloud/v3";
 			}
 			const fileInfoReq = await fetch(
-				`${dataEndpoint}/files/${network}/${fileId}`,
+				`${dataEndpoint}/files/${network}?cid=${cid}`,
 				{
 					method: "GET",
 					headers: {
@@ -137,7 +160,7 @@ export const uploadFile = async (
 				},
 			);
 			const fileInfo = await fileInfoReq.json();
-			const data: UploadResponse = fileInfo.data;
+			const data: UploadResponse = fileInfo.data.files[0];
 			if (options?.vectorize) {
 				const vectorReq = await fetch(
 					`${endpoint}/vectorize/files/${data.id}`,
