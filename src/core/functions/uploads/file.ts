@@ -90,9 +90,7 @@ export const uploadFile = async (
 		let uploadReq: any;
 
 		for (let i = 0; i < totalChunks; i++) {
-			console.log("chunk 1");
 			const chunk = file.slice(offset, offset + chunkSize);
-			let uploadReq;
 			let retryCount = 0;
 			const maxRetries = 5;
 
@@ -145,7 +143,7 @@ export const uploadFile = async (
 		}
 
 		if (uploadReq.status === 204) {
-			const fileId = getFileIdFromUrl(url);
+			const cid = uploadReq.headers.get("upload-cid");
 			let dataEndpoint: string;
 			if (config.endpointUrl) {
 				dataEndpoint = config.endpointUrl;
@@ -153,7 +151,7 @@ export const uploadFile = async (
 				dataEndpoint = "https://api.pinata.cloud/v3";
 			}
 			const fileInfoReq = await fetch(
-				`${dataEndpoint}/files/${network}/${fileId}`,
+				`${dataEndpoint}/files/${network}?cid=${cid}`,
 				{
 					method: "GET",
 					headers: {
@@ -162,7 +160,7 @@ export const uploadFile = async (
 				},
 			);
 			const fileInfo = await fileInfoReq.json();
-			const data: UploadResponse = fileInfo.data;
+			const data: UploadResponse = fileInfo.data.files[0];
 			if (options?.vectorize) {
 				const vectorReq = await fetch(
 					`${endpoint}/vectorize/files/${data.id}`,
