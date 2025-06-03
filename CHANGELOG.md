@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.4] - 2025-06-03
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Updated to use retry mechanism
+- Fixed duplicate variable and used upload-cid header for getting file info
+- Update test workflow
+- Updated tests
+- Version bump
+
 ## [2.4.3] - 2025-05-27
 
 ### ⚙️ Miscellaneous Tasks
