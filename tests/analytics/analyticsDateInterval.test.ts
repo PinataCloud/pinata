@@ -1,14 +1,16 @@
 import {
-	ValidationError,
-	AuthenticationError,
-	NetworkError,
-	PinataError,
 	PinataConfig,
 	TimeIntervalAnalyticsQuery,
 	TimeIntervalAnalyticsResponse,
 	TimePeriodItem,
 	analyticsDateInterval,
-} from "../../src/";
+} from "../../src/core";
+import {
+	ValidationError,
+	AuthenticationError,
+	NetworkError,
+	PinataError,
+} from "../../src/utils";
 
 describe("analyticsDateInterval function", () => {
 	let originalFetch: typeof fetch;

@@ -3,7 +3,7 @@ import {
 	NetworkError,
 	PinataError,
 	ValidationError,
-} from "../../src";
+} from "../../src/utils";
 import { FileListItem, PinataConfig } from "../../src/core";
 import { getFile } from "../../src/core/functions/files/getFile";
 
