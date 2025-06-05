@@ -5,7 +5,6 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../../utils/custom-errors";
-import { getFileIdFromUrl } from "../../../utils/resumable";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -266,10 +265,16 @@ export const uploadFile = async (
 				throw error;
 			}
 			if (error instanceof Error) {
-				throw new PinataError(`Error processing base64: ${error.message}`);
+				throw new PinataError(
+					`Error uploading file: ${error.message}`,
+					undefined,
+					{
+						error: error.toString(),
+					},
+				);
 			}
 			throw new PinataError(
-				"An unknown error occurred while trying to upload base64",
+				"An unknown error occurred while trying to upload file",
 			);
 		}
 	}
@@ -340,8 +345,16 @@ export const uploadFile = async (
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error uploading file: ${error.message}`);
+			throw new PinataError(
+				`Error uploading file: ${error.message}`,
+				undefined,
+				{
+					error: error.toString(),
+				},
+			);
 		}
-		throw new PinataError("An unknown error occurred while uploading the file");
+		throw new PinataError(
+			"An unknown error occurred while trying to upload file",
+		);
 	}
 };
