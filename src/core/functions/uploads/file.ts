@@ -83,7 +83,7 @@ export const uploadFile = async (
 			});
 		}
 
-		const chunkSize = 50 * 1024 * 1024; // 50MB in bytes
+		const chunkSize = 50 * 1024 * 1024 + 1; // 50MB in bytes
 		const totalChunks = Math.ceil(file.size / chunkSize);
 		let offset = 0;
 		let uploadReq: any;
