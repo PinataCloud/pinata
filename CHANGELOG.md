@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.6] - 2025-06-10
+
+### 🐛 Bug Fixes
+
+- Fixed error handling in file.ts
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated changelog
+- Version bump
+- Updated default chunk size for TUS uploads
+- Version bump
+
 ## [2.4.4] - 2025-06-03
 
 ### ⚙️ Miscellaneous Tasks
