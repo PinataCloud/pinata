@@ -44,16 +44,15 @@ export const uploadFile = async (
 		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)},network ${btoa(network)}`;
 
 		if (options?.groupId) {
-			metadata + `,group_id ${btoa(options.groupId)}`;
+			metadata += `,group_id ${btoa(options.groupId)}`;
 		}
 
 		if (options?.metadata?.keyvalues) {
-			metadata +
-				`,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
+			metadata += `,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
 		}
 
 		if (options?.streamable) {
-			metadata + `,streamable ${btoa("true")}`;
+			metadata += `,streamable ${btoa("true")}`;
 		}
 
 		let updatedEndpoint: string = `${endpoint}/files`;
@@ -143,6 +142,22 @@ export const uploadFile = async (
 
 		if (uploadReq.status === 204) {
 			const cid = uploadReq.headers.get("upload-cid");
+			if (!config.pinataJwt) {
+				const data: UploadResponse = {
+					id: "",
+					name: "",
+					cid: cid,
+					size: file.size,
+					created_at: "",
+					number_of_files: 1,
+					group_id: null,
+					mime_type: "",
+					keyvalues: {},
+					vectorized: false,
+					network: "",
+				};
+				return data;
+			}
 			let dataEndpoint: string;
 			if (config.endpointUrl) {
 				dataEndpoint = config.endpointUrl;
