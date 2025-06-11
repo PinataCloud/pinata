@@ -53,7 +53,7 @@ export const uploadFile = async (
 		}
 
 		if (options?.streamable) {
-			metadata + `,keyvalues ${btoa("true")}`;
+			metadata + `,streamable ${btoa("true")}`;
 		}
 
 		let updatedEndpoint: string = `${endpoint}/files`;
