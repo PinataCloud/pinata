@@ -6,8 +6,8 @@ import {
 	uploadFileArray,
 	uploadJson,
 	uploadUrl,
+	uploadCid,
 } from "../../functions";
-import { uploadCid } from "../../functions/uploads/cid";
 import {
 	FileObject,
 	PinataConfig,
