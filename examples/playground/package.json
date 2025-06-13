@@ -1,16 +1,13 @@
 {
-	"name": "test",
-	"module": "index.ts",
-	"type": "module",
-	"devDependencies": {
-		"@types/bun": "latest"
-	},
-	"peerDependencies": {
-		"typescript": "^5.0.0"
-	},
-	"dependencies": {
-		"tus-js-client": "^4.2.3",
-		"viem": "^2.23.2",
-		"pinata": "workspace:*"
-	}
+  "name": "test",
+  "module": "index.ts",
+  "type": "module",
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "tus-js-client": "^4.2.3",
+    "viem": "^2.23.2",
+    "pinata": "workspace:*"
+  }
 }
