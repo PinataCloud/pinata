@@ -5,9 +5,7 @@
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -18,6 +16,11 @@
 			"types": "./dist/react/index.d.ts",
 			"require": "./dist/react/index.js",
 			"import": "./dist/react/index.mjs"
+		},
+		"./expo": {
+			"types": "./dist/expo/index.d.ts",
+			"require": "./dist/expo/index.js",
+			"import": "./dist/expo/index.mjs"
 		}
 	},
 	"scripts": {
@@ -29,11 +32,7 @@
 		"type": "git",
 		"url": "git+https://github.com/PinataCloud/pinata.git"
 	},
-	"keywords": [
-		"ipfs",
-		"sdk",
-		"typescript"
-	],
+	"keywords": ["ipfs", "sdk", "typescript"],
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"bugs": {
@@ -41,14 +40,30 @@
 	},
 	"homepage": "https://github.com/PinataCloud/pinata",
 	"peerDependencies": {
+		"expo": ">=45.0.0",
+		"react-native": ">=0.60.0",
 		"react": ">=16.8.0",
-		"react-dom": ">=16.8.0"
+		"react-dom": ">=16.8.0",
+		"expo-file-system": ">=15.0.0",
+		"Base64": "^1.3.0"
 	},
 	"peerDependenciesMeta": {
 		"react": {
 			"optional": true
 		},
 		"react-dom": {
+			"optional": true
+		},
+		"react-native": {
+			"optional": true
+		},
+		"expo": {
+			"optional": true
+		},
+		"expo-file-system": {
+			"optional": true
+		},
+		"Base64": {
 			"optional": true
 		}
 	},
