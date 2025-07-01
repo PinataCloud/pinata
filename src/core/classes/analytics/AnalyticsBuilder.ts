@@ -72,7 +72,10 @@ export class AnalyticsBuilder<T extends AnalyticsQuery, R> {
 		throw new Error("getAnalytics method must be implemented in derived class");
 	}
 
-	then(onfulfilled?: ((value: R) => any) | null): Promise<any> {
-		return this.getAnalytics().then(onfulfilled);
+	then(
+		onfulfilled?: ((value: R) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
+	): Promise<any> {
+		return this.getAnalytics().then(onfulfilled, onrejected);
 	}
 }

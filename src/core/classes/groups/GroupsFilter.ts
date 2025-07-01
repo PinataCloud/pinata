@@ -44,13 +44,14 @@ export class FilterGroups {
 
 	then(
 		onfulfilled?: ((value: GroupListResponse) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
 	): Promise<GroupListResponse> {
 		return this.fetchPage()
 			.then((response) => {
 				this.nextPageToken = response.next_page_token;
 				return response;
 			})
-			.then(onfulfilled);
+			.then(onfulfilled, onrejected);
 	}
 
 	private async fetchPage(): Promise<GroupListResponse> {

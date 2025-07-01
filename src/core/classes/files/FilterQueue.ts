@@ -64,8 +64,11 @@ export class FilterQueue {
 		return this;
 	}
 
-	then(onfulfilled?: ((value: PinQueueResponse) => any) | null): Promise<any> {
-		return queue(this.config, this.query).then(onfulfilled);
+	then(
+		onfulfilled?: ((value: PinQueueResponse) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
+	): Promise<any> {
+		return queue(this.config, this.query).then(onfulfilled, onrejected);
 	}
 
 	// rate limit, hopefully temporary?
