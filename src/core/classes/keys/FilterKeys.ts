@@ -39,8 +39,11 @@ export class FilterKeys {
 		return this;
 	}
 
-	then(onfulfilled?: ((value: KeyListItem[]) => any) | null): Promise<any> {
-		return listKeys(this.config, this.query).then(onfulfilled);
+	then(
+		onfulfilled?: ((value: KeyListItem[]) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
+	): Promise<any> {
+		return listKeys(this.config, this.query).then(onfulfilled, onrejected);
 	}
 
 	// private async rateLimit(): Promise<void> {

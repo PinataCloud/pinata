@@ -26,9 +26,13 @@ export class OptimizeImageGetCid {
 		return this;
 	}
 
-	then(onfulfilled?: ((value: GetCIDResponse) => any) | null): Promise<any> {
+	then(
+		onfulfilled?: ((value: GetCIDResponse) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
+	): Promise<any> {
 		return getCid(this.config, this.cid, this.gatewayType, this.options).then(
 			onfulfilled,
+			onrejected,
 		);
 	}
 }

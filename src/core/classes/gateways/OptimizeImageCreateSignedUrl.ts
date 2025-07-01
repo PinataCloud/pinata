@@ -20,9 +20,13 @@ export class OptimizeImageCreateAccessLink {
 		return this;
 	}
 
-	then(onfulfilled?: ((value: string) => any) | null): Promise<any> {
+	then(
+		onfulfilled?: ((value: string) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
+	): Promise<any> {
 		return createAccessLink(this.config, this.urlOpts, this.imgOpts).then(
 			onfulfilled,
+			onrejected,
 		);
 	}
 }

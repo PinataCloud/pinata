@@ -72,8 +72,11 @@ export class FilterFiles {
 		return this;
 	}
 
-	then(onfulfilled?: ((value: FileListResponse) => any) | null): Promise<any> {
-		return this.fetchPage().then(onfulfilled);
+	then(
+		onfulfilled?: ((value: FileListResponse) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
+	): Promise<any> {
+		return this.fetchPage().then(onfulfilled, onrejected);
 	}
 
 	private async fetchPage(): Promise<FileListResponse> {

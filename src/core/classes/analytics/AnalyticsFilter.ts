@@ -93,7 +93,11 @@ export class AnalyticsFilter {
 
 	then(
 		onfulfilled?: ((value: TopAnalyticsResponse) => any) | null,
+		onrejected?: ((reason: any) => any) | null,
 	): Promise<any> {
-		return analyticsTopUsage(this.config, this.query).then(onfulfilled);
+		return analyticsTopUsage(this.config, this.query).then(
+			onfulfilled,
+			onrejected,
+		);
 	}
 }
