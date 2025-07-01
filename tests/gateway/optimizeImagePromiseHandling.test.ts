@@ -195,4 +195,4 @@ describe("OptimizeImage Promise Handling", () => {
 			expect(errorCaught).toBe(true);
 		});
 	});
-}); 
+});
