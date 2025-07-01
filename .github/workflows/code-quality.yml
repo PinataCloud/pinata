@@ -12,7 +12,7 @@ jobs:
       - name: Setup Biome
         uses: biomejs/setup-biome@v2
         with:
-          version: latest
+          version: 1.9.4
       - name: Run Biome
         run: biome ci --formatter-enabled=true --linter-enabled=false --organize-imports-enabled=false src tests
   tests:
