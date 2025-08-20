@@ -85,7 +85,7 @@ export const createSignedUploadURL = async (
 	}
 
 	const maxRetries = 3;
-	
+
 	for (let attempt = 0; attempt <= maxRetries; attempt++) {
 		try {
 			const request = await fetch(`${endpoint}/files/sign`, {
@@ -126,14 +126,16 @@ export const createSignedUploadURL = async (
 			if (error instanceof AuthenticationError) {
 				throw error;
 			}
-			if (error instanceof NetworkError && 
-				error.statusCode && 
-				error.statusCode >= 400 && 
-				error.statusCode < 500 && 
-				error.statusCode !== 429) {
+			if (
+				error instanceof NetworkError &&
+				error.statusCode &&
+				error.statusCode >= 400 &&
+				error.statusCode < 500 &&
+				error.statusCode !== 429
+			) {
 				throw error;
 			}
-			
+
 			// If we've exhausted retries, throw the error
 			if (attempt === maxRetries) {
 				if (error instanceof PinataError) {
@@ -144,15 +146,17 @@ export const createSignedUploadURL = async (
 						`Error processing createSignedURL: ${error.message}`,
 					);
 				}
-				throw new PinataError("An unknown error occurred while getting signed url");
+				throw new PinataError(
+					"An unknown error occurred while getting signed url",
+				);
 			}
-			
+
 			// Wait before retrying (exponential backoff: 1s, 2s, 4s)
 			const delay = Math.min(1000 * Math.pow(2, attempt), 4000);
 			await new Promise((resolve) => setTimeout(resolve, delay));
 		}
 	}
-	
+
 	// This should never be reached, but TypeScript requires it
 	throw new PinataError("An unknown error occurred while getting signed url");
 };
