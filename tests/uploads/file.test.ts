@@ -174,4 +174,34 @@ describe("uploadFile function", () => {
 			PinataError,
 		);
 	});
+
+	it("should upload file with CAR format enabled", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const mockOptions: UploadOptions = {
+			car: true,
+		};
+
+		await uploadFile(mockConfig, mockFile, "public", mockOptions);
+
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("car")).toBe("true");
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://uploads.pinata.cloud/v3/files",
+			expect.objectContaining({
+				method: "POST",
+				headers: {
+					Source: "sdk/file",
+					Authorization: "Bearer test-jwt",
+				},
+				body: expect.any(FormData),
+			}),
+		);
+	});
+
 });

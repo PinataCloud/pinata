@@ -25,6 +25,7 @@ export type UploadOptions = {
 	url?: string;
 	streamable?: boolean;
 	peerAddresses?: string[];
+	car?: boolean;
 };
 
 export type SignedUploadUrlOptions = {
@@ -37,6 +38,7 @@ export type SignedUploadUrlOptions = {
 	maxFileSize?: number;
 	mimeTypes?: string[];
 	streamable?: boolean;
+	car?: boolean;
 };
 
 export type UploadCIDOptions = {

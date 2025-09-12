@@ -14,6 +14,7 @@ export class UploadBuilder<T> {
 	private uploadUrl: string | undefined;
 	private isStreamable: boolean | undefined;
 	private peerAddresses: string[] | undefined;
+	private carFormat: boolean | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -75,6 +76,11 @@ export class UploadBuilder<T> {
 		return this;
 	}
 
+	car(): UploadBuilder<T> {
+		this.carFormat = true;
+		return this;
+	}
+
 	peerAddress(peerAddresses: string[]): UploadBuilder<T> {
 		this.peerAddresses = peerAddresses;
 		return this;
@@ -111,6 +117,9 @@ export class UploadBuilder<T> {
 		}
 		if (this.peerAddresses) {
 			options.peerAddresses = this.peerAddresses;
+		}
+		if (this.carFormat) {
+			options.car = this.carFormat;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(
