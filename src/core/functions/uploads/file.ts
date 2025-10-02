@@ -55,6 +55,10 @@ export const uploadFile = async (
 			metadata += `,streamable ${btoa("true")}`;
 		}
 
+		if (options?.car) {
+			metadata += `,car ${btoa("true")}`;
+		}
+
 		let updatedEndpoint: string = `${endpoint}/files`;
 
 		if (options?.url) {
@@ -238,6 +242,10 @@ export const uploadFile = async (
 
 	if (options?.streamable) {
 		data.append("streamable", "true");
+	}
+
+	if (options?.car) {
+		data.append("car", "true");
 	}
 
 	if (options?.url) {
