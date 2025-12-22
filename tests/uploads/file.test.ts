@@ -4,6 +4,7 @@ import type {
 	UploadOptions,
 	UploadResponse,
 	PinataMetadata,
+	CidVersion,
 } from "../../src";
 import {
 	PinataError,
@@ -202,5 +203,161 @@ describe("uploadFile function", () => {
 				body: expect.any(FormData),
 			}),
 		);
+	});
+
+	it("should upload file with CID version 0", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const mockOptions: UploadOptions = {
+			cid_version: "v0" as CidVersion,
+		};
+
+		await uploadFile(mockConfig, mockFile, "public", mockOptions);
+
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("cid_version")).toBe("v0");
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://uploads.pinata.cloud/v3/files",
+			expect.objectContaining({
+				method: "POST",
+				headers: {
+					Source: "sdk/file",
+					Authorization: "Bearer test-jwt",
+				},
+				body: expect.any(FormData),
+			}),
+		);
+	});
+
+	it("should upload file with CID version 1", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const mockOptions: UploadOptions = {
+			cid_version: "v1" as CidVersion,
+		};
+
+		await uploadFile(mockConfig, mockFile, "public", mockOptions);
+
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("cid_version")).toBe("v1");
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://uploads.pinata.cloud/v3/files",
+			expect.objectContaining({
+				method: "POST",
+				headers: {
+					Source: "sdk/file",
+					Authorization: "Bearer test-jwt",
+				},
+				body: expect.any(FormData),
+			}),
+		);
+	});
+
+	it("should upload same file with both CID versions", async () => {
+		const testFile = new File(["test content for cid versions"], "test.txt", {
+			type: "text/plain",
+		});
+
+		// Mock for CID version 0
+		global.fetch = jest.fn()
+			.mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: { ...mockResponse, cid: "QmTestVersion0" } }),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: { ...mockResponse, cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" } }),
+			});
+
+		// Upload with CID version 0
+		const result0 = await uploadFile(mockConfig, testFile, "public", { cid_version: "v0" as CidVersion });
+		
+		// Upload with CID version 1
+		const result1 = await uploadFile(mockConfig, testFile, "public", { cid_version: "v1" as CidVersion });
+
+		// Verify both uploads
+		expect(result0.cid).toBe("QmTestVersion0");
+		expect(result1.cid).toBe("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
+
+		// Verify fetch was called twice
+		expect(global.fetch).toHaveBeenCalledTimes(2);
+
+		// Check CID version 0 FormData
+		const fetchCall0 = (global.fetch as jest.Mock).mock.calls[0];
+		const formData0 = fetchCall0[1].body as FormData;
+		expect(formData0.get("cid_version")).toBe("v0");
+
+		// Check CID version 1 FormData
+		const fetchCall1 = (global.fetch as jest.Mock).mock.calls[1];
+		const formData1 = fetchCall1[1].body as FormData;
+		expect(formData1.get("cid_version")).toBe("v1");
+	});
+
+	it("should upload file with CID version combined with other options", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const mockOptions: UploadOptions = {
+			cid_version: "v1" as CidVersion,
+			car: true,
+			groupId: "test-group",
+			streamable: true,
+		};
+
+		await uploadFile(mockConfig, mockFile, "public", mockOptions);
+
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("cid_version")).toBe("v1");
+		expect(formData.get("car")).toBe("true");
+		expect(formData.get("group_id")).toBe("test-group");
+		expect(formData.get("streamable")).toBe("true");
+	});
+
+	it("should include CID version in metadata for large file upload", async () => {
+		// Create a large file (over 90MB) to trigger chunked upload metadata path
+		const largeFileSize = 94371841; // Just over the threshold
+		const largeFile = new File([new ArrayBuffer(largeFileSize)], "large-test.txt", {
+			type: "text/plain",
+		});
+
+		// Mock the first call (initial upload request) to verify metadata
+		global.fetch = jest.fn().mockImplementationOnce(() => {
+			// We're just testing that the request is made with correct metadata
+			// Return a promise that we can inspect the call and then reject to avoid complex mocking
+			return Promise.reject(new Error("Test stopped after metadata check"));
+		});
+
+		const mockOptions: UploadOptions = {
+			cid_version: "v1" as CidVersion,
+		};
+
+		try {
+			await uploadFile(mockConfig, largeFile, "private", mockOptions);
+		} catch (error) {
+			// Expected to fail, we just want to check the metadata
+		}
+
+		// Check that the initial request contains cid_version in Upload-Metadata
+		expect(global.fetch).toHaveBeenCalledTimes(1);
+		const initialCall = (global.fetch as jest.Mock).mock.calls[0];
+		const uploadMetadata = initialCall[1].headers["Upload-Metadata"];
+		
+		// The metadata should contain base64 encoded cid_version
+		expect(uploadMetadata).toContain("cid_version");
+		expect(uploadMetadata).toContain(btoa("v1"));
 	});
 });

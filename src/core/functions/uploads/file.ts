@@ -59,13 +59,18 @@ export const uploadFile = async (
 			metadata += `,car ${btoa("true")}`;
 		}
 
+		// Build URL with query parameters for chunked uploads
 		let updatedEndpoint: string = `${endpoint}/files`;
-
 		if (options?.url) {
 			updatedEndpoint = options.url;
 		}
+		
+		const requestUrl = new URL(updatedEndpoint);
+		if (options?.cid_version !== undefined) {
+			requestUrl.searchParams.set('X-Upload-Option-Cid-Version', options.cid_version.toString());
+		}
 
-		const urlReq = await fetch(updatedEndpoint, {
+		const urlReq = await fetch(requestUrl.toString(), {
 			method: "POST",
 			headers: {
 				"Upload-Length": `${file.size}`,
@@ -98,7 +103,7 @@ export const uploadFile = async (
 
 			while (retryCount <= maxRetries) {
 				try {
-					uploadReq = await fetch(url as string, {
+					uploadReq = await fetch(url!, {
 						method: "PATCH",
 						headers: {
 							"Content-Type": "application/offset+octet-stream",
@@ -248,9 +253,15 @@ export const uploadFile = async (
 		data.append("car", "true");
 	}
 
+	if (options?.cid_version !== undefined) {
+		data.append("cid_version", options.cid_version.toString());
+	}
+
 	if (options?.url) {
 		try {
-			const request = await fetch(options.url, {
+			const url = new URL(options.url);
+
+			const request = await fetch(url.toString(), {
 				method: "POST",
 				headers: headers,
 				body: data,
