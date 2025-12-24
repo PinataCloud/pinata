@@ -1,4 +1,9 @@
-import type { PinataConfig, PinataMetadata, UploadOptions } from "../../types";
+import type {
+	PinataConfig,
+	PinataMetadata,
+	UploadOptions,
+	CidVersion,
+} from "../../types";
 
 export class UploadBuilder<T> {
 	private config: PinataConfig | undefined;
@@ -15,6 +20,7 @@ export class UploadBuilder<T> {
 	private isStreamable: boolean | undefined;
 	private peerAddresses: string[] | undefined;
 	private carFormat: boolean | undefined;
+	private _cidVersion: CidVersion | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -61,10 +67,10 @@ export class UploadBuilder<T> {
 		return this;
 	}
 
-	// cidVersion(v: 0 | 1): UploadBuilder<T> {
-	// 	this.version = v;
-	// 	return this;
-	// }
+	cidVersion(v: CidVersion): UploadBuilder<T> {
+		this._cidVersion = v;
+		return this;
+	}
 
 	group(groupId: string): UploadBuilder<T> {
 		this.groupId = groupId;
@@ -120,6 +126,9 @@ export class UploadBuilder<T> {
 		}
 		if (this.carFormat) {
 			options.car = this.carFormat;
+		}
+		if (this._cidVersion !== undefined) {
+			options.cid_version = this._cidVersion;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(

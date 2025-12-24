@@ -1,5 +1,7 @@
 import { PinataMetadata } from "./";
 
+export type CidVersion = "v0" | "v1";
+
 export type UploadResponse = {
 	id: string;
 	name: string;
@@ -26,6 +28,10 @@ export type UploadOptions = {
 	streamable?: boolean;
 	peerAddresses?: string[];
 	car?: boolean;
+	/**
+	 * CID version "v1" or "v0" (defaults to v1 if falsy)
+	 */
+	cid_version?: CidVersion;
 };
 
 export type SignedUploadUrlOptions = {
@@ -39,6 +45,10 @@ export type SignedUploadUrlOptions = {
 	mimeTypes?: string[];
 	streamable?: boolean;
 	car?: boolean;
+	/**
+	 * CID version "v1" or "v0" (defaults to v1 if falsy)
+	 */
+	cid_version?: CidVersion;
 };
 
 export type UploadCIDOptions = {
