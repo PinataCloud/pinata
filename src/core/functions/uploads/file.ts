@@ -59,15 +59,22 @@ export const uploadFile = async (
 			metadata += `,car ${btoa("true")}`;
 		}
 
+		if (options?.cid_version !== undefined) {
+			metadata += `,cid_version ${btoa(options.cid_version)}`;
+		}
+
 		// Build URL with query parameters for chunked uploads
 		let updatedEndpoint: string = `${endpoint}/files`;
 		if (options?.url) {
 			updatedEndpoint = options.url;
 		}
-		
+
 		const requestUrl = new URL(updatedEndpoint);
 		if (options?.cid_version !== undefined) {
-			requestUrl.searchParams.set('X-Upload-Option-Cid-Version', options.cid_version.toString());
+			requestUrl.searchParams.set(
+				"X-Upload-Option-Cid-Version",
+				options.cid_version.toString(),
+			);
 		}
 
 		const urlReq = await fetch(requestUrl.toString(), {

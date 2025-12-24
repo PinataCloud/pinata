@@ -1,4 +1,9 @@
-import type { PinataConfig, PinataMetadata, UploadOptions, CidVersion } from "../../types";
+import type {
+	PinataConfig,
+	PinataMetadata,
+	UploadOptions,
+	CidVersion,
+} from "../../types";
 
 export class UploadBuilder<T> {
 	private config: PinataConfig | undefined;

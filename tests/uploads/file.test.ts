@@ -269,25 +269,39 @@ describe("uploadFile function", () => {
 		});
 
 		// Mock for CID version 0
-		global.fetch = jest.fn()
+		global.fetch = jest
+			.fn()
 			.mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce({ data: { ...mockResponse, cid: "QmTestVersion0" } }),
+				json: jest.fn().mockResolvedValueOnce({
+					data: { ...mockResponse, cid: "QmTestVersion0" },
+				}),
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce({ data: { ...mockResponse, cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" } }),
+				json: jest.fn().mockResolvedValueOnce({
+					data: {
+						...mockResponse,
+						cid: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+					},
+				}),
 			});
 
 		// Upload with CID version 0
-		const result0 = await uploadFile(mockConfig, testFile, "public", { cid_version: "v0" as CidVersion });
-		
+		const result0 = await uploadFile(mockConfig, testFile, "public", {
+			cid_version: "v0" as CidVersion,
+		});
+
 		// Upload with CID version 1
-		const result1 = await uploadFile(mockConfig, testFile, "public", { cid_version: "v1" as CidVersion });
+		const result1 = await uploadFile(mockConfig, testFile, "public", {
+			cid_version: "v1" as CidVersion,
+		});
 
 		// Verify both uploads
 		expect(result0.cid).toBe("QmTestVersion0");
-		expect(result1.cid).toBe("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi");
+		expect(result1.cid).toBe(
+			"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+		);
 
 		// Verify fetch was called twice
 		expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -330,9 +344,13 @@ describe("uploadFile function", () => {
 	it("should include CID version in metadata for large file upload", async () => {
 		// Create a large file (over 90MB) to trigger chunked upload metadata path
 		const largeFileSize = 94371841; // Just over the threshold
-		const largeFile = new File([new ArrayBuffer(largeFileSize)], "large-test.txt", {
-			type: "text/plain",
-		});
+		const largeFile = new File(
+			[new ArrayBuffer(largeFileSize)],
+			"large-test.txt",
+			{
+				type: "text/plain",
+			},
+		);
 
 		// Mock the first call (initial upload request) to verify metadata
 		global.fetch = jest.fn().mockImplementationOnce(() => {
@@ -355,7 +373,7 @@ describe("uploadFile function", () => {
 		expect(global.fetch).toHaveBeenCalledTimes(1);
 		const initialCall = (global.fetch as jest.Mock).mock.calls[0];
 		const uploadMetadata = initialCall[1].headers["Upload-Metadata"];
-		
+
 		// The metadata should contain base64 encoded cid_version
 		expect(uploadMetadata).toContain("cid_version");
 		expect(uploadMetadata).toContain(btoa("v1"));
