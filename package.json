@@ -1,6 +1,6 @@
 {
 	"name": "pinata",
-	"version": "2.5.1",
+	"version": "2.5.2",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -23,7 +23,8 @@
 	"scripts": {
 		"build": "tsup",
 		"format": "pnpm dlx @biomejs/biome format --write src tests package.json",
-		"test": "jest --watchAll --verbose --coverage tests"
+		"test": "jest --verbose --coverage tests",
+		"test:watch": "jest --watchAll --verbose --coverage tests"
 	},
 	"repository": {
 		"type": "git",
