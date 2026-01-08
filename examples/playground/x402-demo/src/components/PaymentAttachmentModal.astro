@@ -1,0 +1,460 @@
+---
+// PaymentAttachmentModal component - Modal for attaching payment instructions to files
+---
+
+<div id="payment-attachment-modal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="attachment-modal-title">Attach Payment</h3>
+      <button id="close-attachment-modal" class="modal-close">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- File Summary -->
+      <div class="file-summary">
+        <div class="summary-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+        <div class="summary-info">
+          <span class="summary-name" id="file-name-display"></span>
+          <code class="summary-cid" id="file-cid-display"></code>
+        </div>
+      </div>
+
+      <!-- Attach Section -->
+      <div class="modal-section">
+        <div class="section-label">Select Payment Instruction</div>
+        <div id="payment-instructions-select">
+          <div id="loading-payment-options" class="loading-state">
+            <span class="loading"></span>
+            <span>Loading...</span>
+          </div>
+          <div id="payment-options" class="payment-options" style="display: none;">
+            <select id="payment-instruction-select">
+              <option value="">Select payment instruction...</option>
+            </select>
+            <button id="attach-payment-btn" class="btn" disabled>
+              <span class="attach-text">Attach</span>
+              <span class="loading" style="display: none;"></span>
+            </button>
+          </div>
+          <div id="no-payment-instructions" class="empty-state" style="display: none;">
+            <span>No payment instructions available</span>
+            <span class="empty-hint">Create one first in the Payment Instructions section</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Associations -->
+      <div class="modal-section">
+        <div class="section-label">Current Attachments</div>
+        <div id="current-associations" class="associations-container">
+          <div id="loading-associations" class="loading-state">
+            <span class="loading"></span>
+            <span>Loading...</span>
+          </div>
+          <div id="associations-list" class="associations-list" style="display: none;"></div>
+          <div id="no-associations" class="empty-state" style="display: none;">
+            <span>No attachments yet</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentFileId = null;
+  let currentFileCid = null;
+  let currentFileName = '';
+  let availableInstructions = [];
+
+  const modal = document.getElementById('payment-attachment-modal');
+  const modalTitle = document.getElementById('attachment-modal-title');
+  const closeModal = document.getElementById('close-attachment-modal');
+  const attachBtn = document.getElementById('attach-payment-btn');
+  const instructionSelect = document.getElementById('payment-instruction-select');
+
+  function showPaymentAttachmentModal(fileId, cid, fileName) {
+    currentFileId = fileId;
+    currentFileCid = cid;
+    currentFileName = fileName;
+
+    modalTitle.textContent = `Attach Payment`;
+    document.getElementById('file-name-display').textContent = fileName;
+    document.getElementById('file-cid-display').textContent = cid;
+
+    modal.style.display = 'flex';
+    loadPaymentInstructions();
+    loadCurrentAssociations();
+  }
+
+  function hidePaymentAttachmentModal() {
+    modal.style.display = 'none';
+    currentFileId = null;
+    currentFileCid = null;
+    currentFileName = '';
+  }
+
+  async function loadPaymentInstructions() {
+    const loadingEl = document.getElementById('loading-payment-options');
+    const optionsEl = document.getElementById('payment-options');
+    const noInstructionsEl = document.getElementById('no-payment-instructions');
+
+    loadingEl.style.display = 'flex';
+    optionsEl.style.display = 'none';
+    noInstructionsEl.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/payment-instructions?limit=100');
+      if (!response.ok) throw new Error('Failed to load payment instructions');
+
+      const result = await response.json();
+      availableInstructions = result.data.payment_instructions;
+
+      if (availableInstructions.length === 0) {
+        loadingEl.style.display = 'none';
+        noInstructionsEl.style.display = 'flex';
+        return;
+      }
+
+      // Populate select options
+      instructionSelect.innerHTML = '<option value="">Select payment instruction...</option>' +
+        availableInstructions.map(instruction =>
+          `<option value="${instruction.id}">${instruction.name} (v${instruction.version})</option>`
+        ).join('');
+
+      loadingEl.style.display = 'none';
+      optionsEl.style.display = 'flex';
+
+    } catch (error) {
+      console.error('Error loading payment instructions:', error);
+      loadingEl.style.display = 'none';
+      window.showAlert('Failed to load payment instructions', 'error');
+    }
+  }
+
+  async function loadCurrentAssociations() {
+    const loadingEl = document.getElementById('loading-associations');
+    const listEl = document.getElementById('associations-list');
+    const noAssociationsEl = document.getElementById('no-associations');
+
+    loadingEl.style.display = 'flex';
+    listEl.style.display = 'none';
+    noAssociationsEl.style.display = 'none';
+
+    try {
+      // Find which payment instructions contain this CID
+      const associations = [];
+
+      for (const instruction of availableInstructions) {
+        try {
+          const cidsResponse = await fetch(`/api/payment-instructions/${instruction.id}/cids`);
+          if (cidsResponse.ok) {
+            const cidsResult = await cidsResponse.json();
+            if (cidsResult.data.cids.includes(currentFileCid)) {
+              associations.push(instruction);
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to check CIDs for instruction ${instruction.id}:`, error);
+        }
+      }
+
+      if (associations.length === 0) {
+        loadingEl.style.display = 'none';
+        noAssociationsEl.style.display = 'flex';
+        return;
+      }
+
+      listEl.innerHTML = associations.map(instruction => `
+        <div class="association-item">
+          <div class="association-info">
+            <svg class="association-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+              <line x1="1" y1="10" x2="23" y2="10"></line>
+            </svg>
+            <span class="association-name">${instruction.name}</span>
+            <span class="association-version">v${instruction.version}</span>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="removeAssociation('${instruction.id}', '${instruction.name}')">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      `).join('');
+
+      loadingEl.style.display = 'none';
+      listEl.style.display = 'flex';
+
+    } catch (error) {
+      console.error('Error loading associations:', error);
+      loadingEl.style.display = 'none';
+    }
+  }
+
+  async function attachPaymentInstruction() {
+    const instructionId = instructionSelect.value;
+    if (!instructionId) {
+      window.showAlert('Please select a payment instruction', 'error');
+      return;
+    }
+
+    const submitBtn = attachBtn;
+    const submitText = submitBtn.querySelector('.attach-text');
+    const loading = submitBtn.querySelector('.loading');
+
+    submitBtn.disabled = true;
+    submitText.style.display = 'none';
+    loading.style.display = 'inline-block';
+
+    try {
+      const response = await fetch(`/api/payment-instructions/${instructionId}/cids/${currentFileCid}`, {
+        method: 'PUT'
+      });
+
+      if (response.ok) {
+        window.showAlert('Payment instruction attached', 'success');
+        loadCurrentAssociations();
+        instructionSelect.value = '';
+        attachBtn.disabled = true;
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Attachment failed');
+      }
+    } catch (error) {
+      console.error('Error attaching payment instruction:', error);
+      window.showAlert(error.message || 'Attachment failed', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitText.style.display = 'inline';
+      loading.style.display = 'none';
+    }
+  }
+
+  async function removeAssociation(instructionId, instructionName) {
+    if (!confirm(`Remove "${instructionName}" from this file?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/payment-instructions/${instructionId}/cids/${currentFileCid}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        window.showAlert('Attachment removed', 'success');
+        loadCurrentAssociations();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Removal failed');
+      }
+    } catch (error) {
+      console.error('Error removing payment instruction:', error);
+      window.showAlert(error.message || 'Removal failed', 'error');
+    }
+  }
+
+  // Event listeners
+  closeModal.addEventListener('click', hidePaymentAttachmentModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      hidePaymentAttachmentModal();
+    }
+  });
+
+  instructionSelect.addEventListener('change', (e) => {
+    attachBtn.disabled = !e.target.value;
+  });
+
+  attachBtn.addEventListener('click', attachPaymentInstruction);
+
+  // Make functions globally available
+  window.showPaymentAttachmentModal = showPaymentAttachmentModal;
+  window.removeAssociation = removeAssociation;
+
+  // Close modal with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') {
+      hidePaymentAttachmentModal();
+    }
+  });
+</script>
+
+<style>
+  .file-summary {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+  }
+
+  .summary-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(109, 40, 217, 0.08);
+    border-radius: var(--radius-md);
+    color: var(--accent-primary);
+    flex-shrink: 0;
+  }
+
+  .summary-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .summary-name {
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    word-break: break-word;
+  }
+
+  .summary-cid {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    word-break: break-all;
+    background: transparent;
+    padding: 0;
+    border: none;
+  }
+
+  .modal-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .section-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.875rem;
+  }
+
+  .loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .empty-hint {
+    font-size: 0.8125rem;
+  }
+
+  .payment-options {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  #payment-instruction-select {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236e6e73' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+  }
+
+  #payment-instruction-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1);
+  }
+
+  .associations-container {
+    min-height: 80px;
+  }
+
+  .associations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .association-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    gap: 1rem;
+  }
+
+  .association-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .association-icon {
+    color: var(--accent-primary);
+    flex-shrink: 0;
+  }
+
+  .association-name {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+  }
+
+  .association-version {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--accent-primary);
+    padding: 0.125rem 0.375rem;
+    background: rgba(109, 40, 217, 0.08);
+    border-radius: 100px;
+  }
+
+  .btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+</style>

@@ -1,0 +1,19 @@
+{
+  "name": "x402-demo",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^4.0.0",
+    "@astrojs/node": "^8.0.0",
+    "pinata": "file:../../../"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}
