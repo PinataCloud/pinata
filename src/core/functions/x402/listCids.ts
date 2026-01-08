@@ -1,8 +1,4 @@
-import type {
-	PinataConfig,
-	CidListQuery,
-	CidListResponse,
-} from "../../types";
+import type { PinataConfig, CidListQuery, CidListResponse } from "../../types";
 
 import {
 	PinataError,

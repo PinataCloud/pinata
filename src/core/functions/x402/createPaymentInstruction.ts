@@ -23,7 +23,10 @@ export const createPaymentInstruction = async (
 		throw new ValidationError("Payment instruction name is required");
 	}
 
-	if (!request.payment_requirements || request.payment_requirements.length === 0) {
+	if (
+		!request.payment_requirements ||
+		request.payment_requirements.length === 0
+	) {
 		throw new ValidationError("At least one payment requirement is required");
 	}
 
@@ -50,14 +53,11 @@ export const createPaymentInstruction = async (
 	}
 
 	try {
-		const requestObj = await fetch(
-			`${endpoint}/x402/payment_instructions`,
-			{
-				method: "POST",
-				headers: headers,
-				body: JSON.stringify(request),
-			},
-		);
+		const requestObj = await fetch(`${endpoint}/x402/payment_instructions`, {
+			method: "POST",
+			headers: headers,
+			body: JSON.stringify(request),
+		});
 
 		if (!requestObj.ok) {
 			const errorData = await requestObj.text();
@@ -90,8 +90,12 @@ export const createPaymentInstruction = async (
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing createPaymentInstruction: ${error.message}`);
+			throw new PinataError(
+				`Error processing createPaymentInstruction: ${error.message}`,
+			);
 		}
-		throw new PinataError("An unknown error occurred while creating payment instruction");
+		throw new PinataError(
+			"An unknown error occurred while creating payment instruction",
+		);
 	}
 };

@@ -1,8 +1,5 @@
 import { addCid } from "../../src/core/functions/x402/addCid";
-import type {
-	PinataConfig,
-	CidAssociationResponse,
-} from "../../src";
+import type { PinataConfig, CidAssociationResponse } from "../../src";
 import {
 	PinataError,
 	NetworkError,
@@ -31,8 +28,8 @@ describe("addCid function", () => {
 		data: {
 			payment_instruction_id: "pi-1",
 			cid: "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
-			created_at: "2023-11-07T05:31:56Z"
-		}
+			created_at: "2023-11-07T05:31:56Z",
+		},
 	};
 
 	it("should add CID successfully", async () => {
@@ -42,7 +39,11 @@ describe("addCid function", () => {
 		};
 		global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
-		const result = await addCid(mockConfig, "pi-1", "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG");
+		const result = await addCid(
+			mockConfig,
+			"pi-1",
+			"QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+		);
 
 		expect(fetch).toHaveBeenCalledWith(
 			"https://api.pinata.cloud/v3/x402/payment_instructions/pi-1/cids/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
@@ -105,9 +106,7 @@ describe("addCid function", () => {
 	});
 
 	it("should throw PinataError on fetch failure", async () => {
-		global.fetch = jest
-			.fn()
-			.mockRejectedValue(new Error("Network failure"));
+		global.fetch = jest.fn().mockRejectedValue(new Error("Network failure"));
 
 		await expect(addCid(mockConfig, "pi-1", "QmTest")).rejects.toThrow(
 			PinataError,
@@ -150,16 +149,13 @@ describe("addCid function", () => {
 
 		await addCid(customConfig, "pi-1", "QmTest");
 
-		expect(fetch).toHaveBeenCalledWith(
-			expect.any(String),
-			{
-				method: "PUT",
-				headers: {
-					Authorization: "Bearer test_jwt",
-					"Content-Type": "application/json",
-					"Custom-Header": "custom-value",
-				},
+		expect(fetch).toHaveBeenCalledWith(expect.any(String), {
+			method: "PUT",
+			headers: {
+				Authorization: "Bearer test_jwt",
+				"Content-Type": "application/json",
+				"Custom-Header": "custom-value",
 			},
-		);
+		});
 	});
 });

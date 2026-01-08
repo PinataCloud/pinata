@@ -45,13 +45,10 @@ export const deletePaymentInstruction = async (
 	}
 
 	try {
-		const request = await fetch(
-			`${endpoint}/x402/payment_instructions/${id}`,
-			{
-				method: "DELETE",
-				headers: headers,
-			},
-		);
+		const request = await fetch(`${endpoint}/x402/payment_instructions/${id}`, {
+			method: "DELETE",
+			headers: headers,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.text();
@@ -84,8 +81,12 @@ export const deletePaymentInstruction = async (
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing deletePaymentInstruction: ${error.message}`);
+			throw new PinataError(
+				`Error processing deletePaymentInstruction: ${error.message}`,
+			);
 		}
-		throw new PinataError("An unknown error occurred while deleting payment instruction");
+		throw new PinataError(
+			"An unknown error occurred while deleting payment instruction",
+		);
 	}
 };

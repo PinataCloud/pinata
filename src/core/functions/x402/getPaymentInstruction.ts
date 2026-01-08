@@ -1,7 +1,4 @@
-import type {
-	PinataConfig,
-	PaymentInstructionResponse,
-} from "../../types";
+import type { PinataConfig, PaymentInstructionResponse } from "../../types";
 
 import {
 	PinataError,
@@ -45,13 +42,10 @@ export const getPaymentInstruction = async (
 	}
 
 	try {
-		const request = await fetch(
-			`${endpoint}/x402/payment_instructions/${id}`,
-			{
-				method: "GET",
-				headers: headers,
-			},
-		);
+		const request = await fetch(`${endpoint}/x402/payment_instructions/${id}`, {
+			method: "GET",
+			headers: headers,
+		});
 
 		if (!request.ok) {
 			const errorData = await request.text();
@@ -84,8 +78,12 @@ export const getPaymentInstruction = async (
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing getPaymentInstruction: ${error.message}`);
+			throw new PinataError(
+				`Error processing getPaymentInstruction: ${error.message}`,
+			);
 		}
-		throw new PinataError("An unknown error occurred while getting payment instruction");
+		throw new PinataError(
+			"An unknown error occurred while getting payment instruction",
+		);
 	}
 };

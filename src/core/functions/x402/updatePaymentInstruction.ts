@@ -87,8 +87,12 @@ export const updatePaymentInstruction = async (
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing updatePaymentInstruction: ${error.message}`);
+			throw new PinataError(
+				`Error processing updatePaymentInstruction: ${error.message}`,
+			);
 		}
-		throw new PinataError("An unknown error occurred while updating payment instruction");
+		throw new PinataError(
+			"An unknown error occurred while updating payment instruction",
+		);
 	}
 };

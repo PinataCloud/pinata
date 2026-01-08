@@ -93,8 +93,12 @@ export const listPaymentInstructions = async (
 			throw error;
 		}
 		if (error instanceof Error) {
-			throw new PinataError(`Error processing listPaymentInstructions: ${error.message}`);
+			throw new PinataError(
+				`Error processing listPaymentInstructions: ${error.message}`,
+			);
 		}
-		throw new PinataError("An unknown error occurred while listing payment instructions");
+		throw new PinataError(
+			"An unknown error occurred while listing payment instructions",
+		);
 	}
 };

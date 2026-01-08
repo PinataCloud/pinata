@@ -1,7 +1,4 @@
-import type {
-	PinataConfig,
-	CidAssociationResponse,
-} from "../../types";
+import type { PinataConfig, CidAssociationResponse } from "../../types";
 
 import {
 	PinataError,

@@ -42,14 +42,14 @@ describe("listPaymentInstructions function", () => {
 							pay_to: "0x1234567890123456789012345678901234567890",
 							network: "base",
 							max_amount_required: "0.001",
-							description: "Payment for access"
-						}
+							description: "Payment for access",
+						},
 					],
-					created_at: "2023-11-07T05:31:56Z"
-				}
+					created_at: "2023-11-07T05:31:56Z",
+				},
 			],
-			next_page_token: "next_token"
-		}
+			next_page_token: "next_token",
+		},
 	};
 
 	it("should list payment instructions successfully without options", async () => {
@@ -87,7 +87,7 @@ describe("listPaymentInstructions function", () => {
 			pageToken: "token123",
 			cid: "QmTest",
 			name: "test",
-			id: "pi-1"
+			id: "pi-1",
 		};
 
 		await listPaymentInstructions(mockConfig, options);
@@ -140,9 +140,7 @@ describe("listPaymentInstructions function", () => {
 	});
 
 	it("should throw PinataError on fetch failure", async () => {
-		global.fetch = jest
-			.fn()
-			.mockRejectedValue(new Error("Network failure"));
+		global.fetch = jest.fn().mockRejectedValue(new Error("Network failure"));
 
 		await expect(listPaymentInstructions(mockConfig)).rejects.toThrow(
 			PinataError,
@@ -185,16 +183,13 @@ describe("listPaymentInstructions function", () => {
 
 		await listPaymentInstructions(customConfig);
 
-		expect(fetch).toHaveBeenCalledWith(
-			expect.any(String),
-			{
-				method: "GET",
-				headers: {
-					Authorization: "Bearer test_jwt",
-					"Content-Type": "application/json",
-					"Custom-Header": "custom-value",
-				},
+		expect(fetch).toHaveBeenCalledWith(expect.any(String), {
+			method: "GET",
+			headers: {
+				Authorization: "Bearer test_jwt",
+				"Content-Type": "application/json",
+				"Custom-Header": "custom-value",
 			},
-		);
+		});
 	});
 });

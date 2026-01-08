@@ -57,7 +57,9 @@ export class X402 {
 		return updatePaymentInstruction(this.config, id, request);
 	}
 
-	deletePaymentInstruction(id: string): Promise<PaymentInstructionDeleteResponse> {
+	deletePaymentInstruction(
+		id: string,
+	): Promise<PaymentInstructionDeleteResponse> {
 		return deletePaymentInstruction(this.config, id);
 	}
 
