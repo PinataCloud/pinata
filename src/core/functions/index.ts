@@ -5,3 +5,4 @@ export * from "./gateway";
 export * from "./groups";
 export * from "./keys";
 export * from "./uploads";
+export * from "./x402";

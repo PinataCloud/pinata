@@ -8,6 +8,7 @@ import {
 	Files,
 	Upload,
 	Signatures,
+	X402,
 } from "./classes";
 import { PinataConfig } from "./types";
 
@@ -21,6 +22,7 @@ export class PinataSDK {
 	groups: Groups;
 	analytics: Analytics;
 	signatures: Signatures;
+	x402: X402;
 
 	constructor(config?: PinataConfig) {
 		this.config = formatConfig(config);
@@ -32,6 +34,7 @@ export class PinataSDK {
 		this.groups = new Groups(this.config);
 		this.analytics = new Analytics(this.config);
 		this.signatures = new Signatures(this.config);
+		this.x402 = new X402(this.config);
 	}
 
 	setNewHeaders(headers: Record<string, string>): void {
@@ -49,6 +52,7 @@ export class PinataSDK {
 		this.groups.updateConfig(this.config);
 		this.analytics.updateConfig(this.config);
 		this.signatures.updateConfig(this.config);
+		this.x402.updateConfig(this.config);
 	}
 
 	setNewJwt(jwt: string): void {
@@ -66,6 +70,7 @@ export class PinataSDK {
 		this.groups.updateConfig(this.config);
 		this.analytics.updateConfig(this.config);
 		this.signatures.updateConfig(this.config);
+		this.x402.updateConfig(this.config);
 	}
 
 	testAuthentication(): Promise<string> {
