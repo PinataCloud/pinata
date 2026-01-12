@@ -1,8 +1,14 @@
+export type NetworkIdentifier =
+	| "base"
+	| "base-sepolia"
+	| "eip155:8453"
+	| "eip155:84532";
+
 export interface PaymentRequirement {
 	asset: string;
 	pay_to: string;
-	network: "base" | "base-sepolia";
-	max_amount_required: string;
+	network: NetworkIdentifier;
+	amount: string;
 	description?: string;
 }
 

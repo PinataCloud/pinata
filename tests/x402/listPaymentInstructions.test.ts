@@ -41,7 +41,7 @@ describe("listPaymentInstructions function", () => {
 							asset: "ETH",
 							pay_to: "0x1234567890123456789012345678901234567890",
 							network: "base",
-							max_amount_required: "0.001",
+							amount: "0.001",
 							description: "Payment for access",
 						},
 					],

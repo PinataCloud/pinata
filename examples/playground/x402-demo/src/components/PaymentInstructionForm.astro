@@ -54,7 +54,7 @@
 
         <div class="form-group">
           <label>Amount *</label>
-          <input type="text" name="max_amount_required" required placeholder="1000000" />
+          <input type="text" name="amount" required placeholder="1000000" />
           <span class="form-hint">In smallest token unit (e.g., wei)</span>
         </div>
       </div>
@@ -96,15 +96,15 @@
       const asset = paymentForm.querySelector('[name="asset"]').value;
       const pay_to = paymentForm.querySelector('[name="pay_to"]').value;
       const network = paymentForm.querySelector('[name="network"]').value;
-      const max_amount_required = paymentForm.querySelector('[name="max_amount_required"]').value;
+      const amount = paymentForm.querySelector('[name="amount"]').value;
 
       const requirements = [];
-      if (asset && pay_to && max_amount_required) {
+      if (asset && pay_to && amount) {
         requirements.push({
           asset,
           pay_to,
           network,
-          max_amount_required
+          amount
         });
       }
 

@@ -95,8 +95,8 @@ The demo includes the following API routes:
 2. **Create Payment Instructions**: Fill out the form with payment details:
    - **Asset**: Contract address (e.g., `0x036CbD53842c5426634e7929541eC2318f3dCF7e`)
    - **Pay To Address**: Recipient wallet address
-   - **Network**: `base` or `base-sepolia`
-   - **Max Amount**: Amount in smallest unit (e.g., `1000000` for token amounts)
+   - **Network**: `base`, `base-sepolia`, `eip155:8453`, or `eip155:84532`
+   - **Amount**: Amount in smallest unit (e.g., `1000000` for token amounts)
 
 3. **Associate Files with Payments**: Click "Attach Payment" on any file to associate it with existing payment instructions.
 

@@ -43,7 +43,7 @@ It includes payment instructions and CID associations for testing purposes.`;
           asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
           pay_to: "0x941f29fddA2CB16649b70D1C28aA5933DBba6295",
           network: "base-sepolia",
-          max_amount_required: "1000000",
+          amount: "1000000",
           description: "Payment for demo content access"
         }
       ]
