@@ -12,15 +12,15 @@ A comprehensive Astro demo application showcasing the complete Pinata X402 Monet
 
 ### Payment Instructions
 - Create payment instructions with multiple payment requirements
-- Support for different cryptocurrencies and networks
-- View and manage existing payment instructions  
+- USDC payments on Base and Base Sepolia networks
+- View and manage existing payment instructions
 - Update and delete payment instructions
 
 ### CID-Payment Association
 - Associate uploaded file CIDs with payment instructions
-- View current associations for any file
-- Remove CID associations
-- Attach multiple payment instructions to a single file
+- Attach multiple CIDs to a single payment instruction
+- Each CID can only have one payment instruction at a time
+- View and remove CID associations
 
 ### Auto-Run Demo
 - **🚀 One-click complete workflow demonstration**
@@ -85,8 +85,8 @@ The demo includes the following API routes:
 1. **🚀 Click "Run Complete Demo"** - This will automatically execute the entire workflow:
    - Generate a unique test file with timestamp
    - Upload it to IPFS
-   - Create payment instructions with ETH and USDC options
-   - Associate the CID with payment instructions
+   - Create a payment instruction with USDC on Base Sepolia
+   - Associate the CID with the payment instruction
    - Display detailed results
 
 ### Manual Workflow
