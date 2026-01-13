@@ -1,0 +1,317 @@
+---
+// FileUpload component - Upload files to IPFS
+---
+
+<div class="card upload-card">
+  <div class="card-title">
+    <svg class="title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="17 8 12 3 7 8"></polyline>
+      <line x1="12" y1="3" x2="12" y2="15"></line>
+    </svg>
+    <h4>Upload File</h4>
+  </div>
+
+  <form id="file-upload-form" enctype="multipart/form-data">
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" name="file" required />
+      <div class="zone-content">
+        <div class="zone-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </div>
+        <div class="zone-text">
+          <span class="zone-primary">Drop file here or click to browse</span>
+          <span class="zone-secondary">Supports any file type</span>
+        </div>
+      </div>
+      <div class="zone-selected" id="zone-selected" style="display: none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <span id="selected-filename"></span>
+        <button type="button" class="clear-file" id="clear-file">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="file-name">Custom Name <span class="optional">(optional)</span></label>
+      <input type="text" id="file-name" name="name" placeholder="Leave empty for original filename" />
+    </div>
+
+    <button type="submit" class="btn btn-primary submit-btn">
+      <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+      <span class="upload-text">Upload to IPFS</span>
+      <span class="loading" style="display: none;"></span>
+    </button>
+  </form>
+</div>
+
+<script>
+  const form = document.getElementById('file-upload-form');
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const uploadZone = document.getElementById('upload-zone');
+  const zoneContent = uploadZone.querySelector('.zone-content') as HTMLElement;
+  const zoneSelected = document.getElementById('zone-selected');
+  const selectedFilename = document.getElementById('selected-filename');
+  const clearFileBtn = document.getElementById('clear-file');
+
+  // Handle file selection display
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      selectedFilename.textContent = file.name;
+      zoneContent.style.display = 'none';
+      zoneSelected.style.display = 'flex';
+      uploadZone.classList.add('has-file');
+    }
+  });
+
+  // Clear file selection
+  clearFileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.value = '';
+    zoneContent.style.display = 'flex';
+    zoneSelected.style.display = 'none';
+    uploadZone.classList.remove('has-file');
+  });
+
+  // Drag and drop handling
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+
+  uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('dragover');
+  });
+
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      fileInput.files = e.dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change'));
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitText = submitBtn.querySelector('.upload-text');
+    const btnIcon = submitBtn.querySelector('.btn-icon') as HTMLElement;
+    const loading = submitBtn.querySelector('.loading');
+    const nameInput = document.getElementById('file-name') as HTMLInputElement;
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      window.showAlert('Please select a file to upload', 'error');
+      return;
+    }
+
+    // Show loading state
+    submitBtn.disabled = true;
+    submitText.style.display = 'none';
+    btnIcon.style.display = 'none';
+    loading.style.display = 'inline-block';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      if (nameInput.value.trim()) {
+        formData.append('name', nameInput.value.trim());
+      }
+
+      const response = await fetch('/api/files', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        window.showAlert(`File uploaded - CID: ${result.cid.substring(0, 20)}...`, 'success');
+        form.reset();
+        zoneContent.style.display = 'flex';
+        zoneSelected.style.display = 'none';
+        uploadZone.classList.remove('has-file');
+
+        // Refresh files list
+        if (window.refreshFilesList) {
+          window.refreshFilesList();
+        }
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      window.showAlert(error.message || 'Upload failed', 'error');
+    } finally {
+      // Reset loading state
+      submitBtn.disabled = false;
+      submitText.style.display = 'inline';
+      btnIcon.style.display = 'inline';
+      loading.style.display = 'none';
+    }
+  });
+</script>
+
+<style>
+  .upload-card {
+    position: relative;
+  }
+
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .title-icon {
+    color: var(--accent-primary);
+  }
+
+  .card-title h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .upload-zone {
+    position: relative;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .upload-zone:hover {
+    border-color: var(--accent-primary);
+    background: rgba(109, 40, 217, 0.02);
+  }
+
+  .upload-zone.dragover {
+    border-color: var(--accent-primary);
+    background: rgba(109, 40, 217, 0.04);
+  }
+
+  .upload-zone.has-file {
+    border-style: solid;
+    border-color: var(--success);
+    background: var(--success-bg);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.875rem;
+    pointer-events: none;
+  }
+
+  .zone-icon {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .upload-zone:hover .zone-icon {
+    color: var(--accent-primary);
+    opacity: 1;
+  }
+
+  .zone-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .zone-primary {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .zone-secondary {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .zone-selected {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    color: var(--success);
+    pointer-events: none;
+  }
+
+  .zone-selected span {
+    font-size: 0.875rem;
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  .clear-file {
+    pointer-events: auto;
+    background: transparent;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    color: var(--danger);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .clear-file:hover {
+    background: var(--danger-bg);
+  }
+
+  .optional {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+
+  .submit-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.875rem;
+  }
+
+  .submit-btn .btn-icon {
+    display: inline;
+  }
+</style>

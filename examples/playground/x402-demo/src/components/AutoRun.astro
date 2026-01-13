@@ -1,0 +1,337 @@
+---
+// AutoRun component - Quick demo of the complete X402 workflow
+---
+
+<div class="auto-run-card card">
+  <div class="card-header">
+    <div class="header-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+    </div>
+    <div class="header-text">
+      <h4>Quick Demo</h4>
+      <p class="text-secondary text-sm">Execute complete workflow</p>
+    </div>
+    <span class="tag">Auto</span>
+  </div>
+
+  <div class="card-body">
+    <div class="demo-flow">
+      <div class="flow-step">
+        <span class="flow-number">1</span>
+        <span>Upload file</span>
+      </div>
+      <svg class="flow-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+      <div class="flow-step">
+        <span class="flow-number">2</span>
+        <span>Create payment</span>
+      </div>
+      <svg class="flow-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+      <div class="flow-step">
+        <span class="flow-number">3</span>
+        <span>Associate CID</span>
+      </div>
+    </div>
+
+    <button id="auto-run-btn" class="btn btn-primary btn-execute">
+      <span class="btn-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      </span>
+      <span class="auto-run-text">Run Demo</span>
+      <span class="loading" style="display: none;"></span>
+    </button>
+  </div>
+</div>
+
+<script>
+  const autoRunBtn = document.getElementById('auto-run-btn');
+  const resultsSection = document.getElementById('demo-results-section');
+  const resultsContent = document.getElementById('demo-results-content');
+
+  autoRunBtn.addEventListener('click', async () => {
+    const submitBtn = autoRunBtn;
+    const submitText = submitBtn.querySelector('.auto-run-text');
+    const btnIcon = submitBtn.querySelector('.btn-icon');
+    const loading = submitBtn.querySelector('.loading');
+
+    // Show loading state
+    submitBtn.disabled = true;
+    submitText.style.display = 'none';
+    btnIcon.style.display = 'none';
+    loading.style.display = 'inline-block';
+
+    // Hide any previous results
+    resultsSection.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/auto-run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const truncatedCid = result.data.file.cid.substring(0, 12) + '...' + result.data.file.cid.substring(result.data.file.cid.length - 8);
+
+        // Display results in the page section
+        resultsContent.innerHTML = `
+          <div class="demo-result-card">
+            <div class="result-card-header">
+              <div class="result-status-icon success">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div class="result-status-text">
+                <h3>Workflow Complete</h3>
+                <p>Your file is now monetized with X402</p>
+              </div>
+              <button class="dismiss-btn" onclick="document.getElementById('demo-results-section').style.display='none'" aria-label="Dismiss">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div class="result-details">
+              <div class="result-detail-row">
+                <div class="result-detail-item">
+                  <div class="detail-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                  </div>
+                  <div class="detail-content">
+                    <span class="detail-label">Uploaded File</span>
+                    <span class="detail-value">${result.data.file.name}</span>
+                  </div>
+                </div>
+                <div class="result-detail-item">
+                  <div class="detail-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                      <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                  </div>
+                  <div class="detail-content">
+                    <span class="detail-label">Payment Instruction</span>
+                    <span class="detail-value">${result.data.paymentInstruction.name}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="result-cid-row">
+                <span class="cid-label">Content Identifier (CID)</span>
+                <div class="cid-display">
+                  <code class="cid-value">${truncatedCid}</code>
+                  <button class="copy-cid-btn" onclick="navigator.clipboard.writeText('${result.data.file.cid}').then(() => window.showAlert('CID copied!', 'success'))" title="Copy full CID">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="result-actions">
+              <a href="https://x402-test.mypinata.cloud/x402/cid/${result.data.file.cid}" target="_blank" class="result-action-btn primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                View on X402 Gateway
+              </a>
+            </div>
+
+            <div class="result-note">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>Test your monetized CIDs with the <a href="https://x402-pinata-portal.pages.dev/" target="_blank">X402 Portal</a></span>
+            </div>
+          </div>
+        `;
+
+        // Update section style for success
+        resultsSection.className = 'demo-results-section success';
+        resultsSection.style.display = 'block';
+
+        // Scroll to results
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Refresh other components
+        if (window.refreshFilesList) {
+          window.refreshFilesList();
+        }
+        if (window.refreshPaymentInstructions) {
+          window.refreshPaymentInstructions();
+        }
+
+        window.showAlert('Demo executed successfully', 'success');
+
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || error.error || 'Execution failed');
+      }
+    } catch (error) {
+      console.error('Error in auto-run:', error);
+
+      resultsContent.innerHTML = `
+        <div class="demo-result-card error">
+          <div class="result-card-header">
+            <div class="result-status-icon error">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </div>
+            <div class="result-status-text">
+              <h3>Workflow Failed</h3>
+              <p>Something went wrong during execution</p>
+            </div>
+            <button class="dismiss-btn" onclick="document.getElementById('demo-results-section').style.display='none'" aria-label="Dismiss">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div class="error-details">
+            <div class="error-message-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span>${error.message}</span>
+            </div>
+            <p class="error-hint">Check your <code>PINATA_JWT</code> configuration in the <code>.env</code> file and ensure your API credentials are valid.</p>
+          </div>
+        </div>
+      `;
+
+      // Update section style for error
+      resultsSection.className = 'demo-results-section error';
+      resultsSection.style.display = 'block';
+      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      window.showAlert(error.message || 'Execution failed', 'error');
+    } finally {
+      // Reset loading state
+      submitBtn.disabled = false;
+      submitText.style.display = 'inline';
+      btnIcon.style.display = 'inline-flex';
+      loading.style.display = 'none';
+    }
+  });
+</script>
+
+<style>
+  .auto-run-card {
+    background: var(--bg-secondary);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .header-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(109, 40, 217, 0.08);
+    border-radius: var(--radius-md);
+    color: var(--accent-primary);
+  }
+
+  .header-text h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.125rem 0;
+  }
+
+  .header-text p {
+    margin: 0;
+  }
+
+  .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .demo-flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .flow-number {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .flow-arrow {
+    color: var(--text-muted);
+  }
+
+  .btn-execute {
+    width: 100%;
+    justify-content: center;
+    padding: 0.875rem 1.5rem;
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @media (max-width: 640px) {
+    .demo-flow {
+      font-size: 0.75rem;
+    }
+  }
+</style>

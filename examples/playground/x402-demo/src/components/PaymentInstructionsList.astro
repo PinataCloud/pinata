@@ -1,0 +1,426 @@
+---
+// PaymentInstructionsList component - Display existing payment instructions
+---
+
+<div class="card instructions-card">
+  <div class="card-header-row">
+    <div class="card-title">
+      <svg class="title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      <h4>Payment Instructions</h4>
+    </div>
+    <button id="refresh-list" class="btn btn-sm">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+      </svg>
+      Refresh
+    </button>
+  </div>
+
+  <div id="payment-instructions-container" class="instructions-container">
+    <div id="loading-instructions" class="loading-state">
+      <span class="loading"></span>
+      <span>Loading instructions...</span>
+    </div>
+
+    <div id="instructions-list" class="instructions-list" style="display: none;"></div>
+
+    <div id="no-instructions" class="empty-state" style="display: none;">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+        <line x1="1" y1="10" x2="23" y2="10"></line>
+      </svg>
+      <span>No payment instructions</span>
+      <span class="empty-hint">Create your first instruction above</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentInstructions = [];
+
+  async function loadPaymentInstructions() {
+    const loadingEl = document.getElementById('loading-instructions');
+    const listEl = document.getElementById('instructions-list');
+    const noInstructionsEl = document.getElementById('no-instructions');
+
+    loadingEl.style.display = 'flex';
+    listEl.style.display = 'none';
+    noInstructionsEl.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/payment-instructions?limit=50');
+      if (!response.ok) throw new Error('Failed to load payment instructions');
+
+      const result = await response.json();
+      currentInstructions = result.data.payment_instructions;
+
+      if (currentInstructions.length === 0) {
+        loadingEl.style.display = 'none';
+        noInstructionsEl.style.display = 'flex';
+        return;
+      }
+
+      // Render instructions
+      listEl.innerHTML = currentInstructions.map(instruction => `
+        <div class="instruction-item">
+          <div class="instruction-header">
+            <div class="instruction-title">
+              <svg class="instruction-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+              </svg>
+              <span class="instruction-name">${instruction.name}</span>
+            </div>
+            <div class="instruction-badges">
+              <span class="version-badge">v${instruction.version}</span>
+            </div>
+          </div>
+
+          <div class="instruction-meta">
+            <div class="meta-row">
+              <div class="meta-item">
+                <span class="meta-label">ID</span>
+                <code class="meta-value id">${instruction.id}</code>
+              </div>
+            </div>
+            <div class="meta-row">
+              <div class="meta-item">
+                <span class="meta-label">Created</span>
+                <span class="meta-value">${window.formatDate(instruction.created_at)}</span>
+              </div>
+            </div>
+          </div>
+
+          ${instruction.description ? `<div class="instruction-description">${instruction.description}</div>` : ''}
+
+          <div class="requirements-section">
+            <div class="requirements-label">Payment Requirements</div>
+            <div class="requirements-list">
+              ${instruction.payment_requirements.map(req => `
+                <div class="requirement-tag">
+                  <span class="req-asset">${req.asset.substring(0, 10)}...</span>
+                  <span class="req-divider">|</span>
+                  <span class="req-amount">${req.amount}</span>
+                  <span class="req-divider">to</span>
+                  <span class="req-recipient">${req.pay_to.substring(0, 10)}...</span>
+                  <span class="req-network">${req.network}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="instruction-actions">
+            <button class="btn btn-sm" onclick="viewCids('${instruction.id}', '${instruction.name}')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              View CIDs
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteInstruction('${instruction.id}', '${instruction.name}')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      loadingEl.style.display = 'none';
+      listEl.style.display = 'flex';
+
+    } catch (error) {
+      console.error('Error loading payment instructions:', error);
+      loadingEl.style.display = 'none';
+      window.showAlert('Failed to load payment instructions', 'error');
+    }
+  }
+
+  async function deleteInstruction(id, name) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/payment-instructions/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        window.showAlert('Payment instruction deleted', 'success');
+        loadPaymentInstructions();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Delete failed');
+      }
+    } catch (error) {
+      console.error('Error deleting payment instruction:', error);
+      window.showAlert(error.message || 'Delete failed', 'error');
+    }
+  }
+
+  function viewCids(instructionId, instructionName) {
+    if (window.showCidManagement) {
+      window.showCidManagement(instructionId, instructionName);
+    }
+  }
+
+  // Refresh button
+  document.getElementById('refresh-list').addEventListener('click', loadPaymentInstructions);
+
+  // Make refresh function globally available
+  window.refreshPaymentInstructions = loadPaymentInstructions;
+  window.deleteInstruction = deleteInstruction;
+  window.viewCids = viewCids;
+
+  // Load instructions on page load
+  loadPaymentInstructions();
+</script>
+
+<style>
+  .instructions-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .title-icon {
+    color: var(--accent-primary);
+  }
+
+  .card-title h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .instructions-container {
+    min-height: 150px;
+  }
+
+  .loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .empty-hint {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .instructions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  .instruction-item {
+    padding: 1.125rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--accent-light);
+    transition: all 0.15s ease;
+  }
+
+  .instruction-item:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-hover);
+  }
+
+  .instruction-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.875rem;
+  }
+
+  .instruction-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .instruction-icon {
+    color: var(--accent-primary);
+    flex-shrink: 0;
+  }
+
+  .instruction-name {
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .instruction-badges {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .version-badge {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--accent-primary);
+    padding: 0.25rem 0.5rem;
+    background: rgba(109, 40, 217, 0.08);
+    border-radius: 100px;
+  }
+
+  .instruction-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.875rem;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .meta-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .meta-value {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .meta-value.id {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    word-break: break-all;
+    background: var(--bg-secondary);
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+  }
+
+  .instruction-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.875rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 2px solid var(--border-color);
+  }
+
+  .requirements-section {
+    margin-bottom: 0.875rem;
+  }
+
+  .requirements-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .requirements-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .requirement-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .req-asset, .req-recipient {
+    color: var(--accent-primary);
+    font-family: var(--font-mono);
+  }
+
+  .req-amount {
+    color: var(--success);
+    font-weight: 500;
+  }
+
+  .req-divider {
+    color: var(--text-muted);
+  }
+
+  .req-network {
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.6875rem;
+    font-weight: 500;
+  }
+
+  .instruction-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+</style>

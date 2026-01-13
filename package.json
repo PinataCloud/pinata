@@ -1,13 +1,11 @@
 {
 	"name": "pinata",
-	"version": "2.5.2",
+	"version": "2.5.3",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -22,7 +20,7 @@
 	},
 	"scripts": {
 		"build": "tsup",
-		"format": "pnpm dlx @biomejs/biome format --write src tests package.json",
+		"format": "pnpm dlx @biomejs/biome@1.9.4 format --write src tests package.json",
 		"test": "jest --verbose --coverage tests",
 		"test:watch": "jest --watchAll --verbose --coverage tests"
 	},
@@ -30,11 +28,7 @@
 		"type": "git",
 		"url": "git+https://github.com/PinataCloud/pinata.git"
 	},
-	"keywords": [
-		"ipfs",
-		"sdk",
-		"typescript"
-	],
+	"keywords": ["ipfs", "sdk", "typescript"],
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"bugs": {
@@ -54,7 +48,7 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "1.8.3",
+		"@biomejs/biome": "1.9.4",
 		"@types/jest": "^29.5.12",
 		"@types/node": "^20.11.17",
 		"@types/react": "^19.0.12",

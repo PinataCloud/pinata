@@ -1,0 +1,360 @@
+---
+// CidManagement component - Modal for managing CIDs associated with payment instructions
+---
+
+<div id="cid-management-modal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="cid-modal-title">Manage CIDs</h3>
+      <button id="close-cid-modal" class="modal-close">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Add CID Form -->
+      <div class="modal-section">
+        <div class="section-label">Add New CID</div>
+        <form id="add-cid-form" class="add-cid-form">
+          <div class="form-row-inline">
+            <input type="text" id="new-cid" placeholder="QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG" required />
+            <button type="submit" class="btn">
+              <span class="add-cid-text">Add</span>
+              <span class="loading" style="display: none;"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- CIDs List -->
+      <div class="modal-section">
+        <div class="section-header-row">
+          <div class="section-label">Associated CIDs</div>
+          <button id="refresh-cids" class="btn btn-sm">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div id="cids-container" class="cids-container">
+          <div id="loading-cids" class="loading-state">
+            <span class="loading"></span>
+            <span>Loading CIDs...</span>
+          </div>
+          <div id="cids-list" class="cids-list" style="display: none;"></div>
+          <div id="no-cids" class="empty-state" style="display: none;">
+            <span>No CIDs associated</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentPaymentInstructionId = null;
+  let currentPaymentInstructionName = '';
+
+  const modal = document.getElementById('cid-management-modal');
+  const modalTitle = document.getElementById('cid-modal-title');
+  const closeModal = document.getElementById('close-cid-modal');
+  const addCidForm = document.getElementById('add-cid-form');
+  const refreshCidsBtn = document.getElementById('refresh-cids');
+
+  function showCidManagement(instructionId, instructionName) {
+    currentPaymentInstructionId = instructionId;
+    currentPaymentInstructionName = instructionName;
+    modalTitle.textContent = `CIDs - ${instructionName}`;
+    modal.style.display = 'flex';
+    loadCids();
+  }
+
+  function hideCidManagement() {
+    modal.style.display = 'none';
+    currentPaymentInstructionId = null;
+    currentPaymentInstructionName = '';
+  }
+
+  async function loadCids() {
+    if (!currentPaymentInstructionId) return;
+
+    const loadingEl = document.getElementById('loading-cids');
+    const listEl = document.getElementById('cids-list');
+    const noCidsEl = document.getElementById('no-cids');
+
+    loadingEl.style.display = 'flex';
+    listEl.style.display = 'none';
+    noCidsEl.style.display = 'none';
+
+    try {
+      const response = await fetch(`/api/payment-instructions/${currentPaymentInstructionId}/cids`);
+      if (!response.ok) throw new Error('Failed to load CIDs');
+
+      const result = await response.json();
+      const cids = result.data.cids;
+
+      if (cids.length === 0) {
+        loadingEl.style.display = 'none';
+        noCidsEl.style.display = 'flex';
+        return;
+      }
+
+      // Render CIDs
+      listEl.innerHTML = cids.map(cid => `
+        <div class="cid-item">
+          <div class="cid-info">
+            <svg class="cid-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+            <code class="cid-text">${cid}</code>
+          </div>
+          <div class="cid-actions">
+            <a href="https://gateway.pinata.cloud/ipfs/${cid}" target="_blank" class="btn btn-sm">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </a>
+            <button class="btn btn-danger btn-sm" onclick="removeCid('${cid}')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      loadingEl.style.display = 'none';
+      listEl.style.display = 'flex';
+
+    } catch (error) {
+      console.error('Error loading CIDs:', error);
+      loadingEl.style.display = 'none';
+      window.showAlert('Failed to load CIDs', 'error');
+    }
+  }
+
+  async function addCid(cid) {
+    if (!currentPaymentInstructionId || !cid) return;
+
+    try {
+      const response = await fetch(`/api/payment-instructions/${currentPaymentInstructionId}/cids/${cid}`, {
+        method: 'PUT'
+      });
+
+      if (response.ok) {
+        window.showAlert('CID added', 'success');
+        loadCids();
+        document.getElementById('new-cid').value = '';
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add CID');
+      }
+    } catch (error) {
+      console.error('Error adding CID:', error);
+      window.showAlert(error.message || 'Failed to add CID', 'error');
+    }
+  }
+
+  async function removeCid(cid) {
+    if (!currentPaymentInstructionId || !cid) return;
+
+    if (!confirm(`Remove CID from this payment instruction?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/payment-instructions/${currentPaymentInstructionId}/cids/${cid}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        window.showAlert('CID removed', 'success');
+        loadCids();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove CID');
+      }
+    } catch (error) {
+      console.error('Error removing CID:', error);
+      window.showAlert(error.message || 'Failed to remove CID', 'error');
+    }
+  }
+
+  // Event listeners
+  closeModal.addEventListener('click', hideCidManagement);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      hideCidManagement();
+    }
+  });
+
+  addCidForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const submitBtn = addCidForm.querySelector('button[type="submit"]');
+    const submitText = submitBtn.querySelector('.add-cid-text');
+    const loading = submitBtn.querySelector('.loading');
+
+    submitBtn.disabled = true;
+    submitText.style.display = 'none';
+    loading.style.display = 'inline-block';
+
+    try {
+      const cid = document.getElementById('new-cid').value.trim();
+      if (cid) {
+        await addCid(cid);
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitText.style.display = 'inline';
+      loading.style.display = 'none';
+    }
+  });
+
+  refreshCidsBtn.addEventListener('click', loadCids);
+
+  // Make functions globally available
+  window.showCidManagement = showCidManagement;
+  window.removeCid = removeCid;
+
+  // Close modal with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') {
+      hideCidManagement();
+    }
+  });
+</script>
+
+<style>
+  .modal-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .section-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.875rem;
+  }
+
+  .section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.875rem;
+  }
+
+  .section-header-row .section-label {
+    margin-bottom: 0;
+  }
+
+  .add-cid-form .form-row-inline {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .add-cid-form input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+  }
+
+  .add-cid-form input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1);
+  }
+
+  .add-cid-form input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .cids-container {
+    min-height: 100px;
+  }
+
+  .loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .cids-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .cid-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    gap: 1rem;
+  }
+
+  .cid-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cid-icon {
+    color: var(--accent-primary);
+    flex-shrink: 0;
+  }
+
+  .cid-text {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    word-break: break-all;
+    background: transparent;
+    padding: 0;
+    border: none;
+  }
+
+  .cid-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+</style>

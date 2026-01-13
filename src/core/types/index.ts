@@ -6,3 +6,4 @@ export * from "./groups";
 export * from "./keys";
 export * from "./signature";
 export * from "./uploads";
+export * from "./x402";

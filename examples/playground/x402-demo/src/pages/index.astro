@@ -1,0 +1,408 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AutoRun from '../components/AutoRun.astro';
+import FileUpload from '../components/FileUpload.astro';
+import FilesList from '../components/FilesList.astro';
+import PaymentInstructionForm from '../components/PaymentInstructionForm.astro';
+import PaymentInstructionsList from '../components/PaymentInstructionsList.astro';
+import CidManagement from '../components/CidManagement.astro';
+import PaymentAttachmentModal from '../components/PaymentAttachmentModal.astro';
+---
+
+<Layout title="X402 Monetization Demo | Pinata">
+  <div class="app-wrapper">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="logo-section">
+          <!-- Pinata Logo -->
+          <svg class="pinata-logo" width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#6d28d9"/>
+            <path d="M16 8L10 14H14V20H18V14H22L16 8Z" fill="white"/>
+            <circle cx="16" cy="22" r="2" fill="white"/>
+          </svg>
+          <div class="logo-text">
+            <span class="brand-name">Pinata</span>
+            <span class="product-name">X402 Demo</span>
+          </div>
+        </div>
+        <a href="https://docs.pinata.cloud" target="_blank" class="docs-link">
+          Documentation
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Hero Section -->
+      <section class="hero-section">
+        <div class="hero-content">
+          <span class="hero-badge">X402 Protocol</span>
+          <h1 class="hero-title">Monetize Your IPFS Content</h1>
+          <p class="hero-description">
+            Upload files to IPFS, attach payment instructions, and enable HTTP 402-based
+            micropayments for your decentralized content with Pinata.
+          </p>
+        </div>
+        <div class="hero-demo">
+          <AutoRun />
+        </div>
+      </section>
+
+      <!-- Demo Results (shown after running demo) -->
+      <section id="demo-results-section" class="demo-results-section" style="display: none;">
+        <div id="demo-results-content"></div>
+      </section>
+
+      <!-- Main Demo Sections -->
+      <div class="demo-grid">
+        <!-- Left Column: Files -->
+        <section class="demo-column">
+          <h2 class="section-title">Files</h2>
+          <div class="section-content">
+            <FileUpload />
+            <FilesList />
+          </div>
+        </section>
+
+        <!-- Right Column: Payment Instructions -->
+        <section class="demo-column">
+          <h2 class="section-title">Payment Instructions</h2>
+          <div class="section-content">
+            <PaymentInstructionForm />
+            <PaymentInstructionsList />
+          </div>
+        </section>
+      </div>
+
+      <!-- How It Works -->
+      <section class="how-it-works">
+        <h2 class="section-title">How It Works</h2>
+        <div class="steps-grid">
+          <div class="step">
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <h3>Upload</h3>
+            <p>Pin files to IPFS through Pinata's reliable storage network</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+              </svg>
+            </div>
+            <h3>Configure</h3>
+            <p>Create payment instructions with asset, amount, and recipient</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+            </div>
+            <h3>Associate</h3>
+            <p>Link your CIDs to payment instructions for monetization</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+            <h3>Monetize</h3>
+            <p>Content returns HTTP 402 requiring payment for access</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <span class="footer-brand">Powered by Pinata</span>
+        <span class="footer-divider">•</span>
+        <span class="footer-protocol">X402 Protocol</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modals -->
+  <CidManagement />
+  <PaymentAttachmentModal />
+</Layout>
+
+<style>
+  .app-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.875rem 1.5rem;
+  }
+
+  .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo-section {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .pinata-logo {
+    flex-shrink: 0;
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .brand-name {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .product-name {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.2;
+  }
+
+  .docs-link {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .docs-link:hover {
+    color: var(--accent-primary);
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    width: 100%;
+  }
+
+  /* Hero Section */
+  .hero-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+    margin-bottom: 3rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 0.375rem 0.875rem;
+    background: rgba(109, 40, 217, 0.08);
+    color: var(--accent-primary);
+    border-radius: 100px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+    margin-bottom: 1rem;
+  }
+
+  .hero-description {
+    font-size: 1.0625rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 480px;
+  }
+
+  /* Demo Results Section */
+  .demo-results-section {
+    margin-bottom: 2rem;
+    animation: slideDown 0.3s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Demo Grid */
+  .demo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .demo-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  /* How It Works */
+  .how-it-works {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+  }
+
+  .how-it-works .section-title {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+  }
+
+  .step {
+    text-align: center;
+  }
+
+  .step-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(109, 40, 217, 0.08);
+    border-radius: 50%;
+    color: var(--accent-primary);
+  }
+
+  .step h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .step p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* Footer */
+  .app-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-secondary);
+  }
+
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .footer-brand {
+    font-weight: 500;
+  }
+
+  .footer-divider {
+    color: var(--border-color);
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .hero-section {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .demo-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .steps-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .main-content {
+      padding: 1.5rem 1rem;
+    }
+
+    .hero-title {
+      font-size: 1.75rem;
+    }
+
+    .steps-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
