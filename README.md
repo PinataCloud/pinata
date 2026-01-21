@@ -6,7 +6,7 @@ The new all-in-one Pinata SDK
 
 ## Quickstart
 
-[View the full documentation here](https://docs.pinata.cloud/sdk-beta/getting-started)
+[View the full documentation here](https://docs.pinata.cloud/sdk/getting-started)
 
 ### 1. Install
 
