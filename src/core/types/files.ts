@@ -17,6 +17,10 @@ export type UpdateFileOptions = {
 	id: string;
 	name?: string;
 	keyvalues?: Record<string, string>;
+	/**
+	 * Unix timestamp (in seconds) when the file should expire (must be in the future)
+	 */
+	expires_at?: number;
 };
 
 export type DeleteResponse = {
