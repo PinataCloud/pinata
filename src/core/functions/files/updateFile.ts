@@ -21,10 +21,11 @@ export const updateFile = async (
 
 	if (
 		!options.name &&
-		(!options.keyvalues || Object.keys(options.keyvalues).length === 0)
+		(!options.keyvalues || Object.keys(options.keyvalues).length === 0) &&
+		options.expires_at === undefined
 	) {
 		throw new ValidationError(
-			"At least one of 'name' or 'keyvalues' must be provided",
+			"At least one of 'name', 'keyvalues', or 'expires_at' must be provided",
 		);
 	}
 
@@ -35,6 +36,9 @@ export const updateFile = async (
 	}
 	if (options.keyvalues && Object.keys(options.keyvalues).length > 0) {
 		data.keyvalues = options.keyvalues;
+	}
+	if (options.expires_at !== undefined) {
+		data.expires_at = options.expires_at;
 	}
 
 	const body = JSON.stringify(data);

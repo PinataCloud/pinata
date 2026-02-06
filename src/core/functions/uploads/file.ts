@@ -63,6 +63,10 @@ export const uploadFile = async (
 			metadata += `,cid_version ${btoa(options.cid_version)}`;
 		}
 
+		if (options?.expires_at !== undefined) {
+			metadata += `,expires_at ${btoa(options.expires_at.toString())}`;
+		}
+
 		// Build URL with query parameters for chunked uploads
 		let updatedEndpoint: string = `${endpoint}/files`;
 		if (options?.url) {
@@ -262,6 +266,10 @@ export const uploadFile = async (
 
 	if (options?.cid_version !== undefined) {
 		data.append("cid_version", options.cid_version.toString());
+	}
+
+	if (options?.expires_at !== undefined) {
+		data.append("expires_at", options.expires_at.toString());
 	}
 
 	if (options?.url) {

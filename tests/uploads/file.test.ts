@@ -341,6 +341,63 @@ describe("uploadFile function", () => {
 		expect(formData.get("streamable")).toBe("true");
 	});
 
+	it("should upload file with expires_at timestamp", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const futureTimestamp = Math.floor(Date.now() / 1000) + 86400; // 24 hours from now
+		const mockOptions: UploadOptions = {
+			expires_at: futureTimestamp,
+		};
+
+		await uploadFile(mockConfig, mockFile, "public", mockOptions);
+
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("expires_at")).toBe(futureTimestamp.toString());
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://uploads.pinata.cloud/v3/files",
+			expect.objectContaining({
+				method: "POST",
+				headers: {
+					Source: "sdk/file",
+					Authorization: "Bearer test-jwt",
+				},
+				body: expect.any(FormData),
+			}),
+		);
+	});
+
+	it("should upload file with expires_at combined with other options", async () => {
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const futureTimestamp = Math.floor(Date.now() / 1000) + 86400;
+		const mockOptions: UploadOptions = {
+			expires_at: futureTimestamp,
+			groupId: "test-group",
+			metadata: {
+				name: "Test File",
+				keyvalues: { key: "value" },
+			},
+		};
+
+		await uploadFile(mockConfig, mockFile, "private", mockOptions);
+
+		const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+		const formData = fetchCall[1].body as FormData;
+
+		expect(formData.get("expires_at")).toBe(futureTimestamp.toString());
+		expect(formData.get("group_id")).toBe("test-group");
+		expect(formData.get("name")).toBe("Test File");
+		expect(formData.get("keyvalues")).toBe(JSON.stringify({ key: "value" }));
+	});
+
 	it("should include CID version in metadata for large file upload", async () => {
 		// Create a large file (over 90MB) to trigger chunked upload metadata path
 		const largeFileSize = 94371841; // Just over the threshold
@@ -377,5 +434,42 @@ describe("uploadFile function", () => {
 		// The metadata should contain base64 encoded cid_version
 		expect(uploadMetadata).toContain("cid_version");
 		expect(uploadMetadata).toContain(btoa("v1"));
+	});
+
+	it("should include expires_at in metadata for large file upload", async () => {
+		// Create a large file (over 90MB) to trigger chunked upload metadata path
+		const largeFileSize = 94371841; // Just over the threshold
+		const largeFile = new File(
+			[new ArrayBuffer(largeFileSize)],
+			"large-test.txt",
+			{
+				type: "text/plain",
+			},
+		);
+
+		// Mock the first call (initial upload request) to verify metadata
+		global.fetch = jest.fn().mockImplementationOnce(() => {
+			return Promise.reject(new Error("Test stopped after metadata check"));
+		});
+
+		const futureTimestamp = Math.floor(Date.now() / 1000) + 86400;
+		const mockOptions: UploadOptions = {
+			expires_at: futureTimestamp,
+		};
+
+		try {
+			await uploadFile(mockConfig, largeFile, "private", mockOptions);
+		} catch (error) {
+			// Expected to fail, we just want to check the metadata
+		}
+
+		// Check that the initial request contains expires_at in Upload-Metadata
+		expect(global.fetch).toHaveBeenCalledTimes(1);
+		const initialCall = (global.fetch as jest.Mock).mock.calls[0];
+		const uploadMetadata = initialCall[1].headers["Upload-Metadata"];
+
+		// The metadata should contain base64 encoded expires_at
+		expect(uploadMetadata).toContain("expires_at");
+		expect(uploadMetadata).toContain(btoa(futureTimestamp.toString()));
 	});
 });

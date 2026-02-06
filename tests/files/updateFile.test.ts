@@ -249,4 +249,97 @@ describe("updateFile function", () => {
 			expect.any(Object),
 		);
 	});
+
+	it("should update file with only expires_at", async () => {
+		const futureTimestamp = Math.floor(Date.now() / 1000) + 86400; // 24 hours from now
+		const expiresAtOptions: UpdateFileOptions = {
+			id: "testId",
+			expires_at: futureTimestamp,
+		};
+
+		const mockResponse: FileListItem = {
+			id: "testId",
+			name: "Test File",
+			cid: "QmTest...",
+			size: 1000,
+			number_of_files: 1,
+			mime_type: "text/plain",
+			group_id: "groupId",
+			created_at: "2023-01-01T00:00:00Z",
+			keyvalues: {},
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await updateFile(mockConfig, expiresAtOptions, "public");
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/files/public/testId",
+			expect.objectContaining({
+				method: "PUT",
+				headers: expect.objectContaining({
+					Authorization: `Bearer ${mockConfig.pinataJwt}`,
+				}),
+				body: JSON.stringify({
+					expires_at: futureTimestamp,
+				}),
+			}),
+		);
+		expect(result).toEqual(mockResponse);
+	});
+
+	it("should update file with expires_at combined with name and keyvalues", async () => {
+		const futureTimestamp = Math.floor(Date.now() / 1000) + 86400;
+		const combinedOptions: UpdateFileOptions = {
+			id: "testId",
+			name: "Updated Name",
+			keyvalues: { key: "value" },
+			expires_at: futureTimestamp,
+		};
+
+		const mockResponse: FileListItem = {
+			id: "testId",
+			name: "Updated Name",
+			cid: "QmTest...",
+			size: 1000,
+			number_of_files: 1,
+			mime_type: "text/plain",
+			group_id: "groupId",
+			created_at: "2023-01-01T00:00:00Z",
+			keyvalues: { key: "value" },
+		};
+
+		global.fetch = jest.fn().mockResolvedValueOnce({
+			ok: true,
+			json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+		});
+
+		const result = await updateFile(mockConfig, combinedOptions, "private");
+
+		expect(global.fetch).toHaveBeenCalledWith(
+			"https://api.pinata.cloud/v3/files/private/testId",
+			expect.objectContaining({
+				method: "PUT",
+				body: JSON.stringify({
+					name: "Updated Name",
+					keyvalues: { key: "value" },
+					expires_at: futureTimestamp,
+				}),
+			}),
+		);
+		expect(result).toEqual(mockResponse);
+	});
+
+	it("should throw ValidationError if no name, keyvalues, or expires_at provided", async () => {
+		const invalidOptions: UpdateFileOptions = {
+			id: "testId",
+		};
+
+		await expect(
+			updateFile(mockConfig, invalidOptions, "public"),
+		).rejects.toThrow(ValidationError);
+	});
 });

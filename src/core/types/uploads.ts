@@ -32,6 +32,10 @@ export type UploadOptions = {
 	 * CID version "v1" or "v0" (defaults to v1 if falsy)
 	 */
 	cid_version?: CidVersion;
+	/**
+	 * Unix timestamp (in seconds) when the file should expire (must be in the future)
+	 */
+	expires_at?: number;
 };
 
 export type SignedUploadUrlOptions = {
