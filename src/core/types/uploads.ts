@@ -46,7 +46,28 @@ export type SignedUploadUrlOptions = {
 	keyvalues?: Record<string, string>;
 	vectorize?: boolean;
 	maxFileSize?: number;
+	/**
+	 * Restrict the signed URL to specific MIME types.
+	 *
+	 * NOTE: For directory uploads (e.g. `pinata.upload.public.fileArray(...).url(...)`),
+	 * this array MUST include the synthetic `"directory"` MIME type — otherwise the
+	 * upload will be rejected with `400 "Presigned URL does not grant permissions to
+	 * upload detected MIME type: directory"`. Aliases like `application/x-directory` or
+	 * `inode/directory` are NOT accepted, and a wildcard (`["*"]` / `["*\/*"]`) does not
+	 * cover it.
+	 *
+	 * Example: `mimeTypes: ["directory"]` (or `["directory", "text/plain"]` to also
+	 * allow plain-text files inside the directory).
+	 */
 	mimeTypes?: string[];
+	/**
+	 * Mint this signed URL for directory uploads (e.g. `fileArray(...).url(...)`).
+	 *
+	 * Adds `"directory"` to `mimeTypes` so the API permits the synthetic directory
+	 * MIME type. Any other entries in `mimeTypes` are preserved, so you can both
+	 * allow a directory and constrain the file types inside it.
+	 */
+	forDirectory?: boolean;
 	streamable?: boolean;
 	car?: boolean;
 	/**

@@ -21,6 +21,104 @@ export const uploadFileArray = async (
 
 	const folder = options?.metadata?.name || "folder_from_sdk";
 
+	let headers: Record<string, string>;
+
+	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			...config.customHeaders,
+		};
+	} else {
+		headers = {
+			Authorization: `Bearer ${jwt}`,
+			Source: "sdk/fileArray",
+		};
+	}
+
+	if (options?.url) {
+		const data = new FormData();
+
+		for (const file of Array.from(files)) {
+			const path = file.webkitRelativePath || `${folder}/${file.name}`;
+			data.append("file", file, path);
+		}
+
+		data.append("network", network);
+		data.append("name", folder);
+
+		if (options.groupId) {
+			data.append("group_id", options.groupId);
+		}
+
+		if (options.metadata?.keyvalues) {
+			data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+		}
+
+		if (options.streamable) {
+			data.append("streamable", "true");
+		}
+
+		if (options.car) {
+			data.append("car", "true");
+		}
+
+		if (options.cid_version !== undefined) {
+			data.append("cid_version", options.cid_version.toString());
+		}
+
+		if (options.expires_at !== undefined) {
+			data.append("expires_at", options.expires_at.toString());
+		}
+
+		try {
+			const url = new URL(options.url);
+
+			const request = await fetch(url.toString(), {
+				method: "POST",
+				headers: headers,
+				body: data,
+			});
+
+			if (!request.ok) {
+				const errorData = await request.text();
+				if (request.status === 401 || request.status === 403) {
+					throw new AuthenticationError(
+						`Authentication failed: ${errorData}`,
+						request.status,
+						{
+							error: errorData,
+							code: "AUTH_ERROR",
+							metadata: {
+								requestUrl: request.url,
+							},
+						},
+					);
+				}
+				throw new NetworkError(`HTTP error: ${errorData}`, request.status, {
+					error: errorData,
+					code: "HTTP_ERROR",
+					metadata: {
+						requestUrl: request.url,
+					},
+				});
+			}
+
+			const res = await request.json();
+			const resData: UploadResponse = res.data;
+			return resData;
+		} catch (error) {
+			if (error instanceof PinataError) {
+				throw error;
+			}
+			if (error instanceof Error) {
+				throw new PinataError(`Error processing fileArray: ${error.message}`);
+			}
+			throw new PinataError(
+				"An unknown error occurred while uploading an array of files",
+			);
+		}
+	}
+
 	const data = new FormData();
 
 	for (const file of Array.from(files)) {
@@ -58,19 +156,6 @@ export const uploadFileArray = async (
 		}),
 	);
 
-	let headers: Record<string, string>;
-
-	if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
-		headers = {
-			Authorization: `Bearer ${jwt}`,
-			...config.customHeaders,
-		};
-	} else {
-		headers = {
-			Authorization: `Bearer ${jwt}`,
-			Source: "sdk/fileArray",
-		};
-	}
 	// Reserved for later release
 	//let endpoint: string = "https://uploads.pinata.cloud/v3";
 	let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
