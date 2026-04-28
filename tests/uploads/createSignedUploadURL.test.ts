@@ -213,5 +213,4 @@ describe("createSignedUploadURL function", () => {
 
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
-
 });

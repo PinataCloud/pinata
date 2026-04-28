@@ -162,7 +162,9 @@ describe("uploadFileArray function", () => {
 				json: jest.fn().mockResolvedValueOnce({ data: mockV3Response }),
 			});
 
-			await uploadFileArray(mockConfig, mockFiles, "public", { url: signedUrl });
+			await uploadFileArray(mockConfig, mockFiles, "public", {
+				url: signedUrl,
+			});
 
 			const calls = (global.fetch as jest.Mock).mock.calls;
 			for (const call of calls) {
@@ -248,12 +250,9 @@ describe("uploadFileArray function", () => {
 				json: jest.fn().mockResolvedValueOnce({ data: mockV3Response }),
 			});
 
-			await uploadFileArray(
-				{ pinataJwt: "" },
-				mockFiles,
-				"public",
-				{ url: "https://uploads.pinata.cloud/v3/files/test" },
-			);
+			await uploadFileArray({ pinataJwt: "" }, mockFiles, "public", {
+				url: "https://uploads.pinata.cloud/v3/files/test",
+			});
 
 			const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
 			expect(fetchCall[1].headers.Authorization).toBe("Bearer ");
