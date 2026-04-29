@@ -58,8 +58,12 @@ export const createSignedUploadURL = async (
 		payload.max_file_size = options.maxFileSize;
 	}
 
-	if (options.mimeTypes) {
-		payload.allow_mime_types = options.mimeTypes;
+	if (options.mimeTypes || options.forDirectory) {
+		const types = new Set(options.mimeTypes ?? []);
+		if (options.forDirectory) {
+			types.add("directory");
+		}
+		payload.allow_mime_types = Array.from(types);
 	}
 
 	let endpoint: string = "https://uploads.pinata.cloud/v3";
