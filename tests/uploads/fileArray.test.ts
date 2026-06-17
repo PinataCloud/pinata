@@ -34,20 +34,7 @@ describe("uploadFileArray function", () => {
 		new File(["two"], "b.txt", { type: "text/plain" }),
 	];
 
-	// Legacy pinFileToIPFS shape (PascalCase keys)
-	const mockLegacyResponse = {
-		ID: "legacy-id",
-		Name: "folder_from_sdk",
-		IpfsHash: "QmLegacyDirectory",
-		PinSize: 246,
-		Timestamp: "2023-01-01T00:00:00Z",
-		NumberOfFiles: 2,
-		MimeType: "directory",
-		GroupId: null,
-		Keyvalues: {},
-	};
-
-	// v3 envelope-style response (returned by signed-URL endpoint)
+	// v3 envelope-style response shape returned by uploads.pinata.cloud/v3/files
 	const mockV3Response: UploadResponse = {
 		id: "v3-id",
 		name: "folder_from_sdk",
@@ -68,31 +55,18 @@ describe("uploadFileArray function", () => {
 		).rejects.toThrow(ValidationError);
 	});
 
-	describe("legacy pinFileToIPFS path", () => {
-		it("should POST to pinFileToIPFS and remap response", async () => {
+	describe("default v3 path", () => {
+		it("should POST to uploads.pinata.cloud/v3/files and unwrap res.data", async () => {
 			global.fetch = jest.fn().mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce(mockLegacyResponse),
+				json: jest.fn().mockResolvedValueOnce({ data: mockV3Response }),
 			});
 
 			const result = await uploadFileArray(mockConfig, mockFiles, "public");
 
-			expect(result).toEqual({
-				id: "legacy-id",
-				name: "folder_from_sdk",
-				cid: "QmLegacyDirectory",
-				size: 246,
-				created_at: "2023-01-01T00:00:00Z",
-				number_of_files: 2,
-				mime_type: "directory",
-				group_id: null,
-				keyvalues: {},
-				vectorized: false,
-				network: "public",
-			});
-
+			expect(result).toEqual(mockV3Response);
 			expect(global.fetch).toHaveBeenCalledWith(
-				"https://api.pinata.cloud/pinning/pinFileToIPFS",
+				"https://uploads.pinata.cloud/v3/files",
 				expect.objectContaining({
 					method: "POST",
 					headers: {
@@ -102,35 +76,123 @@ describe("uploadFileArray function", () => {
 					body: expect.any(FormData),
 				}),
 			);
+		});
+
+		it("should send the v3 directory shape and not legacy pinata* fields", async () => {
+			global.fetch = jest.fn().mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: mockV3Response }),
+			});
+
+			await uploadFileArray(mockConfig, mockFiles, "public", {
+				groupId: "group-1",
+				metadata: {
+					name: "my-folder",
+					keyvalues: { env: "prod" },
+				},
+				cid_version: "v1" as CidVersion,
+				expires_at: 1735689600,
+				streamable: true,
+				car: true,
+			});
 
 			const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
 			const formData = fetchCall[1].body as FormData;
-			const fileEntries = formData.getAll("file");
-			expect(fileEntries).toHaveLength(2);
 
-			const metadata = JSON.parse(formData.get("pinataMetadata") as string);
-			expect(metadata.name).toBe("folder_from_sdk");
+			expect(formData.get("name")).toBe("my-folder");
+			expect(formData.get("network")).toBe("public");
+			expect(formData.get("group_id")).toBe("group-1");
+			expect(formData.get("keyvalues")).toBe(JSON.stringify({ env: "prod" }));
+			expect(formData.get("cid_version")).toBe("v1");
+			expect(formData.get("expires_at")).toBe("1735689600");
+			expect(formData.get("streamable")).toBe("true");
+			expect(formData.get("car")).toBe("true");
 
-			const opts = JSON.parse(formData.get("pinataOptions") as string);
-			expect(opts.cidVersion).toBe(1);
+			expect(formData.get("pinataMetadata")).toBeNull();
+			expect(formData.get("pinataOptions")).toBeNull();
 		});
 
-		it("should respect a custom legacyUploadUrl", async () => {
+		it("should never hit the legacy pinFileToIPFS endpoint", async () => {
 			global.fetch = jest.fn().mockResolvedValueOnce({
 				ok: true,
-				json: jest.fn().mockResolvedValueOnce(mockLegacyResponse),
+				json: jest.fn().mockResolvedValueOnce({ data: mockV3Response }),
+			});
+
+			await uploadFileArray(mockConfig, mockFiles, "public");
+
+			const calls = (global.fetch as jest.Mock).mock.calls;
+			for (const call of calls) {
+				expect(call[0]).not.toContain("api.pinata.cloud/pinning/pinFileToIPFS");
+			}
+		});
+
+		it("should respect a custom config.uploadUrl", async () => {
+			global.fetch = jest.fn().mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: mockV3Response }),
 			});
 
 			await uploadFileArray(
-				{ ...mockConfig, legacyUploadUrl: "https://custom.example/legacy" },
+				{ ...mockConfig, uploadUrl: "https://custom.example/v3" },
 				mockFiles,
 				"public",
 			);
 
 			expect(global.fetch).toHaveBeenCalledWith(
-				"https://custom.example/legacy",
+				"https://custom.example/v3/files",
 				expect.any(Object),
 			);
+		});
+
+		it("should pass network=private through to FormData", async () => {
+			global.fetch = jest.fn().mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({
+					data: { ...mockV3Response, network: "private" },
+				}),
+			});
+
+			await uploadFileArray(mockConfig, mockFiles, "private");
+
+			const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+			const formData = fetchCall[1].body as FormData;
+			expect(formData.get("network")).toBe("private");
+		});
+
+		it("should throw AuthenticationError on 401", async () => {
+			global.fetch = jest.fn().mockResolvedValueOnce({
+				ok: false,
+				status: 401,
+				url: "https://uploads.pinata.cloud/v3/files",
+				text: jest.fn().mockResolvedValueOnce("Unauthorized"),
+			});
+
+			await expect(
+				uploadFileArray(mockConfig, mockFiles, "public"),
+			).rejects.toThrow(AuthenticationError);
+		});
+
+		it("should throw NetworkError on non-auth error response", async () => {
+			global.fetch = jest.fn().mockResolvedValueOnce({
+				ok: false,
+				status: 500,
+				url: "https://uploads.pinata.cloud/v3/files",
+				text: jest.fn().mockResolvedValueOnce("Server Error"),
+			});
+
+			await expect(
+				uploadFileArray(mockConfig, mockFiles, "public"),
+			).rejects.toThrow(NetworkError);
+		});
+
+		it("should throw PinataError when fetch itself rejects", async () => {
+			global.fetch = jest
+				.fn()
+				.mockRejectedValueOnce(new Error("Network failure"));
+
+			await expect(
+				uploadFileArray(mockConfig, mockFiles, "public"),
+			).rejects.toThrow(PinataError);
 		});
 	});
 
