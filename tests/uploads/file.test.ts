@@ -472,4 +472,263 @@ describe("uploadFile function", () => {
 		expect(uploadMetadata).toContain("expires_at");
 		expect(uploadMetadata).toContain(btoa(futureTimestamp.toString()));
 	});
+
+	describe("chunked upload recovery", () => {
+		// Just over the 90 MiB threshold, so the file goes through TUS in two chunks
+		const largeSize = 94371841;
+		const chunkSize = 50 * 1024 * 1024 + 1;
+		const uploadUrl = "https://uploads.pinata.cloud/v3/files/file-id/large.bin";
+		let largeFile: File;
+		let setTimeoutSpy: jest.SpyInstance;
+
+		beforeAll(() => {
+			largeFile = new File([new ArrayBuffer(largeSize)], "large.bin", {
+				type: "application/octet-stream",
+			});
+		});
+
+		beforeEach(() => {
+			// Skip the retry backoff
+			setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
+				callback: () => void,
+			) => {
+				callback();
+				return 0;
+			}) as unknown as typeof setTimeout);
+		});
+
+		afterEach(() => {
+			setTimeoutSpy.mockRestore();
+		});
+
+		const created = () =>
+			new Response(null, { status: 201, headers: { Location: uploadUrl } });
+		const accepted = (offset: number, cid?: string) =>
+			new Response(null, {
+				status: 204,
+				headers: {
+					"Upload-Offset": offset.toString(),
+					...(cid ? { "Upload-Cid": cid } : {}),
+				},
+			});
+		const uploadStatus = (offset: number, cid?: string) =>
+			new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": offset.toString(),
+					"Upload-Length": largeSize.toString(),
+					...(cid ? { "Upload-Cid": cid } : {}),
+				},
+			});
+		const fileInfo = () =>
+			new Response(JSON.stringify({ data: { files: [mockResponse] } }), {
+				status: 200,
+			});
+
+		// Answers each request with the next step and records what was sent
+		const script = (...steps: Array<Response | Error>) => {
+			const calls: {
+				method: string;
+				url: string;
+				offset?: string;
+				size?: number;
+			}[] = [];
+			global.fetch = jest.fn(async (url: any, init?: any) => {
+				calls.push({
+					method: init?.method ?? "GET",
+					url: url.toString(),
+					offset: init?.headers?.["Upload-Offset"],
+					size: init?.body?.size,
+				});
+				const step = steps.shift();
+				if (!step) {
+					throw new Error("unexpected request");
+				}
+				if (step instanceof Error) {
+					throw step;
+				}
+				return step;
+			}) as jest.Mock;
+			return calls;
+		};
+
+		it("finishes with the CID from HEAD when the last chunk's response is lost", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize),
+				new Error("socket hang up"),
+				uploadStatus(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			const result = await uploadFile(mockConfig, largeFile, "public");
+
+			expect(result).toEqual(mockResponse);
+			expect(calls.map((c) => c.method)).toEqual([
+				"POST",
+				"PATCH",
+				"PATCH",
+				"HEAD",
+				"GET",
+			]);
+			expect(calls[3].url).toBe(uploadUrl);
+			expect(calls[4].url).toContain("cid=bafyfinal");
+		});
+
+		it("continues from the offset the server reports after a failed PATCH", async () => {
+			const stored = 10 * 1024 * 1024;
+			const calls = script(
+				created(),
+				new Error("connection reset"),
+				uploadStatus(stored),
+				accepted(stored + chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			await uploadFile(mockConfig, largeFile, "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual([
+				"0",
+				stored.toString(),
+				(stored + chunkSize).toString(),
+			]);
+			expect(patches.map((c) => c.size)).toEqual([
+				chunkSize,
+				chunkSize,
+				largeSize - stored - chunkSize,
+			]);
+		});
+
+		it("resends the chunk when the server stored nothing and answered 503", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize),
+				new Response("body ended early", { status: 503 }),
+				uploadStatus(chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			await uploadFile(mockConfig, largeFile, "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual([
+				"0",
+				chunkSize.toString(),
+				chunkSize.toString(),
+			]);
+		});
+
+		it("follows the Upload-Offset of a 204 that stored only part of the chunk", async () => {
+			const calls = script(
+				created(),
+				accepted(1000),
+				accepted(1000 + chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			await uploadFile(mockConfig, largeFile, "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual([
+				"0",
+				"1000",
+				(1000 + chunkSize).toString(),
+			]);
+		});
+
+		it("retries at its own offset when HEAD cannot answer", async () => {
+			const calls = script(
+				created(),
+				new Error("socket hang up"),
+				new Response(null, { status: 503 }),
+				accepted(chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			await uploadFile(mockConfig, largeFile, "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual([
+				"0",
+				"0",
+				chunkSize.toString(),
+			]);
+		});
+
+		it("throws when the server has every byte but returns no CID", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize),
+				new Error("socket hang up"),
+				uploadStatus(largeSize),
+			);
+
+			await expect(uploadFile(mockConfig, largeFile, "public")).rejects.toThrow(
+				"did not return its CID",
+			);
+			expect(calls.map((c) => c.method)).toEqual([
+				"POST",
+				"PATCH",
+				"PATCH",
+				"HEAD",
+			]);
+		});
+
+		it("throws when the upload no longer exists", async () => {
+			const calls = script(
+				created(),
+				new Error("socket hang up"),
+				new Response(null, { status: 404 }),
+			);
+
+			await expect(uploadFile(mockConfig, largeFile, "public")).rejects.toThrow(
+				NetworkError,
+			);
+			expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH", "HEAD"]);
+		});
+
+		it("gives up after 5 retries", async () => {
+			const steps: Response[] = [created()];
+			for (let i = 0; i < 5; i++) {
+				steps.push(new Response("boom", { status: 500 }), uploadStatus(0));
+			}
+			steps.push(new Response("boom", { status: 500 }));
+			const calls = script(...steps);
+
+			await expect(uploadFile(mockConfig, largeFile, "public")).rejects.toThrow(
+				"after 5 retries",
+			);
+			expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(6);
+			expect(calls.filter((c) => c.method === "HEAD")).toHaveLength(5);
+		});
+
+		it("resets the retry budget when HEAD shows the server stored more", async () => {
+			// Every PATCH response is lost, but the server stores 1000 more bytes each time
+			const steps: Response[] = [created()];
+			for (let i = 1; i <= 6; i++) {
+				steps.push(
+					new Response("lost", { status: 502 }),
+					uploadStatus(i * 1000),
+				);
+			}
+			steps.push(accepted(largeSize, "bafyfinal"), fileInfo());
+			const calls = script(...steps);
+
+			await uploadFile(mockConfig, largeFile, "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual(
+				[0, 1000, 2000, 3000, 4000, 5000, 6000].map(String),
+			);
+			// The backoff starts over too
+			expect(setTimeoutSpy.mock.calls.map((c) => c[1])).toEqual(
+				Array(6).fill(1000),
+			);
+		});
+	});
 });

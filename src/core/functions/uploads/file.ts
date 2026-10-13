@@ -6,6 +6,58 @@ import {
 	ValidationError,
 } from "../../../utils/custom-errors";
 
+// Reads a TUS Upload-Offset header. Returns undefined unless it is a whole
+// number between 0 and the file size.
+const parseUploadOffset = (
+	headers: Headers,
+	size: number,
+): number | undefined => {
+	const value = headers.get("upload-offset");
+	if (value === null || !/^\d+$/.test(value)) {
+		return undefined;
+	}
+	const offset = Number(value);
+	return Number.isSafeInteger(offset) && offset <= size ? offset : undefined;
+};
+
+// Asks the server how much of a resumable upload it has stored (TUS HEAD).
+// Returns undefined when the server cannot tell right now, so the caller retries
+// at its own offset. Throws when the upload no longer exists, because no retry
+// can succeed then.
+const getUploadStatus = async (
+	url: string,
+	headers: Record<string, string>,
+	size: number,
+): Promise<{ offset: number; cid: string | null } | undefined> => {
+	let res: Response;
+	try {
+		res = await fetch(url, { method: "HEAD", headers });
+	} catch {
+		return undefined;
+	}
+	if (res.status === 404 || res.status === 410) {
+		throw new NetworkError(
+			"The upload no longer exists on the server",
+			res.status,
+			{
+				error: `HEAD returned ${res.status}`,
+				code: "HTTP_ERROR",
+				metadata: {
+					requestUrl: res.url || url,
+				},
+			},
+		);
+	}
+	if (!res.ok) {
+		return undefined;
+	}
+	const offset = parseUploadOffset(res.headers, size);
+	if (offset === undefined) {
+		return undefined;
+	}
+	return { offset, cid: res.headers.get("upload-cid") };
+};
+
 export const uploadFile = async (
 	config: PinataConfig | undefined,
 	file: File,
@@ -103,128 +155,169 @@ export const uploadFile = async (
 		}
 
 		const chunkSize = 50 * 1024 * 1024 + 1; // 50MB in bytes
-		const totalChunks = Math.ceil(file.size / chunkSize);
+		const maxRetries = 5;
 		let offset = 0;
-		let uploadReq: any;
+		let failures = 0;
+		let cid: string | null = null;
 
-		for (let i = 0; i < totalChunks; i++) {
+		while (offset < file.size) {
 			const chunk = file.slice(offset, offset + chunkSize);
-			let retryCount = 0;
-			const maxRetries = 5;
+			let failure: { status: number; error: string; requestUrl: string };
 
-			while (retryCount <= maxRetries) {
-				try {
-					uploadReq = await fetch(url!, {
-						method: "PATCH",
-						headers: {
-							"Content-Type": "application/offset+octet-stream",
-							"Upload-Offset": offset.toString(),
-							...headers,
-						},
-						body: chunk,
-					});
-
-					if (uploadReq.ok) {
-						break;
-					} else {
-						const errorData = await uploadReq.text();
-						throw new Error(`HTTP ${uploadReq.status}: ${errorData}`);
-					}
-				} catch (error) {
-					retryCount++;
-
-					if (retryCount > maxRetries) {
-						// All retries exhausted - throw final error
-						const errorData = uploadReq
-							? await uploadReq.text().catch(() => "Unknown error")
-							: error instanceof Error
-								? error.message
-								: String(error);
-						throw new NetworkError(
-							`HTTP error during chunk upload after ${maxRetries} retries: ${errorData}`,
-							uploadReq?.status || 0,
-							{
-								error: errorData,
-								code: "HTTP_ERROR",
-								metadata: {
-									requestUrl: uploadReq?.url || url,
-									retriesAttempted: maxRetries,
-								},
-							},
-						);
-					}
-					const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000); // Cap at 10 seconds
-					await new Promise((resolve) => setTimeout(resolve, delay));
-				}
-			}
-			offset += chunk.size;
-		}
-
-		if (uploadReq.status === 204) {
-			const cid = uploadReq.headers.get("upload-cid");
-			if (!config.pinataJwt) {
-				const data: UploadResponse = {
-					id: "",
-					name: "",
-					cid: cid,
-					size: file.size,
-					created_at: "",
-					number_of_files: 1,
-					group_id: null,
-					mime_type: "",
-					keyvalues: {},
-					vectorized: false,
-					network: "",
-				};
-				return data;
-			}
-			let dataEndpoint: string;
-			if (config.endpointUrl) {
-				dataEndpoint = config.endpointUrl;
-			} else {
-				dataEndpoint = "https://api.pinata.cloud/v3";
-			}
-			const fileInfoReq = await fetch(
-				`${dataEndpoint}/files/${network}?cid=${cid}`,
-				{
-					method: "GET",
+			try {
+				const uploadReq = await fetch(url, {
+					method: "PATCH",
 					headers: {
-						Authorization: `Bearer ${jwt}`,
+						"Content-Type": "application/offset+octet-stream",
+						"Upload-Offset": offset.toString(),
+						...headers,
 					},
-				},
-			);
-			const fileInfo = await fileInfoReq.json();
-			const data: UploadResponse = fileInfo.data.files[0];
-			if (options?.vectorize) {
-				const vectorReq = await fetch(
-					`${endpoint}/vectorize/files/${data.id}`,
+					body: chunk,
+				});
+
+				if (uploadReq.ok) {
+					// The server's Upload-Offset wins over our own count: it can be lower than
+					// the end of this chunk (only part of the body was stored) or the full length
+					// (the server replayed an upload that had already finished).
+					const next =
+						parseUploadOffset(uploadReq.headers, file.size) ??
+						offset + chunk.size;
+					if (next > offset) {
+						offset = next;
+						failures = 0;
+						if (offset === file.size) {
+							cid = uploadReq.headers.get("upload-cid");
+						}
+						continue;
+					}
+					failure = {
+						status: uploadReq.status,
+						error: "the server did not accept any bytes of the chunk",
+						requestUrl: uploadReq.url || url,
+					};
+				} else {
+					failure = {
+						status: uploadReq.status,
+						error: await uploadReq.text().catch(() => "Unknown error"),
+						requestUrl: uploadReq.url || url,
+					};
+				}
+			} catch (error) {
+				failure = {
+					status: 0,
+					error: error instanceof Error ? error.message : String(error),
+					requestUrl: url,
+				};
+			}
+
+			failures++;
+			if (failures > maxRetries) {
+				throw new NetworkError(
+					`HTTP error during chunk upload after ${maxRetries} retries: ${failure.error}`,
+					failure.status,
 					{
-						method: "POST",
-						headers: {
-							Authorization: `Bearer ${jwt}`,
+						error: failure.error,
+						code: "HTTP_ERROR",
+						metadata: {
+							requestUrl: failure.requestUrl,
+							retriesAttempted: maxRetries,
 						},
 					},
 				);
-				if (vectorReq.ok) {
-					data.vectorized = true;
-					return data;
-				} else {
-					const errorData = await vectorReq.text();
-					throw new NetworkError(
-						`HTTP error during vectorization: ${errorData}`,
-						vectorReq.status,
-						{
-							error: errorData,
-							code: "HTTP_ERROR",
-							metadata: {
-								requestUrl: vectorReq.url,
-							},
-						},
-					);
+			}
+			const delay = Math.min(1000 * Math.pow(2, failures - 1), 10000); // Cap at 10 seconds
+			await new Promise((resolve) => setTimeout(resolve, delay));
+
+			// The failed PATCH may have been stored, in full or in part, before its
+			// response was lost. Ask the server where the upload stands and continue
+			// from there, instead of resending at our own offset (TUS: HEAD after a failure).
+			const status = await getUploadStatus(url, headers, file.size);
+			if (status) {
+				// The server stored more of the upload, so this retry made progress. Reset
+				// the retry budget and the backoff, as tus-js-client does.
+				if (status.offset > offset) {
+					failures = 0;
+				}
+				offset = status.offset;
+				if (offset === file.size) {
+					cid = status.cid;
 				}
 			}
+		}
+
+		if (!cid) {
+			throw new NetworkError(
+				"The server has every byte of the upload, but did not return its CID",
+				0,
+				{
+					error: "missing upload-cid",
+					code: "HTTP_ERROR",
+					metadata: {
+						requestUrl: url,
+					},
+				},
+			);
+		}
+
+		if (!config.pinataJwt) {
+			const data: UploadResponse = {
+				id: "",
+				name: "",
+				cid: cid,
+				size: file.size,
+				created_at: "",
+				number_of_files: 1,
+				group_id: null,
+				mime_type: "",
+				keyvalues: {},
+				vectorized: false,
+				network: "",
+			};
 			return data;
 		}
+		let dataEndpoint: string;
+		if (config.endpointUrl) {
+			dataEndpoint = config.endpointUrl;
+		} else {
+			dataEndpoint = "https://api.pinata.cloud/v3";
+		}
+		const fileInfoReq = await fetch(
+			`${dataEndpoint}/files/${network}?cid=${cid}`,
+			{
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${jwt}`,
+				},
+			},
+		);
+		const fileInfo = await fileInfoReq.json();
+		const data: UploadResponse = fileInfo.data.files[0];
+		if (options?.vectorize) {
+			const vectorReq = await fetch(`${endpoint}/vectorize/files/${data.id}`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${jwt}`,
+				},
+			});
+			if (vectorReq.ok) {
+				data.vectorized = true;
+				return data;
+			} else {
+				const errorData = await vectorReq.text();
+				throw new NetworkError(
+					`HTTP error during vectorization: ${errorData}`,
+					vectorReq.status,
+					{
+						error: errorData,
+						code: "HTTP_ERROR",
+						metadata: {
+							requestUrl: vectorReq.url,
+						},
+					},
+				);
+			}
+		}
+		return data;
 	}
 
 	let headers: Record<string, string>;
