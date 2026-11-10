@@ -72,6 +72,26 @@ describe("uploadFile function", () => {
 		);
 	});
 
+	it("vectorizes a file up to 90 MiB even with waitForCid: false, which only applies to larger files", async () => {
+		global.fetch = jest
+			.fn()
+			.mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+			})
+			.mockResolvedValueOnce({ ok: true });
+
+		const result = await uploadFile(mockConfig, mockFile, "public", {
+			waitForCid: false,
+			vectorize: true,
+		});
+
+		expect(result).toMatchObject({ cid: mockResponse.cid, vectorized: true });
+		expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain(
+			`/vectorize/files/${mockResponse.id}`,
+		);
+	});
+
 	it("should handle upload options for private network", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom File Name",
@@ -729,6 +749,156 @@ describe("uploadFile function", () => {
 			expect(setTimeoutSpy.mock.calls.map((c) => c[1])).toEqual(
 				Array(6).fill(1000),
 			);
+		});
+
+		describe("on a server that registers the file after its last byte", () => {
+			// The last PATCH answers before the file is registered
+			const received = (cid?: string) =>
+				new Response(null, {
+					status: 204,
+					headers: {
+						"Upload-Offset": largeSize.toString(),
+						"Upload-Status": "processing",
+						...(cid ? { "Upload-Cid": cid } : {}),
+					},
+				});
+			const head = (status: string, cid?: string, error?: string) =>
+				new Response(null, {
+					status: 200,
+					headers: {
+						"Upload-Offset": largeSize.toString(),
+						"Upload-Status": status,
+						...(cid ? { "Upload-Cid": cid } : {}),
+						...(error ? { "Upload-Error": error } : {}),
+					},
+				});
+
+			it("looks the file up only once HEAD reports it ready", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received("bafyfinal"),
+					head("processing"),
+					head("ready", "bafyfinal"),
+					fileInfo(),
+				);
+
+				const result = await uploadFile(mockConfig, largeFile, "public");
+
+				expect(result).toEqual(mockResponse);
+				expect(calls.map((c) => c.method)).toEqual([
+					"POST",
+					"PATCH",
+					"PATCH",
+					"HEAD",
+					"HEAD",
+					"GET",
+				]);
+				expect(calls[5].url).toContain("cid=bafyfinal");
+				// The server routes only clients that prefer async completion to that path
+				expect(
+					(global.fetch as jest.Mock).mock.calls[0][1].headers.Prefer,
+				).toBe("respond-async");
+			});
+
+			it("waits for the CID when the last PATCH returns none", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received(),
+					head("ready", "bafyfinal"),
+					fileInfo(),
+				);
+
+				await uploadFile(mockConfig, largeFile, "public");
+
+				expect(calls[4].url).toContain("cid=bafyfinal");
+			});
+
+			it("throws when the upload fails after its last byte", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received("bafyfinal"),
+					head("failed", undefined, "stored copy differs"),
+				);
+
+				await expect(
+					uploadFile(mockConfig, largeFile, "public"),
+				).rejects.toThrow("not registered: stored copy differs");
+				expect(calls.some((c) => c.method === "GET")).toBe(false);
+			});
+
+			it("gives up when the upload is never registered", async () => {
+				// Every Date.now() is 5 minutes later; the deadline is 11 minutes for <1 GiB
+				let now = 0;
+				const clock = jest.spyOn(Date, "now").mockImplementation(() => {
+					now += 5 * 60 * 1000;
+					return now;
+				});
+				try {
+					const calls = script(
+						created(),
+						accepted(chunkSize),
+						received("bafyfinal"),
+						head("processing"),
+						head("processing"),
+						head("processing"),
+					);
+
+					await expect(
+						uploadFile(mockConfig, largeFile, "public"),
+					).rejects.toThrow(
+						"Timed out waiting for the upload to be registered",
+					);
+					expect(calls.some((c) => c.method === "GET")).toBe(false);
+				} finally {
+					clock.mockRestore();
+				}
+			});
+
+			it("returns the last chunk's CID without waiting when waitForCid is false", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received("bafyearly"),
+				);
+
+				const result = await uploadFile(mockConfig, largeFile, "public", {
+					waitForCid: false,
+				});
+
+				expect(result).toMatchObject({ cid: "bafyearly", size: largeSize });
+				expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH", "PATCH"]);
+			});
+		});
+
+		it("ignores waitForCid: false on a server that registers the file on the last PATCH", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			const result = await uploadFile(mockConfig, largeFile, "public", {
+				waitForCid: false,
+			});
+
+			expect(result).toEqual(mockResponse);
+			expect(calls[3].url).toContain("cid=bafyfinal");
+		});
+
+		it("rejects waitForCid: false with vectorize before uploading", async () => {
+			const calls = script();
+
+			await expect(
+				uploadFile(mockConfig, largeFile, "public", {
+					waitForCid: false,
+					vectorize: true,
+				}),
+			).rejects.toThrow(ValidationError);
+			expect(calls).toHaveLength(0);
 		});
 	});
 });

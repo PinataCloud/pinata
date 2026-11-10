@@ -6,6 +6,7 @@ import {
 	type UploadResult,
 	type ReactUploadOptions,
 } from "../types";
+import { waitForRegistration } from "../../core/functions/uploads/tusStatus";
 
 const LARGE_FILE_THRESHOLD = 94371840; // ~90MB
 const BASE_CHUNK_SIZE = 262144; // 256KB
@@ -35,6 +36,18 @@ export const useUpload = (): UseUploadReturn => {
 	const headersRef = useRef<Record<string, string>>({});
 	const lastResponseHeadersRef = useRef<Headers | null>(null);
 	const chunkSizeRef = useRef<number>(BASE_CHUNK_SIZE * DEFAULT_CHUNKS);
+	const waitForCidRef = useRef<boolean>(true);
+	// Identifies the current upload: a wait for registration that outlives it (cancel, a new
+	// upload, unmount) must not publish its result.
+	const runRef = useRef<number>(0);
+	const waitAbortRef = useRef<AbortController | null>(null);
+
+	// Ends the current upload's wait for registration, if any.
+	const stopWaiting = () => {
+		runRef.current++;
+		waitAbortRef.current?.abort();
+		waitAbortRef.current = null;
+	};
 
 	const resetState = useCallback(() => {
 		setProgress(0);
@@ -60,6 +73,7 @@ export const useUpload = (): UseUploadReturn => {
 
 	const cancel = useCallback(() => {
 		cancelledRef.current = true;
+		stopWaiting();
 		setLoading(false);
 	}, []);
 
@@ -135,22 +149,40 @@ export const useUpload = (): UseUploadReturn => {
 
 	// Finalize upload and get response
 	const finalizeUpload = useCallback(async () => {
-		if (!uploadUrlRef.current || !fileRef.current) return;
+		// Cancelled while its last chunk was in flight.
+		if (!uploadUrlRef.current || !fileRef.current || cancelledRef.current)
+			return;
 
+		const run = runRef.current;
 		try {
 			// Try to get CID from response headers
 			let cid = null;
-			if (lastResponseHeadersRef.current) {
-				cid = lastResponseHeadersRef.current.get("upload-cid");
+			const headers = lastResponseHeadersRef.current;
+			if (headers) {
+				cid = headers.get("upload-cid");
+				// A server that sends Upload-Status registers the file after its last
+				// byte, and may already return the CID: wait until it is `ready`,
+				// unless the caller passed `waitForCid: false`.
+				const status = headers.get("upload-status");
+				if (status !== null && status !== "ready" && waitForCidRef.current) {
+					const controller = new AbortController();
+					waitAbortRef.current = controller;
+					cid = await waitForRegistration(
+						uploadUrlRef.current,
+						headersRef.current,
+						fileRef.current.size,
+						controller.signal,
+					);
+				}
 			}
-
-			// If no CID in headers, we may need to fetch file info from the API
-			// This would depend on your API's response format
+			// Cancelled, replaced by another upload or unmounted while waiting.
+			if (runRef.current !== run) return;
 
 			setUploadResponse(cid);
 			setProgress(100);
 			setLoading(false);
 		} catch (err) {
+			if (runRef.current !== run) return;
 			if (err instanceof Error) {
 				setError(err);
 			} else {
@@ -237,6 +269,7 @@ export const useUpload = (): UseUploadReturn => {
 			options?: ReactUploadOptions,
 		) => {
 			try {
+				stopWaiting();
 				resetState();
 				setLoading(true);
 				fileRef.current = file;
@@ -244,6 +277,7 @@ export const useUpload = (): UseUploadReturn => {
 				// Set up headers
 				const headers: Record<string, string> = { Source: "sdk/react" };
 				headersRef.current = headers;
+				waitForCidRef.current = options?.waitForCid !== false;
 
 				if (options?.chunkSize && options.chunkSize > 0) {
 					chunkSizeRef.current = normalizeChunkSize(options.chunkSize);
@@ -279,6 +313,8 @@ export const useUpload = (): UseUploadReturn => {
 						"Upload-Length": `${file.size}`,
 						"Upload-Metadata": metadata,
 						...headers,
+						// RFC 7240: this client waits for `ready` before reporting the CID.
+						Prefer: "respond-async",
 					},
 				});
 
@@ -328,6 +364,7 @@ export const useUpload = (): UseUploadReturn => {
 	useEffect(() => {
 		return () => {
 			cancelledRef.current = true;
+			stopWaiting();
 		};
 	}, []);
 

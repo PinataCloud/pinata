@@ -36,6 +36,13 @@ export type UploadOptions = {
 	 * Unix timestamp (in seconds) when the file should expire (must be in the future)
 	 */
 	expires_at?: number;
+	/**
+	 * Resumable uploads (files over 90 MiB) only. Defaults to true: wait until the server
+	 * has registered the file, then return it. With false, return once the bytes are
+	 * stored: the response holds only `size` and the CID the server sent with the last
+	 * chunk (empty if none), and registration can still fail. Not allowed with `vectorize`.
+	 */
+	waitForCid?: boolean;
 };
 
 export type SignedUploadUrlOptions = {

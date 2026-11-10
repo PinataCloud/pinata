@@ -21,6 +21,7 @@ export class UploadBuilder<T> {
 	private peerAddresses: string[] | undefined;
 	private carFormat: boolean | undefined;
 	private _cidVersion: CidVersion | undefined;
+	private waitCid: boolean | undefined;
 
 	constructor(
 		config: PinataConfig | undefined,
@@ -92,6 +93,12 @@ export class UploadBuilder<T> {
 		return this;
 	}
 
+	// See UploadOptions.waitForCid: `.waitForCid(false)` returns once the bytes are stored.
+	waitForCid(wait: boolean): UploadBuilder<T> {
+		this.waitCid = wait;
+		return this;
+	}
+
 	then<TResult1 = T, TResult2 = never>(
 		onfulfilled?:
 			| ((value: T) => TResult1 | PromiseLike<TResult1>)
@@ -129,6 +136,9 @@ export class UploadBuilder<T> {
 		}
 		if (this._cidVersion !== undefined) {
 			options.cid_version = this._cidVersion;
+		}
+		if (this.waitCid !== undefined) {
+			options.waitForCid = this.waitCid;
 		}
 		this.args[this.args.length - 1] = options;
 		return this.uploadFunction(this.config, ...this.args).then(

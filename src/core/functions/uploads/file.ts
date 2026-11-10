@@ -5,58 +5,11 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../../utils/custom-errors";
-
-// Reads a TUS Upload-Offset header. Returns undefined unless it is a whole
-// number between 0 and the file size.
-const parseUploadOffset = (
-	headers: Headers,
-	size: number,
-): number | undefined => {
-	const value = headers.get("upload-offset");
-	if (value === null || !/^\d+$/.test(value)) {
-		return undefined;
-	}
-	const offset = Number(value);
-	return Number.isSafeInteger(offset) && offset <= size ? offset : undefined;
-};
-
-// Asks the server how much of a resumable upload it has stored (TUS HEAD).
-// Returns undefined when the server cannot tell right now, so the caller retries
-// at its own offset. Throws when the upload no longer exists, because no retry
-// can succeed then.
-const getUploadStatus = async (
-	url: string,
-	headers: Record<string, string>,
-	size: number,
-): Promise<{ offset: number; cid: string | null } | undefined> => {
-	let res: Response;
-	try {
-		res = await fetch(url, { method: "HEAD", headers });
-	} catch {
-		return undefined;
-	}
-	if (res.status === 404 || res.status === 410) {
-		throw new NetworkError(
-			"The upload no longer exists on the server",
-			res.status,
-			{
-				error: `HEAD returned ${res.status}`,
-				code: "HTTP_ERROR",
-				metadata: {
-					requestUrl: res.url || url,
-				},
-			},
-		);
-	}
-	if (!res.ok) {
-		return undefined;
-	}
-	const offset = parseUploadOffset(res.headers, size);
-	if (offset === undefined) {
-		return undefined;
-	}
-	return { offset, cid: res.headers.get("upload-cid") };
-};
+import {
+	getUploadStatus,
+	parseUploadOffset,
+	waitForRegistration,
+} from "./tusStatus";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -77,6 +30,12 @@ export const uploadFile = async (
 	}
 
 	if (file.size > 94371840) {
+		// Checked here, before any request: waitForCid only applies to these uploads.
+		if (options?.waitForCid === false && options.vectorize) {
+			throw new ValidationError(
+				"waitForCid: false cannot be combined with vectorize, which needs the registered file",
+			);
+		}
 		let headers: Record<string, string>;
 
 		if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {
@@ -139,6 +98,9 @@ export const uploadFile = async (
 				"Upload-Length": `${file.size}`,
 				"Upload-Metadata": metadata,
 				...headers,
+				// RFC 7240: this client accepts that the server registers the file after the
+				// last PATCH, and waits for `ready` (see waitForRegistration).
+				Prefer: "respond-async",
 			},
 		});
 		const url = urlReq.headers.get("Location");
@@ -159,6 +121,7 @@ export const uploadFile = async (
 		let offset = 0;
 		let failures = 0;
 		let cid: string | null = null;
+		let uploadStatus: string | null = null;
 
 		while (offset < file.size) {
 			const chunk = file.slice(offset, offset + chunkSize);
@@ -187,6 +150,7 @@ export const uploadFile = async (
 						failures = 0;
 						if (offset === file.size) {
 							cid = uploadReq.headers.get("upload-cid");
+							uploadStatus = uploadReq.headers.get("upload-status");
 						}
 						continue;
 					}
@@ -241,11 +205,20 @@ export const uploadFile = async (
 				offset = status.offset;
 				if (offset === file.size) {
 					cid = status.cid;
+					uploadStatus = status.status;
 				}
 			}
 		}
 
-		if (!cid) {
+		// A server that sends Upload-Status registers the file after its last byte, and
+		// may already return the CID: only `ready` means the file can be looked up.
+		const registersLater = uploadStatus !== null && uploadStatus !== "ready";
+		const skipWait = registersLater && options?.waitForCid === false;
+		if (registersLater && !skipWait) {
+			cid = await waitForRegistration(url, headers, file.size);
+		}
+
+		if (!cid && !skipWait) {
 			throw new NetworkError(
 				"The server has every byte of the upload, but did not return its CID",
 				0,
@@ -259,11 +232,13 @@ export const uploadFile = async (
 			);
 		}
 
-		if (!config.pinataJwt) {
+		// Without the registered file to look up (no JWT, or waitForCid: false), return
+		// what the upload itself reported.
+		if (!config.pinataJwt || skipWait) {
 			const data: UploadResponse = {
 				id: "",
 				name: "",
-				cid: cid,
+				cid: cid ?? "",
 				size: file.size,
 				created_at: "",
 				number_of_files: 1,

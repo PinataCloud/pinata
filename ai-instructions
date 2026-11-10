@@ -523,6 +523,7 @@ Response: "Revoked"
     .group(groupId)         // Optional
     .vectorize()            // Optional AI vectorization
     .url(signedUrl)         // Optional
+    .waitForCid(false)      // Optional: files over 90 MiB return once stored, before the CID is final
 
   // Private file upload
   pinata.upload.private.file(File)
