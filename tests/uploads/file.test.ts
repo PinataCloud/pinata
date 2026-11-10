@@ -832,6 +832,53 @@ describe("uploadFile function", () => {
 					clock.mockRestore();
 				}
 			});
+
+			it("returns the last chunk's CID without waiting when waitForCid is false", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received("bafyearly"),
+				);
+
+				const result = await uploadFile(mockConfig, largeFile, "public", {
+					waitForCid: false,
+				});
+
+				expect(result).toMatchObject({
+					cid: "bafyearly",
+					name: "large.bin",
+					size: largeSize,
+				});
+				expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH", "PATCH"]);
+			});
+		});
+
+		it("ignores waitForCid: false on a server that registers the file on the last PATCH", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			const result = await uploadFile(mockConfig, largeFile, "public", {
+				waitForCid: false,
+			});
+
+			expect(result).toEqual(mockResponse);
+			expect(calls[3].url).toContain("cid=bafyfinal");
+		});
+
+		it("rejects waitForCid: false with vectorize before uploading", async () => {
+			const calls = script();
+
+			await expect(
+				uploadFile(mockConfig, largeFile, "public", {
+					waitForCid: false,
+					vectorize: true,
+				}),
+			).rejects.toThrow(ValidationError);
+			expect(calls).toHaveLength(0);
 		});
 	});
 });

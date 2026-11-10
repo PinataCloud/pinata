@@ -36,6 +36,7 @@ export const useUpload = (): UseUploadReturn => {
 	const headersRef = useRef<Record<string, string>>({});
 	const lastResponseHeadersRef = useRef<Headers | null>(null);
 	const chunkSizeRef = useRef<number>(BASE_CHUNK_SIZE * DEFAULT_CHUNKS);
+	const waitForCidRef = useRef<boolean>(true);
 
 	const resetState = useCallback(() => {
 		setProgress(0);
@@ -145,9 +146,10 @@ export const useUpload = (): UseUploadReturn => {
 			if (headers) {
 				cid = headers.get("upload-cid");
 				// A server that sends Upload-Status registers the file after its last
-				// byte, and may already return the CID: wait until it is `ready`.
+				// byte, and may already return the CID: wait until it is `ready`,
+				// unless the caller passed `waitForCid: false`.
 				const status = headers.get("upload-status");
-				if (status !== null && status !== "ready") {
+				if (status !== null && status !== "ready" && waitForCidRef.current) {
 					cid = await waitForRegistration(
 						uploadUrlRef.current,
 						headersRef.current,
@@ -253,6 +255,7 @@ export const useUpload = (): UseUploadReturn => {
 				// Set up headers
 				const headers: Record<string, string> = { Source: "sdk/react" };
 				headersRef.current = headers;
+				waitForCidRef.current = options?.waitForCid !== false;
 
 				if (options?.chunkSize && options.chunkSize > 0) {
 					chunkSizeRef.current = normalizeChunkSize(options.chunkSize);

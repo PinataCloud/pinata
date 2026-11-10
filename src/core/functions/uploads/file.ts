@@ -20,6 +20,11 @@ export const uploadFile = async (
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
+	if (options?.waitForCid === false && options.vectorize) {
+		throw new ValidationError(
+			"waitForCid: false cannot be combined with vectorize, which needs the registered file",
+		);
+	}
 
 	const jwt: string | undefined = options?.keys || config.pinataJwt;
 
@@ -204,6 +209,22 @@ export const uploadFile = async (
 		// A server that sends Upload-Status registers the file after its last byte, and
 		// may already return the CID: only `ready` means the file can be looked up.
 		if (uploadStatus !== null && uploadStatus !== "ready") {
+			if (options?.waitForCid === false) {
+				const data: UploadResponse = {
+					id: "",
+					name,
+					cid: cid ?? "",
+					size: file.size,
+					created_at: "",
+					number_of_files: 1,
+					group_id: null,
+					mime_type: "",
+					keyvalues: {},
+					vectorized: false,
+					network,
+				};
+				return data;
+			}
 			cid = await waitForRegistration(url, headers, file.size);
 		}
 

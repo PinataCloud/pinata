@@ -76,12 +76,13 @@ export const getUploadStatus = async (
 // Some servers answer the request that completes an upload before the file is
 // registered (Upload-Status: processing), sometimes already with its Upload-Cid. The
 // file can only be looked up once HEAD reports `ready`; until then registration can
-// still fail. Polls HEAD until then and returns the registered CID.
+// still fail. Polls HEAD until then and returns the registered CID (null if `ready`
+// came without one).
 export const waitForRegistration = async (
 	url: string,
 	headers: Record<string, string>,
 	size: number,
-): Promise<string> => {
+): Promise<string | null> => {
 	const deadline =
 		Date.now() +
 		REGISTRATION_TIMEOUT_BASE_MS +
@@ -91,7 +92,8 @@ export const waitForRegistration = async (
 		await new Promise((resolve) => setTimeout(resolve, delay));
 		delay = Math.min(delay * 2, REGISTRATION_POLL_MAX_MS);
 		const status = await getUploadStatus(url, headers, size);
-		if (status?.status === "ready" && status.cid) {
+		// `ready` is final: without a CID the caller reports the missing CID.
+		if (status?.status === "ready") {
 			return status.cid;
 		}
 		if (status?.status === "failed") {
