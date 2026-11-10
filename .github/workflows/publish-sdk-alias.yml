@@ -1,0 +1,53 @@
+name: Publish @pinata/sdk alias
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/sdk-alias/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing (OIDC) + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sdk-alias
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check if this version is already published
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@pinata/sdk@$VERSION" version >/dev/null 2>&1; then
+            echo "@pinata/sdk@$VERSION is already on npm, skipping."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.publish == 'true'
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Run tests
+        if: steps.check.outputs.publish == 'true'
+        run: npm test
+
+      # The dist-tag comes from publishConfig.tag in package.json
+      # ("next" while staging, "latest" once promoted).
+      - name: Publish
+        if: steps.check.outputs.publish == 'true'
+        run: npm publish --provenance --access public
