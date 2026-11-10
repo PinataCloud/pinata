@@ -752,7 +752,7 @@ describe("uploadFile function", () => {
 		});
 
 		describe("on a server that registers the file after its last byte", () => {
-			// The last PATCH answers before registration, as files-tus does
+			// The last PATCH answers before the file is registered
 			const received = (cid?: string) =>
 				new Response(null, {
 					status: 204,
