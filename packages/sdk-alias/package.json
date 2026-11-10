@@ -1,0 +1,60 @@
+{
+	"name": "@pinata/sdk",
+	"version": "3.0.0",
+	"description": "Alias of the official Pinata SDK (`pinata`)",
+	"main": "./index.js",
+	"module": "./index.mjs",
+	"types": "./index.d.ts",
+	"exports": {
+		".": {
+			"types": "./index.d.ts",
+			"import": "./index.mjs",
+			"require": "./index.js"
+		},
+		"./react": {
+			"types": "./react/index.d.ts",
+			"import": "./react/index.mjs",
+			"require": "./react/index.js"
+		}
+	},
+	"files": [
+		"index.js",
+		"index.mjs",
+		"index.d.ts",
+		"legacy.js",
+		"react"
+	],
+	"scripts": {
+		"test": "node --test test/*.test.cjs test/*.test.mjs"
+	},
+	"dependencies": {
+		"pinata": "^2.5.7"
+	},
+	"peerDependencies": {
+		"react": ">=16.8.0",
+		"react-dom": ">=16.8.0"
+	},
+	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		},
+		"react-dom": {
+			"optional": true
+		}
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PinataCloud/pinata.git",
+		"directory": "packages/sdk-alias"
+	},
+	"homepage": "https://docs.pinata.cloud/sdk",
+	"bugs": {
+		"url": "https://github.com/PinataCloud/pinata/issues"
+	},
+	"keywords": ["pinata", "ipfs", "sdk"],
+	"author": "Pinata Cloud Technologies",
+	"license": "MIT"
+}
