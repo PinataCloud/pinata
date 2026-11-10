@@ -775,12 +775,10 @@ describe("uploadFile function", () => {
 					"GET",
 				]);
 				expect(calls[5].url).toContain("cid=bafyfinal");
-				// The server routes only clients that declare this to the async path
+				// The server routes only clients that prefer async completion to that path
 				expect(
-					(global.fetch as jest.Mock).mock.calls[0][1].headers[
-						"Upload-Completion"
-					],
-				).toBe("async");
+					(global.fetch as jest.Mock).mock.calls[0][1].headers.Prefer,
+				).toBe("respond-async");
 			});
 
 			it("waits for the CID when the last PATCH returns none", async () => {
