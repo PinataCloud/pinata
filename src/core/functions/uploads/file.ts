@@ -211,27 +211,13 @@ export const uploadFile = async (
 
 		// A server that sends Upload-Status registers the file after its last byte, and
 		// may already return the CID: only `ready` means the file can be looked up.
-		if (uploadStatus !== null && uploadStatus !== "ready") {
-			if (options?.waitForCid === false) {
-				const data: UploadResponse = {
-					id: "",
-					name,
-					cid: cid ?? "",
-					size: file.size,
-					created_at: "",
-					number_of_files: 1,
-					group_id: null,
-					mime_type: "",
-					keyvalues: {},
-					vectorized: false,
-					network,
-				};
-				return data;
-			}
+		const registersLater = uploadStatus !== null && uploadStatus !== "ready";
+		const skipWait = registersLater && options?.waitForCid === false;
+		if (registersLater && !skipWait) {
 			cid = await waitForRegistration(url, headers, file.size);
 		}
 
-		if (!cid) {
+		if (!cid && !skipWait) {
 			throw new NetworkError(
 				"The server has every byte of the upload, but did not return its CID",
 				0,
@@ -245,11 +231,13 @@ export const uploadFile = async (
 			);
 		}
 
-		if (!config.pinataJwt) {
+		// Without the registered file to look up (no JWT, or waitForCid: false), return
+		// what the upload itself reported.
+		if (!config.pinataJwt || skipWait) {
 			const data: UploadResponse = {
 				id: "",
 				name: "",
-				cid: cid,
+				cid: cid ?? "",
 				size: file.size,
 				created_at: "",
 				number_of_files: 1,

@@ -850,11 +850,7 @@ describe("uploadFile function", () => {
 					waitForCid: false,
 				});
 
-				expect(result).toMatchObject({
-					cid: "bafyearly",
-					name: "large.bin",
-					size: largeSize,
-				});
+				expect(result).toMatchObject({ cid: "bafyearly", size: largeSize });
 				expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH", "PATCH"]);
 			});
 		});

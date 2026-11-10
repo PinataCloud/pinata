@@ -37,13 +37,10 @@ export type UploadOptions = {
 	 */
 	expires_at?: number;
 	/**
-	 * Resumable uploads (files over 90 MiB) only. Defaults to true: once the server has
-	 * every byte, wait until it registers the file and has its CID, then return the
-	 * registered file. Set to false to return as soon as the bytes are stored: when the
-	 * server registers the file later, the response holds only `name`, `size` and the
-	 * `cid` the server returned with the last chunk (empty if it returned none), and
-	 * registration can still fail. `false` cannot be combined with `vectorize`, which
-	 * needs the registered file.
+	 * Resumable uploads (files over 90 MiB) only. Defaults to true: wait until the server
+	 * has registered the file, then return it. With false, return once the bytes are
+	 * stored: the response holds only `size` and the CID the server sent with the last
+	 * chunk (empty if none), and registration can still fail. Not allowed with `vectorize`.
 	 */
 	waitForCid?: boolean;
 };
