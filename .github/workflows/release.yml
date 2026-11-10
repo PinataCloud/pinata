@@ -5,6 +5,50 @@ on:
     types: [published]
 
 jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing (OIDC) + provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check release tag matches package.json
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${{ github.event.release.tag_name }}"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Release tag $TAG does not match package.json version v$VERSION"
+            exit 1
+          fi
+          if npm view "pinata@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::pinata@$VERSION is already on npm"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Run tests
+        run: npx jest
+
+      - name: Build
+        run: npm run build
+
+      # Pre-releases go to the "next" dist-tag so `npm i pinata` keeps getting the latest stable.
+      - name: Publish
+        run: npm publish --provenance --access public --tag ${{ github.event.release.prerelease && 'next' || 'latest' }}
+
   changelog:
     name: Generate changelog
     runs-on: ubuntu-latest

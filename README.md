@@ -127,13 +127,13 @@ npm run build
 Releases are published to npm and a changelog is generated automatically from [Conventional Commits](https://www.conventionalcommits.org/).
 
 1. **Use Conventional Commit messages** (`feat:`, `fix:`, `chore:`, etc.) so the changelog and version bump are accurate.
-2. **Bump the version** in `package.json` (e.g. `npm version patch|minor|major`) and commit it.
-3. **Build and publish** the package to npm:
-   ```bash
-   npm run build
-   npm publish
-   ```
-4. **Create a GitHub Release** for the new version tag. Publishing the release triggers the `Release` workflow (`.github/workflows/release.yml`), which runs [git-cliff](https://git-cliff.org/) to regenerate `CHANGELOG.md`.
+2. **Bump the version** in `package.json` (e.g. `npm version patch|minor|major`) and commit it to `main`.
+3. **Create a GitHub Release** with the tag `v<version>` (e.g. `v2.5.8`). Publishing the release triggers the `Release` workflow (`.github/workflows/release.yml`), which:
+   - checks that the tag matches `package.json` and that the version isn't on npm yet
+   - runs the tests, builds, and publishes to npm with [trusted publishing](https://docs.npmjs.com/trusted-publishers) and provenance (no npm token needed). Releases marked as pre-release are published under the `next` dist-tag.
+   - runs [git-cliff](https://git-cliff.org/) to generate the changelog
+
+The `@pinata/sdk` alias in `packages/sdk-alias` is published separately by `.github/workflows/publish-sdk-alias.yml` whenever its version changes on `main`.
 
 On every pull request the `Code Quality` workflow (`.github/workflows/code-quality.yml`) runs Biome formatting checks and the Jest test suite.
 
