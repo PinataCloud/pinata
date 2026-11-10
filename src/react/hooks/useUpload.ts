@@ -291,6 +291,8 @@ export const useUpload = (): UseUploadReturn => {
 						"Upload-Length": `${file.size}`,
 						"Upload-Metadata": metadata,
 						...headers,
+						// This client waits for `ready` before reporting the CID.
+						"Upload-Completion": "async",
 					},
 				});
 

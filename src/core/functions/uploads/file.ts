@@ -97,6 +97,9 @@ export const uploadFile = async (
 				"Upload-Length": `${file.size}`,
 				"Upload-Metadata": metadata,
 				...headers,
+				// Tells the server this client waits for `ready` (see waitForRegistration), so
+				// it may register the file after the last PATCH.
+				"Upload-Completion": "async",
 			},
 		});
 		const url = urlReq.headers.get("Location");
