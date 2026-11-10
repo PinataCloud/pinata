@@ -8,6 +8,9 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    # Protected environment: requires approval, and only main / v* tags can deploy.
+    # npm's trusted publisher for `pinata` only accepts OIDC tokens from this environment.
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write # npm trusted publishing (OIDC) + provenance
@@ -24,9 +27,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Check release tag matches package.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          TAG="${{ github.event.release.tag_name }}"
           if [ "$TAG" != "v$VERSION" ]; then
             echo "::error::Release tag $TAG does not match package.json version v$VERSION"
             exit 1
