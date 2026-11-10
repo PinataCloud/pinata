@@ -730,5 +730,108 @@ describe("uploadFile function", () => {
 				Array(6).fill(1000),
 			);
 		});
+
+		describe("on a server that registers the file after its last byte", () => {
+			// The last PATCH answers before registration, as files-tus does
+			const received = (cid?: string) =>
+				new Response(null, {
+					status: 204,
+					headers: {
+						"Upload-Offset": largeSize.toString(),
+						"Upload-Status": "processing",
+						...(cid ? { "Upload-Cid": cid } : {}),
+					},
+				});
+			const head = (status: string, cid?: string, error?: string) =>
+				new Response(null, {
+					status: 200,
+					headers: {
+						"Upload-Offset": largeSize.toString(),
+						"Upload-Status": status,
+						...(cid ? { "Upload-Cid": cid } : {}),
+						...(error ? { "Upload-Error": error } : {}),
+					},
+				});
+
+			it("looks the file up only once HEAD reports it ready", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received("bafyfinal"),
+					head("processing"),
+					head("ready", "bafyfinal"),
+					fileInfo(),
+				);
+
+				const result = await uploadFile(mockConfig, largeFile, "public");
+
+				expect(result).toEqual(mockResponse);
+				expect(calls.map((c) => c.method)).toEqual([
+					"POST",
+					"PATCH",
+					"PATCH",
+					"HEAD",
+					"HEAD",
+					"GET",
+				]);
+				expect(calls[5].url).toContain("cid=bafyfinal");
+			});
+
+			it("waits for the CID when the last PATCH returns none", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received(),
+					head("ready", "bafyfinal"),
+					fileInfo(),
+				);
+
+				await uploadFile(mockConfig, largeFile, "public");
+
+				expect(calls[4].url).toContain("cid=bafyfinal");
+			});
+
+			it("throws when the upload fails after its last byte", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					received("bafyfinal"),
+					head("failed", undefined, "stored copy differs"),
+				);
+
+				await expect(
+					uploadFile(mockConfig, largeFile, "public"),
+				).rejects.toThrow("not registered: stored copy differs");
+				expect(calls.some((c) => c.method === "GET")).toBe(false);
+			});
+
+			it("gives up when the upload is never registered", async () => {
+				// Every Date.now() is 5 minutes later; the deadline is 11 minutes for <1 GiB
+				let now = 0;
+				const clock = jest.spyOn(Date, "now").mockImplementation(() => {
+					now += 5 * 60 * 1000;
+					return now;
+				});
+				try {
+					const calls = script(
+						created(),
+						accepted(chunkSize),
+						received("bafyfinal"),
+						head("processing"),
+						head("processing"),
+						head("processing"),
+					);
+
+					await expect(
+						uploadFile(mockConfig, largeFile, "public"),
+					).rejects.toThrow(
+						"Timed out waiting for the upload to be registered",
+					);
+					expect(calls.some((c) => c.method === "GET")).toBe(false);
+				} finally {
+					clock.mockRestore();
+				}
+			});
+		});
 	});
 });

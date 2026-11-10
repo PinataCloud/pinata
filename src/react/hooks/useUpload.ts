@@ -6,6 +6,7 @@ import {
 	type UploadResult,
 	type ReactUploadOptions,
 } from "../types";
+import { waitForRegistration } from "../../core/functions/uploads/tusStatus";
 
 const LARGE_FILE_THRESHOLD = 94371840; // ~90MB
 const BASE_CHUNK_SIZE = 262144; // 256KB
@@ -140,12 +141,20 @@ export const useUpload = (): UseUploadReturn => {
 		try {
 			// Try to get CID from response headers
 			let cid = null;
-			if (lastResponseHeadersRef.current) {
-				cid = lastResponseHeadersRef.current.get("upload-cid");
+			const headers = lastResponseHeadersRef.current;
+			if (headers) {
+				cid = headers.get("upload-cid");
+				// A server that sends Upload-Status registers the file after its last
+				// byte, and may already return the CID: wait until it is `ready`.
+				const status = headers.get("upload-status");
+				if (status !== null && status !== "ready") {
+					cid = await waitForRegistration(
+						uploadUrlRef.current,
+						headersRef.current,
+						fileRef.current.size,
+					);
+				}
 			}
-
-			// If no CID in headers, we may need to fetch file info from the API
-			// This would depend on your API's response format
 
 			setUploadResponse(cid);
 			setProgress(100);
