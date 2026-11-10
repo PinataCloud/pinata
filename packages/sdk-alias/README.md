@@ -14,6 +14,8 @@
 npm i @pinata/sdk   # or, preferably: npm i pinata
 ```
 
+While v3 is in preview it's published under the `next` tag, so `npm i @pinata/sdk` still installs the legacy v2. To try v3 now, run `npm i @pinata/sdk@next`.
+
 Requires Node.js 20 or newer.
 
 ## Usage
