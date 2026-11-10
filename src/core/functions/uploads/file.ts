@@ -20,11 +20,6 @@ export const uploadFile = async (
 	if (!config) {
 		throw new ValidationError("Pinata configuration is missing");
 	}
-	if (options?.waitForCid === false && options.vectorize) {
-		throw new ValidationError(
-			"waitForCid: false cannot be combined with vectorize, which needs the registered file",
-		);
-	}
 
 	const jwt: string | undefined = options?.keys || config.pinataJwt;
 
@@ -35,6 +30,12 @@ export const uploadFile = async (
 	}
 
 	if (file.size > 94371840) {
+		// Checked here, before any request: waitForCid only applies to these uploads.
+		if (options?.waitForCid === false && options.vectorize) {
+			throw new ValidationError(
+				"waitForCid: false cannot be combined with vectorize, which needs the registered file",
+			);
+		}
 		let headers: Record<string, string>;
 
 		if (config.customHeaders && Object.keys(config.customHeaders).length > 0) {

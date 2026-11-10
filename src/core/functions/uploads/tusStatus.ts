@@ -38,10 +38,11 @@ export const getUploadStatus = async (
 	url: string,
 	headers: Record<string, string>,
 	size: number,
+	signal?: AbortSignal,
 ): Promise<UploadStatus | undefined> => {
 	let res: Response;
 	try {
-		res = await fetch(url, { method: "HEAD", headers });
+		res = await fetch(url, { method: "HEAD", headers, signal });
 	} catch {
 		return undefined;
 	}
@@ -77,11 +78,12 @@ export const getUploadStatus = async (
 // registered (Upload-Status: processing), sometimes already with its Upload-Cid. The
 // file can only be looked up once HEAD reports `ready`; until then registration can
 // still fail. Polls HEAD until then and returns the registered CID (null if `ready`
-// came without one).
+// came without one). `signal` stops the wait: it rejects with the abort reason.
 export const waitForRegistration = async (
 	url: string,
 	headers: Record<string, string>,
 	size: number,
+	signal?: AbortSignal,
 ): Promise<string | null> => {
 	const deadline =
 		Date.now() +
@@ -89,9 +91,21 @@ export const waitForRegistration = async (
 		Math.ceil(size / GIB) * REGISTRATION_TIMEOUT_PER_GIB_MS;
 	let delay = 1000;
 	while (Date.now() + delay <= deadline) {
-		await new Promise((resolve) => setTimeout(resolve, delay));
+		await new Promise<void>((resolve, reject) => {
+			if (signal?.aborted) return reject(signal.reason);
+			const onAbort = () => {
+				clearTimeout(timer);
+				reject(signal?.reason);
+			};
+			const timer = setTimeout(() => {
+				signal?.removeEventListener("abort", onAbort);
+				resolve();
+			}, delay);
+			signal?.addEventListener("abort", onAbort, { once: true });
+		});
 		delay = Math.min(delay * 2, REGISTRATION_POLL_MAX_MS);
-		const status = await getUploadStatus(url, headers, size);
+		const status = await getUploadStatus(url, headers, size, signal);
+		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.
 		if (status?.status === "ready") {
 			return status.cid;

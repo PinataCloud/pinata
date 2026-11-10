@@ -72,6 +72,26 @@ describe("uploadFile function", () => {
 		);
 	});
 
+	it("vectorizes a file up to 90 MiB even with waitForCid: false, which only applies to larger files", async () => {
+		global.fetch = jest
+			.fn()
+			.mockResolvedValueOnce({
+				ok: true,
+				json: jest.fn().mockResolvedValueOnce({ data: mockResponse }),
+			})
+			.mockResolvedValueOnce({ ok: true });
+
+		const result = await uploadFile(mockConfig, mockFile, "public", {
+			waitForCid: false,
+			vectorize: true,
+		});
+
+		expect(result).toMatchObject({ cid: mockResponse.cid, vectorized: true });
+		expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain(
+			`/vectorize/files/${mockResponse.id}`,
+		);
+	});
+
 	it("should handle upload options for private network", async () => {
 		const mockMetadata: PinataMetadata = {
 			name: "Custom File Name",
