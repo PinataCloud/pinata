@@ -127,13 +127,30 @@ npm run build
 Releases are published to npm and a changelog is generated automatically from [Conventional Commits](https://www.conventionalcommits.org/).
 
 1. **Use Conventional Commit messages** (`feat:`, `fix:`, `chore:`, etc.) so the changelog and version bump are accurate.
-2. **Bump the version** in `package.json` (e.g. `npm version patch|minor|major`) and commit it to `main`.
-3. **Create a GitHub Release** with the tag `v<version>` (e.g. `v2.5.8`). Publishing the release triggers the `Release` workflow (`.github/workflows/release.yml`), which:
+2. **Bump the version** in `package.json` and commit it to `main`. If you use `npm version patch|minor|major --no-git-tag-version`, run `npm run format` afterwards: npm rewrites `package.json` with its own formatting.
+3. **Create a GitHub Release** with the tag `v<version>` (e.g. `v2.5.8`) targeting that commit. Publishing the release triggers the `Release` workflow (`.github/workflows/release.yml`), which:
    - checks that the tag matches `package.json` and that the version isn't on npm yet
-   - runs the tests, builds, and publishes to npm with [trusted publishing](https://docs.npmjs.com/trusted-publishers) and provenance (no npm token needed). Releases marked as pre-release are published under the `next` dist-tag.
-   - runs [git-cliff](https://git-cliff.org/) to generate the changelog
+   - runs the tests, builds, and publishes to npm with [trusted publishing](https://docs.npmjs.com/trusted-publishers) and provenance (no npm token needed). Releases marked as pre-release are published under the `next` dist-tag. Everything else goes to `latest`.
+   - runs [git-cliff](https://git-cliff.org/) to generate the changelog. The output is printed in the workflow log; `CHANGELOG.md` is not committed automatically yet.
 
-The `@pinata/sdk` alias in `packages/sdk-alias` is published separately by `.github/workflows/publish-sdk-alias.yml` whenever its version changes on `main`.
+```bash
+# Example: a patch release
+npm version patch --no-git-tag-version && npm run format
+git commit -am "chore: bump version to 2.5.8" && git push
+gh release create v2.5.8 --generate-notes          # add --prerelease for a "next" release
+```
+
+### Pre-releases
+
+Create the GitHub Release with **Set as a pre-release** checked (or `gh release create --prerelease`) and a pre-release version such as `2.5.8-rc.0`. It's published under the `next` dist-tag, so `npm i pinata` keeps installing the latest stable version and testers use `npm i pinata@next`.
+
+To promote a pre-release to `latest`, run `npm dist-tag add pinata@<version> latest` as a maintainer. CI isn't allowed to change dist-tags. Usually you cut a stable release (e.g. `2.5.8`) instead.
+
+### `@pinata/sdk` alias
+
+The `@pinata/sdk` package in `packages/sdk-alias` is a thin alias that re-exports `pinata` (see its [README](packages/sdk-alias/README.md)). It depends on `pinata` with a caret range, so new `pinata` releases reach it without republishing. It only needs a release when the alias itself changes or `pinata` ships a new major.
+
+To release it, bump `version` in `packages/sdk-alias/package.json` and push to `main`. `.github/workflows/publish-sdk-alias.yml` runs its tests and publishes the new version with trusted publishing. The dist-tag comes from `publishConfig.tag` in that file. It's `next` while v3 is in preview; change it to `latest` when v3 is promoted.
 
 On every pull request the `Code Quality` workflow (`.github/workflows/code-quality.yml`) runs Biome formatting checks and the Jest test suite.
 
