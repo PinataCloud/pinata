@@ -4,6 +4,8 @@ import { serverReason } from "./tusMetadata";
 import {
 	getUploadStatus,
 	parseUploadOffset,
+	type RequestHeaders,
+	resolveHeaders,
 	waitForRegistration,
 } from "./tusStatus";
 
@@ -26,7 +28,7 @@ export interface StoredUpload {
 // (TUS creation-with-upload), so a small file takes one request instead of two.
 export const sendResumable = async (
 	createUrl: string,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	file: File,
 	metadata: string,
 	inline = false,
@@ -40,7 +42,7 @@ export const sendResumable = async (
 			...(withBody
 				? { "Content-Type": "application/offset+octet-stream" }
 				: {}),
-			...headers,
+			...resolveHeaders(headers),
 			// RFC 7240: this client accepts that the server registers the file after the
 			// last PATCH, and waits for `ready` (see waitForRegistration).
 			Prefer: "respond-async",
@@ -98,7 +100,7 @@ export const sendResumable = async (
 					headers: {
 						"Content-Type": "application/offset+octet-stream",
 						"Upload-Offset": offset.toString(),
-						...headers,
+						...resolveHeaders(headers),
 					},
 					body: chunk,
 				});
@@ -205,10 +207,12 @@ export const registersLater = (upload: StoredUpload): boolean =>
 	upload.status !== null && upload.status !== "ready";
 
 // Waits until a stored upload is registered (see waitForRegistration) and returns it with
-// the CID and Upload-Metadata of the registered file. Throws if it has no CID.
+// its own CID (the one computed from its bytes, else the registered file's) and the
+// registered file's Upload-Metadata, which may be an earlier upload's. Throws if it has no
+// CID.
 export const registerResumable = async (
 	upload: StoredUpload,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
 ): Promise<StoredUpload> => {

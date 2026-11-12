@@ -186,7 +186,7 @@ describe("uploadFolder", () => {
 
 		it("refuses a folder name that is not one path segment", async () => {
 			const { created } = server();
-			for (const name of ["..", ".", "a/b", "a\\b", "..\\x"]) {
+			for (const name of ["..", ".", "a/b", "a\\b", "..\\x", "100%"]) {
 				await expect(
 					uploadFolder(
 						config,
@@ -620,11 +620,15 @@ describe("uploadFolder", () => {
 			},
 		);
 
-		const auth = fetchMock.mock.calls.map(
-			([, init]) => (init.headers as Record<string, string>).Authorization,
-		);
-		expect(auth[0]).toBe("Bearer first-jwt");
-		expect(auth.at(-1)).toBe("Bearer fresh-jwt");
+		const auth = (path: string) =>
+			fetchMock.mock.calls
+				.map(([, init]) => init.headers as Record<string, string>)
+				.filter(
+					(h) => decodeMetadata(h["Upload-Metadata"] ?? "").filename === path,
+				)
+				.map((h) => h.Authorization);
+		expect(auth("d/a.txt")).toEqual(["Bearer first-jwt"]);
+		expect(auth("d/b.txt")).toEqual(["Bearer fresh-jwt"]);
 	});
 
 	it("fails a file at once when the server refuses a chunk for good", async () => {
@@ -708,6 +712,58 @@ describe("uploadFolder", () => {
 		expect(error.failed[0].error).toBeInstanceOf(ValidationError);
 		expect(created.map((c) => c.path)).toEqual(["d/ok.txt"]);
 		expect(events).toContain("error d/100%.txt 0");
+	});
+
+	it("checks a file's registration with a JWT replaced while it was being sent", async () => {
+		const live: PinataConfig = { ...config, pinataJwt: "first-jwt" };
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const auth = (init.headers as Record<string, string>).Authorization;
+			if (init.method === "POST") {
+				// The token expires: the dashboard sets a fresh one
+				live.pinataJwt = "fresh-jwt";
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/upload`,
+						"Upload-Offset": "1",
+						"Upload-Cid": "bafyfile",
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			if (init.method === "HEAD") {
+				return auth === "Bearer fresh-jwt"
+					? new Response(null, {
+							status: 200,
+							headers: {
+								"Upload-Offset": "1",
+								"Upload-Status": "ready",
+								"Upload-Cid": "bafyfile",
+							},
+						})
+					: new Response(null, { status: 401 });
+			}
+			return new Response(
+				JSON.stringify({
+					data: {
+						id: "f",
+						name: "d",
+						cid: "bafyfolder",
+						size: 1,
+						number_of_files: 1,
+					},
+				}),
+				{ status: 200 },
+			);
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			live,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+		);
+
+		expect(result.files[0].cid).toBe("bafyfile");
 	});
 
 	it("refuses options a folder upload cannot honor", async () => {

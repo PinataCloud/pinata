@@ -22,8 +22,6 @@ const DEFAULT_FOLDER_NAME = "folder_from_sdk";
 // don't hold a send slot, but at most this many per slot are under way at once, so that a
 // large folder doesn't poll the registration of thousands of files.
 const UNDER_WAY_PER_SLOT = 4;
-// The sync computes the folder's CID from every file within the request
-const SYNC_TIMEOUT_MS = 2 * 60 * 1000;
 
 // Uploads a folder file by file: each file is its own resumable upload into the folder,
 // several at a time, each retried on its own. A final sync gives the folder's CID.
@@ -140,7 +138,7 @@ export const uploadFolder = async (
 					try {
 						return await sendResumable(
 							createUrl.toString(),
-							headers(),
+							headers,
 							file,
 							`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
 							true,
@@ -154,11 +152,7 @@ export const uploadFolder = async (
 				// The file is in the folder once registered. It may be reported as an earlier
 				// upload when, alone, it matches one (a one-file folder of the same name and
 				// content): its object is in this folder all the same, and its CID is its own.
-				const registered = await registerResumable(
-					stored,
-					headers(),
-					file.size,
-				);
+				const registered = await registerResumable(stored, headers, file.size);
 				const result = { path, size: file.size, cid: registered.cid as string };
 				uploaded.push(result);
 				emit({
@@ -301,7 +295,6 @@ const syncFolder = async (
 			const res = await fetch(`${endpoint}/buckets/${folderId}/sync`, {
 				method: "PUT",
 				headers,
-				signal: AbortSignal.timeout(SYNC_TIMEOUT_MS),
 			});
 			if (res.ok) {
 				const body = await res.json();
@@ -364,7 +357,7 @@ const folderEntries = (
 	);
 	const folder = name || (sharedTop ? top : DEFAULT_FOLDER_NAME);
 	// One segment, checked as the input paths are
-	if (/[/\\]/.test(folder) || folder === "." || folder === "..") {
+	if (/[/\\%]/.test(folder) || folder === "." || folder === "..") {
 		throw new ValidationError(`Invalid folder name: "${folder}"`);
 	}
 

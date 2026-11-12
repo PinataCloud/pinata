@@ -43,19 +43,34 @@ export const parseUploadOffset = (
 	return Number.isSafeInteger(offset) && offset <= size ? offset : undefined;
 };
 
+// Request headers, or a function that builds them for each request: a token replaced
+// meanwhile (setNewJwt) is then used from the next request on.
+export type RequestHeaders =
+	| Record<string, string>
+	| (() => Record<string, string>);
+
+export const resolveHeaders = (
+	headers: RequestHeaders,
+): Record<string, string> =>
+	typeof headers === "function" ? headers() : headers;
+
 // Asks the server how much of a resumable upload it has stored (TUS HEAD).
 // Returns undefined when the server cannot tell right now, so the caller retries
 // at its own offset. Throws when the upload no longer exists, because no retry
 // can succeed then.
 export const getUploadStatus = async (
 	url: string,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
 ): Promise<UploadStatus | undefined> => {
 	let res: Response;
 	try {
-		res = await fetch(url, { method: "HEAD", headers, signal });
+		res = await fetch(url, {
+			method: "HEAD",
+			headers: resolveHeaders(headers),
+			signal,
+		});
 	} catch {
 		return undefined;
 	}
@@ -108,7 +123,7 @@ export const getUploadStatus = async (
 // `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
 export const waitForRegistration = async (
 	url: string,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
 ): Promise<UploadStatus> => {
