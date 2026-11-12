@@ -7,6 +7,10 @@ import {
 	type ReactUploadOptions,
 } from "../types";
 import { waitForRegistration } from "../../core/functions/uploads/tusStatus";
+import {
+	encodeMetadataValue,
+	serverReason,
+} from "../../core/functions/uploads/tusMetadata";
 
 const LARGE_FILE_THRESHOLD = 94371840; // ~90MB
 const BASE_CHUNK_SIZE = 262144; // 256KB
@@ -167,12 +171,14 @@ export const useUpload = (): UseUploadReturn => {
 				if (status !== null && status !== "ready" && waitForCidRef.current) {
 					const controller = new AbortController();
 					waitAbortRef.current = controller;
-					cid = await waitForRegistration(
-						uploadUrlRef.current,
-						headersRef.current,
-						fileRef.current.size,
-						controller.signal,
-					);
+					cid = (
+						await waitForRegistration(
+							uploadUrlRef.current,
+							headersRef.current,
+							fileRef.current.size,
+							controller.signal,
+						)
+					).cid;
 				}
 			}
 			// Cancelled, replaced by another upload or unmounted while waiting.
@@ -292,18 +298,18 @@ export const useUpload = (): UseUploadReturn => {
 				}
 
 				// For larger files, use chunked upload with TUS protocol
-				let metadata = `filename ${btoa(file.name)},filetype ${btoa(file.type)},network ${btoa(network)}`;
+				let metadata = `filename ${encodeMetadataValue(file.name)},filetype ${encodeMetadataValue(file.type)},network ${encodeMetadataValue(network)}`;
 
 				if (options?.groupId) {
-					metadata += `,group_id ${btoa(options.groupId)}`;
+					metadata += `,group_id ${encodeMetadataValue(options.groupId)}`;
 				}
 
 				if (options?.metadata?.keyvalues) {
-					metadata += `,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
+					metadata += `,keyvalues ${encodeMetadataValue(JSON.stringify(options.metadata.keyvalues))}`;
 				}
 
 				if (options?.streamable) {
-					metadata += `,streamable ${btoa("true")}`;
+					metadata += `,streamable ${encodeMetadataValue("true")}`;
 				}
 
 				// Initialize TUS upload
@@ -330,10 +336,15 @@ export const useUpload = (): UseUploadReturn => {
 							},
 						);
 					}
-					throw new NetworkError("Error initializing upload", urlReq.status, {
-						error: errorData,
-						code: "HTTP_ERROR",
-					});
+					const reason = serverReason(errorData);
+					throw new NetworkError(
+						`Error initializing upload (HTTP ${urlReq.status})${reason ? `: ${reason}` : ""}`,
+						urlReq.status,
+						{
+							error: errorData,
+							code: "HTTP_ERROR",
+						},
+					);
 				}
 
 				const uploadUrl = urlReq.headers.get("Location");

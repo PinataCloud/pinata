@@ -21,6 +21,11 @@ export interface UploadStatus {
 	status: string | null;
 	// Why a `failed` upload failed, when the server says (Upload-Error)
 	error: string | null;
+	// TUS Upload-Metadata: once the file is registered, the server may report its id
+	// (file_id) and name (filename) there
+	metadata: string | null;
+	// The file's detected type (Upload-Content-Type), when the server reports it
+	contentType: string | null;
 }
 
 // Reads a TUS Upload-Offset header. Returns undefined unless it is a whole
@@ -78,20 +83,22 @@ export const getUploadStatus = async (
 		cid: res.headers.get("upload-cid"),
 		status: res.headers.get("upload-status"),
 		error: res.headers.get("upload-error"),
+		metadata: res.headers.get("upload-metadata"),
+		contentType: res.headers.get("upload-content-type"),
 	};
 };
 
 // Some servers answer the request that completes an upload before the file is
 // registered (Upload-Status: processing), sometimes already with its Upload-Cid. The
 // file can only be looked up once HEAD reports `ready`; until then registration can
-// still fail. Polls HEAD until then and returns the registered CID (null if `ready`
-// came without one). `signal` stops the wait: it rejects with the abort reason.
+// still fail. Polls HEAD until then and returns that `ready` status (its CID is null if
+// `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
 export const waitForRegistration = async (
 	url: string,
 	headers: Record<string, string>,
 	size: number,
 	signal?: AbortSignal,
-): Promise<string | null> => {
+): Promise<UploadStatus> => {
 	const timeout = registrationTimeout(size);
 	const deadline = Date.now() + timeout;
 	let delay = 1000;
@@ -113,7 +120,7 @@ export const waitForRegistration = async (
 		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.
 		if (status?.status === "ready") {
-			return status.cid;
+			return status;
 		}
 		if (status?.status === "failed") {
 			// Upload-Error is optional: a server may report the failure without a reason.

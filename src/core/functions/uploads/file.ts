@@ -11,6 +11,11 @@ import {
 	waitForRegistration,
 } from "./tusStatus";
 import { FileChunks } from "./fileChunks";
+import {
+	encodeMetadataValue,
+	parseUploadMetadata,
+	serverReason,
+} from "./tusMetadata";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -53,30 +58,30 @@ export const uploadFile = async (
 
 		const name = options?.metadata?.name || file.name || "File from SDK";
 
-		let metadata: string = `filename ${btoa(name)},filetype ${btoa(file.type)},network ${btoa(network)}`;
+		let metadata: string = `filename ${encodeMetadataValue(name)},filetype ${encodeMetadataValue(file.type)},network ${encodeMetadataValue(network)}`;
 
 		if (options?.groupId) {
-			metadata += `,group_id ${btoa(options.groupId)}`;
+			metadata += `,group_id ${encodeMetadataValue(options.groupId)}`;
 		}
 
 		if (options?.metadata?.keyvalues) {
-			metadata += `,keyvalues ${btoa(JSON.stringify(options.metadata.keyvalues))}`;
+			metadata += `,keyvalues ${encodeMetadataValue(JSON.stringify(options.metadata.keyvalues))}`;
 		}
 
 		if (options?.streamable) {
-			metadata += `,streamable ${btoa("true")}`;
+			metadata += `,streamable ${encodeMetadataValue("true")}`;
 		}
 
 		if (options?.car) {
-			metadata += `,car ${btoa("true")}`;
+			metadata += `,car ${encodeMetadataValue("true")}`;
 		}
 
 		if (options?.cid_version !== undefined) {
-			metadata += `,cid_version ${btoa(options.cid_version)}`;
+			metadata += `,cid_version ${encodeMetadataValue(options.cid_version)}`;
 		}
 
 		if (options?.expires_at !== undefined) {
-			metadata += `,expires_at ${btoa(options.expires_at.toString())}`;
+			metadata += `,expires_at ${encodeMetadataValue(options.expires_at.toString())}`;
 		}
 
 		// Build URL with query parameters for chunked uploads
@@ -106,15 +111,22 @@ export const uploadFile = async (
 		});
 		const url = urlReq.headers.get("Location");
 		if (!url) {
-			const errorData = await urlReq.text();
-			throw new NetworkError("Upload URL not provided", urlReq.status, {
-				error: errorData,
-				code: "HTTP_ERROR",
-				metadata: {
-					requestUrl: urlReq.url,
-					requestHeaders: urlReq.headers,
+			const errorData = await urlReq.text().catch(() => "");
+			const reason = serverReason(errorData);
+			throw new NetworkError(
+				urlReq.ok
+					? `Upload URL not provided: the server answered ${urlReq.status} without a Location header`
+					: `Could not start the upload (HTTP ${urlReq.status})${reason ? `: ${reason}` : ""}`,
+				urlReq.status,
+				{
+					error: errorData,
+					code: "HTTP_ERROR",
+					metadata: {
+						requestUrl: urlReq.url,
+						requestHeaders: urlReq.headers,
+					},
 				},
-			});
+			);
 		}
 
 		const chunkSize = 50 * 1024 * 1024 + 1; // 50MB in bytes
@@ -123,6 +135,11 @@ export const uploadFile = async (
 		let failures = 0;
 		let cid: string | null = null;
 		let uploadStatus: string | null = null;
+		// Upload-Metadata and Upload-Content-Type of the response that reported the upload done
+		let completion: { metadata: string | null; contentType: string | null } = {
+			metadata: null,
+			contentType: null,
+		};
 
 		// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
 		const chunks = new FileChunks(file, chunkSize);
@@ -160,6 +177,10 @@ export const uploadFile = async (
 							if (offset === file.size) {
 								cid = uploadReq.headers.get("upload-cid");
 								uploadStatus = uploadReq.headers.get("upload-status");
+								completion = {
+									metadata: uploadReq.headers.get("upload-metadata"),
+									contentType: uploadReq.headers.get("upload-content-type"),
+								};
 							}
 							continue;
 						}
@@ -215,6 +236,7 @@ export const uploadFile = async (
 					if (offset === file.size) {
 						cid = status.cid;
 						uploadStatus = status.status;
+						completion = status;
 					}
 				}
 			}
@@ -227,7 +249,9 @@ export const uploadFile = async (
 		const registersLater = uploadStatus !== null && uploadStatus !== "ready";
 		const skipWait = registersLater && options?.waitForCid === false;
 		if (registersLater && !skipWait) {
-			cid = await waitForRegistration(url, headers, file.size);
+			const ready = await waitForRegistration(url, headers, file.size);
+			cid = ready.cid;
+			completion = ready;
 		}
 
 		if (!cid && !skipWait) {
@@ -245,20 +269,24 @@ export const uploadFile = async (
 		}
 
 		// Without the registered file to look up (no JWT, or waitForCid: false), return
-		// what the upload itself reported.
+		// what the upload itself reported. A server that registered the file can report its
+		// id and name in Upload-Metadata: that may be an earlier file with the same content,
+		// so they are only taken from there, never from the request.
 		if (!config.pinataJwt || skipWait) {
+			const registered = parseUploadMetadata(completion.metadata);
+			const known = registered.file_id !== undefined;
 			const data: UploadResponse = {
-				id: "",
-				name: "",
+				id: known ? registered.file_id : "",
+				name: known ? (registered.filename ?? "") : "",
 				cid: cid ?? "",
 				size: file.size,
 				created_at: "",
 				number_of_files: 1,
 				group_id: null,
-				mime_type: "",
+				mime_type: completion.contentType ?? "",
 				keyvalues: {},
 				vectorized: false,
-				network: "",
+				network,
 			};
 			return data;
 		}
