@@ -67,9 +67,10 @@ describe("waitForRegistration", () => {
 		it("waits long enough for a 10 GB upload that becomes ready after 35 minutes", async () => {
 			serverReadyAt(35 * MINUTE);
 
-			await expect(waitForRegistration(url, {}, size)).resolves.toBe(
-				"bafyregistered",
-			);
+			await expect(waitForRegistration(url, {}, size)).resolves.toMatchObject({
+				status: "ready",
+				cid: "bafyregistered",
+			});
 			expect(now).toBeGreaterThanOrEqual(35 * MINUTE);
 		});
 

@@ -135,11 +135,8 @@ export const uploadFile = async (
 		let failures = 0;
 		let cid: string | null = null;
 		let uploadStatus: string | null = null;
-		// Upload-Metadata and Upload-Content-Type of the response that reported the upload done
-		let completion: { metadata: string | null; contentType: string | null } = {
-			metadata: null,
-			contentType: null,
-		};
+		// Upload-Metadata of the response that reported the upload done
+		let completion: string | null = null;
 
 		// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
 		const chunks = new FileChunks(file, chunkSize);
@@ -177,10 +174,7 @@ export const uploadFile = async (
 							if (offset === file.size) {
 								cid = uploadReq.headers.get("upload-cid");
 								uploadStatus = uploadReq.headers.get("upload-status");
-								completion = {
-									metadata: uploadReq.headers.get("upload-metadata"),
-									contentType: uploadReq.headers.get("upload-content-type"),
-								};
+								completion = uploadReq.headers.get("upload-metadata");
 							}
 							continue;
 						}
@@ -236,7 +230,7 @@ export const uploadFile = async (
 					if (offset === file.size) {
 						cid = status.cid;
 						uploadStatus = status.status;
-						completion = status;
+						completion = status.metadata;
 					}
 				}
 			}
@@ -251,7 +245,7 @@ export const uploadFile = async (
 		if (registersLater && !skipWait) {
 			const ready = await waitForRegistration(url, headers, file.size);
 			cid = ready.cid;
-			completion = ready;
+			completion = ready.metadata;
 		}
 
 		if (!cid && !skipWait) {
@@ -271,9 +265,10 @@ export const uploadFile = async (
 		// Without the registered file to look up (no JWT, or waitForCid: false), return
 		// what the upload itself reported. A server that registered the file can report its
 		// id and name in Upload-Metadata: that may be an earlier file with the same content,
-		// so they are only taken from there, never from the request.
+		// so they are only taken from there, never from the request. Not the type: the server's
+		// Upload-Content-Type is detected from this upload, even when it returns an earlier file.
 		if (!config.pinataJwt || skipWait) {
-			const registered = parseUploadMetadata(completion.metadata);
+			const registered = parseUploadMetadata(completion);
 			const known = registered.file_id !== undefined;
 			const data: UploadResponse = {
 				id: known ? registered.file_id : "",
@@ -283,7 +278,7 @@ export const uploadFile = async (
 				created_at: "",
 				number_of_files: 1,
 				group_id: null,
-				mime_type: completion.contentType ?? "",
+				mime_type: "",
 				keyvalues: {},
 				vectorized: false,
 				network,

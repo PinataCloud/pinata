@@ -164,7 +164,7 @@ describe("uploadFile, resumable", () => {
 	});
 
 	describe("without a JWT to look the file up", () => {
-		it("returns the id, name and type the server reports for the registered file", async () => {
+		it("returns the id and name the server reports for the registered file", async () => {
 			script(
 				created(),
 				accepted(chunkSize),
@@ -182,7 +182,6 @@ describe("uploadFile, resumable", () => {
 				name: "動画.mp4",
 				cid: "bafyfinal",
 				size: largeSize,
-				mime_type: "video/mp4",
 				network: "private",
 			});
 		});
@@ -203,6 +202,8 @@ describe("uploadFile, resumable", () => {
 						"Upload-Status": "ready",
 						"Upload-Cid": "bafyfinal",
 						"Upload-Metadata": registered("earlier-id", "earlier.bin"),
+						// Detected from this upload, not the earlier file's type
+						"Upload-Content-Type": "application/octet-stream",
 					},
 				}),
 			);
@@ -215,6 +216,7 @@ describe("uploadFile, resumable", () => {
 				id: "earlier-id",
 				name: "earlier.bin",
 				cid: "bafyfinal",
+				mime_type: "",
 				network: "public",
 			});
 		});

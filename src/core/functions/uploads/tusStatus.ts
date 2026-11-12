@@ -24,8 +24,6 @@ export interface UploadStatus {
 	// TUS Upload-Metadata: once the file is registered, the server may report its id
 	// (file_id) and name (filename) there
 	metadata: string | null;
-	// The file's detected type (Upload-Content-Type), when the server reports it
-	contentType: string | null;
 }
 
 // Reads a TUS Upload-Offset header. Returns undefined unless it is a whole
@@ -84,7 +82,6 @@ export const getUploadStatus = async (
 		status: res.headers.get("upload-status"),
 		error: res.headers.get("upload-error"),
 		metadata: res.headers.get("upload-metadata"),
-		contentType: res.headers.get("upload-content-type"),
 	};
 };
 
