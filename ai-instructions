@@ -563,6 +563,7 @@ Response: "Revoked"
     .cidVersion("v1")       // Optional
     .key(apiKey)            // Optional
     // Not supported: vectorize, url, car, streamable, peerAddress, waitForCid(false)
+    // Paths holding "%" fail before sending (the server cannot address them yet)
 
   type FolderUploadOptions = {
     concurrency?: number;   // files sending bytes at once (default 4)
@@ -580,8 +581,12 @@ Response: "Revoked"
 
   Response: UploadResponse of the folder (its CID covers every file), plus
     files: { path: string; size: number; cid: string }[]
+    is_duplicate?: true     // the content was already uploaded: id, name, cid and paths
+                            // are that earlier folder's, and this upload was removed
   Throws FolderUploadError when files fail for good: .folderId, .uploaded, .failed
     ({ path, size, error }); the other files are uploaded into that folder.
+  If the first file fails for a reason of its own (path, type, size), the next one
+  creates the folder; any other failure of the first file stops the upload.
 
   // JSON content
   pinata.upload.public.json(JsonObject)
