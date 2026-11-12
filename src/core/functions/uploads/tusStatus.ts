@@ -1,11 +1,17 @@
 import { NetworkError } from "../../../utils/custom-errors";
 
 const GIB = 1024 * 1024 * 1024;
-// How long to wait for a finished upload to be registered: the server hashes the stored
-// copy first, which takes about half a minute per GiB.
-const REGISTRATION_TIMEOUT_BASE_MS = 10 * 60 * 1000;
-const REGISTRATION_TIMEOUT_PER_GIB_MS = 60 * 1000;
+// How long to wait for a finished upload to be registered. Processing a large file
+// can take several minutes per GiB after its last byte arrives, so allow 5 minutes per
+// GiB on top of the base (10 GB: 60 minutes).
+export const REGISTRATION_TIMEOUT_BASE_MS = 10 * 60 * 1000;
+export const REGISTRATION_TIMEOUT_PER_GIB_MS = 5 * 60 * 1000;
 const REGISTRATION_POLL_MAX_MS = 10 * 1000;
+
+// How long waitForRegistration waits for an upload of `size` bytes.
+export const registrationTimeout = (size: number): number =>
+	REGISTRATION_TIMEOUT_BASE_MS +
+	Math.ceil(size / GIB) * REGISTRATION_TIMEOUT_PER_GIB_MS;
 
 export interface UploadStatus {
 	offset: number;
@@ -85,10 +91,8 @@ export const waitForRegistration = async (
 	size: number,
 	signal?: AbortSignal,
 ): Promise<string | null> => {
-	const deadline =
-		Date.now() +
-		REGISTRATION_TIMEOUT_BASE_MS +
-		Math.ceil(size / GIB) * REGISTRATION_TIMEOUT_PER_GIB_MS;
+	const timeout = registrationTimeout(size);
+	const deadline = Date.now() + timeout;
 	let delay = 1000;
 	while (Date.now() + delay <= deadline) {
 		await new Promise<void>((resolve, reject) => {
@@ -124,14 +128,19 @@ export const waitForRegistration = async (
 			);
 		}
 	}
+	// Not a failure of the upload: the server has every byte and may still register it.
 	throw new NetworkError(
-		"Timed out waiting for the upload to be registered",
+		`Timed out waiting for the upload to be registered after ${Math.round(timeout / 60000)} minutes. ` +
+			`The server has every byte and is still processing it, so it may yet be registered: poll ${url} ` +
+			"with HEAD until it returns Upload-Status: ready (its Upload-Cid header then holds the CID), " +
+			"or failed (Upload-Error says why).",
 		0,
 		{
 			error: "upload still processing",
 			code: "HTTP_ERROR",
 			metadata: {
 				requestUrl: url,
+				timeoutMs: timeout,
 			},
 		},
 	);

@@ -10,6 +10,7 @@ import {
 	parseUploadOffset,
 	waitForRegistration,
 } from "./tusStatus";
+import { StreamChunks } from "./streamChunks";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -123,91 +124,100 @@ export const uploadFile = async (
 		let cid: string | null = null;
 		let uploadStatus: string | null = null;
 
-		while (offset < file.size) {
-			const chunk = file.slice(offset, offset + chunkSize);
-			let failure: { status: number; error: string; requestUrl: string };
+		// Read the file as a stream rather than with file.slice(): see StreamChunks.
+		const chunks = new StreamChunks(file, chunkSize);
 
-			try {
-				const uploadReq = await fetch(url, {
-					method: "PATCH",
-					headers: {
-						"Content-Type": "application/offset+octet-stream",
-						"Upload-Offset": offset.toString(),
-						...headers,
-					},
-					body: chunk,
-				});
+		try {
+			while (offset < file.size) {
+				// The rest of the chunk that holds `offset`: after a PATCH that stored only part
+				// of a chunk, the next one resends the remainder.
+				const chunk = await chunks.at(offset);
+				let failure: { status: number; error: string; requestUrl: string };
 
-				if (uploadReq.ok) {
-					// The server's Upload-Offset wins over our own count: it can be lower than
-					// the end of this chunk (only part of the body was stored) or the full length
-					// (the server replayed an upload that had already finished).
-					const next =
-						parseUploadOffset(uploadReq.headers, file.size) ??
-						offset + chunk.size;
-					if (next > offset) {
-						offset = next;
-						failures = 0;
-						if (offset === file.size) {
-							cid = uploadReq.headers.get("upload-cid");
-							uploadStatus = uploadReq.headers.get("upload-status");
-						}
-						continue;
-					}
-					failure = {
-						status: uploadReq.status,
-						error: "the server did not accept any bytes of the chunk",
-						requestUrl: uploadReq.url || url,
-					};
-				} else {
-					failure = {
-						status: uploadReq.status,
-						error: await uploadReq.text().catch(() => "Unknown error"),
-						requestUrl: uploadReq.url || url,
-					};
-				}
-			} catch (error) {
-				failure = {
-					status: 0,
-					error: error instanceof Error ? error.message : String(error),
-					requestUrl: url,
-				};
-			}
-
-			failures++;
-			if (failures > maxRetries) {
-				throw new NetworkError(
-					`HTTP error during chunk upload after ${maxRetries} retries: ${failure.error}`,
-					failure.status,
-					{
-						error: failure.error,
-						code: "HTTP_ERROR",
-						metadata: {
-							requestUrl: failure.requestUrl,
-							retriesAttempted: maxRetries,
+				try {
+					const uploadReq = await fetch(url, {
+						method: "PATCH",
+						headers: {
+							"Content-Type": "application/offset+octet-stream",
+							"Upload-Offset": offset.toString(),
+							...headers,
 						},
-					},
-				);
-			}
-			const delay = Math.min(1000 * Math.pow(2, failures - 1), 10000); // Cap at 10 seconds
-			await new Promise((resolve) => setTimeout(resolve, delay));
+						body: chunk,
+					});
 
-			// The failed PATCH may have been stored, in full or in part, before its
-			// response was lost. Ask the server where the upload stands and continue
-			// from there, instead of resending at our own offset (TUS: HEAD after a failure).
-			const status = await getUploadStatus(url, headers, file.size);
-			if (status) {
-				// The server stored more of the upload, so this retry made progress. Reset
-				// the retry budget and the backoff, as tus-js-client does.
-				if (status.offset > offset) {
-					failures = 0;
+					if (uploadReq.ok) {
+						// The server's Upload-Offset wins over our own count: it can be lower than
+						// the end of this chunk (only part of the body was stored) or the full length
+						// (the server replayed an upload that had already finished).
+						const next =
+							parseUploadOffset(uploadReq.headers, file.size) ??
+							offset + chunk.byteLength;
+						if (next > offset) {
+							offset = next;
+							failures = 0;
+							if (offset === file.size) {
+								cid = uploadReq.headers.get("upload-cid");
+								uploadStatus = uploadReq.headers.get("upload-status");
+							}
+							continue;
+						}
+						failure = {
+							status: uploadReq.status,
+							error: "the server did not accept any bytes of the chunk",
+							requestUrl: uploadReq.url || url,
+						};
+					} else {
+						failure = {
+							status: uploadReq.status,
+							error: await uploadReq.text().catch(() => "Unknown error"),
+							requestUrl: uploadReq.url || url,
+						};
+					}
+				} catch (error) {
+					failure = {
+						status: 0,
+						error: error instanceof Error ? error.message : String(error),
+						requestUrl: url,
+					};
 				}
-				offset = status.offset;
-				if (offset === file.size) {
-					cid = status.cid;
-					uploadStatus = status.status;
+
+				failures++;
+				if (failures > maxRetries) {
+					throw new NetworkError(
+						`HTTP error during chunk upload after ${maxRetries} retries: ${failure.error}`,
+						failure.status,
+						{
+							error: failure.error,
+							code: "HTTP_ERROR",
+							metadata: {
+								requestUrl: failure.requestUrl,
+								retriesAttempted: maxRetries,
+							},
+						},
+					);
+				}
+				const delay = Math.min(1000 * Math.pow(2, failures - 1), 10000); // Cap at 10 seconds
+				await new Promise((resolve) => setTimeout(resolve, delay));
+
+				// The failed PATCH may have been stored, in full or in part, before its
+				// response was lost. Ask the server where the upload stands and continue
+				// from there, instead of resending at our own offset (TUS: HEAD after a failure).
+				const status = await getUploadStatus(url, headers, file.size);
+				if (status) {
+					// The server stored more of the upload, so this retry made progress. Reset
+					// the retry budget and the backoff, as tus-js-client does.
+					if (status.offset > offset) {
+						failures = 0;
+					}
+					offset = status.offset;
+					if (offset === file.size) {
+						cid = status.cid;
+						uploadStatus = status.status;
+					}
 				}
 			}
+		} finally {
+			await chunks.close();
 		}
 
 		// A server that sends Upload-Status registers the file after its last byte, and

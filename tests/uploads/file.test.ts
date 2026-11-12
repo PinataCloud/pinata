@@ -507,6 +507,51 @@ describe("uploadFile function", () => {
 			});
 		});
 
+		// Content that differs at every offset, so a test can tell which bytes were sent
+		const byteAt = (offset: number) => offset % 251;
+		let content: Uint8Array<ArrayBuffer>;
+		beforeAll(() => {
+			content = new Uint8Array(largeSize + 4096);
+			for (let i = 0; i < content.length; i++) {
+				content[i] = byteAt(i);
+			}
+		});
+
+		// Stands in for Node's Blobs over 4 GiB: `size` may disagree with the bytes that
+		// `stream()` yields (fs.openAsBlob), and `slice()` is unusable (it aborts the
+		// process past 2^32). The stream comes in pieces that do not line up with chunks.
+		class StreamOnlyFile extends File {
+			constructor(
+				private readonly source: Uint8Array<ArrayBuffer>,
+				reportedSize: number,
+			) {
+				super([], "large.bin", { type: "application/octet-stream" });
+				Object.defineProperty(this, "size", { value: reportedSize });
+			}
+
+			slice(): Blob {
+				throw new Error("slice() must not be used");
+			}
+
+			stream(): ReadableStream<Uint8Array<ArrayBuffer>> {
+				const bytes = this.source;
+				const piece = 1_000_003;
+				let position = 0;
+				return new ReadableStream({
+					pull(controller) {
+						if (position >= bytes.length) {
+							controller.close();
+							return;
+						}
+						controller.enqueue(bytes.slice(position, position + piece));
+						position += piece;
+					},
+				});
+			}
+		}
+		const streamOnly = (actual = largeSize, reported = largeSize) =>
+			new StreamOnlyFile(content.subarray(0, actual), reported);
+
 		beforeEach(() => {
 			// Skip the retry backoff
 			setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
@@ -552,13 +597,20 @@ describe("uploadFile function", () => {
 				url: string;
 				offset?: string;
 				size?: number;
+				// First and last byte of the PATCH body
+				first?: number;
+				last?: number;
+				length?: string;
 			}[] = [];
 			global.fetch = jest.fn(async (url: any, init?: any) => {
 				calls.push({
 					method: init?.method ?? "GET",
 					url: url.toString(),
 					offset: init?.headers?.["Upload-Offset"],
-					size: init?.body?.size,
+					size: init?.body?.byteLength,
+					first: init?.body?.[0],
+					last: init?.body?.[init.body.byteLength - 1],
+					length: init?.headers?.["Upload-Length"],
 				});
 				const step = steps.shift();
 				if (!step) {
@@ -595,29 +647,35 @@ describe("uploadFile function", () => {
 			expect(calls[4].url).toContain("cid=bafyfinal");
 		});
 
-		it("continues from the offset the server reports after a failed PATCH", async () => {
-			const stored = 10 * 1024 * 1024;
+		it("resends the rest of the chunk from the offset the server reports after a failed PATCH", async () => {
+			const stored = 10 * 1024 * 1024 + 7;
 			const calls = script(
 				created(),
 				new Error("connection reset"),
 				uploadStatus(stored),
-				accepted(stored + chunkSize),
+				accepted(chunkSize),
 				accepted(largeSize, "bafyfinal"),
 				fileInfo(),
 			);
 
-			await uploadFile(mockConfig, largeFile, "public");
+			await uploadFile(mockConfig, streamOnly(), "public");
 
 			const patches = calls.filter((c) => c.method === "PATCH");
 			expect(patches.map((c) => c.offset)).toEqual([
 				"0",
 				stored.toString(),
-				(stored + chunkSize).toString(),
+				chunkSize.toString(),
 			]);
 			expect(patches.map((c) => c.size)).toEqual([
 				chunkSize,
-				chunkSize,
-				largeSize - stored - chunkSize,
+				chunkSize - stored,
+				largeSize - chunkSize,
+			]);
+			// Each body holds the file's bytes at its offset
+			expect(patches.map((c) => [c.first, c.last])).toEqual([
+				[byteAt(0), byteAt(chunkSize - 1)],
+				[byteAt(stored), byteAt(chunkSize - 1)],
+				[byteAt(chunkSize), byteAt(largeSize - 1)],
 			]);
 		});
 
@@ -645,7 +703,7 @@ describe("uploadFile function", () => {
 			const calls = script(
 				created(),
 				accepted(1000),
-				accepted(1000 + chunkSize),
+				accepted(chunkSize),
 				accepted(largeSize, "bafyfinal"),
 				fileInfo(),
 			);
@@ -656,8 +714,66 @@ describe("uploadFile function", () => {
 			expect(patches.map((c) => c.offset)).toEqual([
 				"0",
 				"1000",
-				(1000 + chunkSize).toString(),
+				chunkSize.toString(),
 			]);
+			expect(patches.map((c) => c.size)).toEqual([
+				chunkSize,
+				chunkSize - 1000,
+				largeSize - chunkSize,
+			]);
+		});
+
+		it("skips ahead when the server reports an offset past the chunk it was sent", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize + 1000),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			await uploadFile(mockConfig, streamOnly(), "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual([
+				"0",
+				(chunkSize + 1000).toString(),
+			]);
+			expect(patches[1]).toMatchObject({
+				size: largeSize - chunkSize - 1000,
+				first: byteAt(chunkSize + 1000),
+			});
+		});
+
+		it("rereads the file from the start when the server reports an offset before the current chunk", async () => {
+			const calls = script(
+				created(),
+				accepted(chunkSize),
+				new Error("socket hang up"),
+				uploadStatus(500),
+				accepted(500 + chunkSize),
+				accepted(largeSize, "bafyfinal"),
+				fileInfo(),
+			);
+
+			await uploadFile(mockConfig, streamOnly(), "public");
+
+			const patches = calls.filter((c) => c.method === "PATCH");
+			expect(patches.map((c) => c.offset)).toEqual([
+				"0",
+				chunkSize.toString(),
+				"500",
+				(500 + chunkSize).toString(),
+			]);
+			expect(patches[2]).toMatchObject({
+				size: chunkSize,
+				first: byteAt(500),
+				last: byteAt(500 + chunkSize - 1),
+			});
+			expect(patches[3]).toMatchObject({
+				size: largeSize - 500 - chunkSize,
+				first: byteAt(500 + chunkSize),
+				last: byteAt(largeSize - 1),
+			});
 		});
 
 		it("retries at its own offset when HEAD cannot answer", async () => {
@@ -829,8 +945,8 @@ describe("uploadFile function", () => {
 				expect(calls.some((c) => c.method === "GET")).toBe(false);
 			});
 
-			it("gives up when the upload is never registered", async () => {
-				// Every Date.now() is 5 minutes later; the deadline is 11 minutes for <1 GiB
+			it("gives up when the upload is never registered, and says how to keep polling", async () => {
+				// Every Date.now() is 5 minutes later; the deadline is 15 minutes for <1 GiB
 				let now = 0;
 				const clock = jest.spyOn(Date, "now").mockImplementation(() => {
 					now += 5 * 60 * 1000;
@@ -846,11 +962,19 @@ describe("uploadFile function", () => {
 						head("processing"),
 					);
 
-					await expect(
-						uploadFile(mockConfig, largeFile, "public"),
-					).rejects.toThrow(
-						"Timed out waiting for the upload to be registered",
+					const error = await uploadFile(mockConfig, largeFile, "public").catch(
+						(e) => e,
 					);
+					expect(error).toBeInstanceOf(NetworkError);
+					expect(error.message).toContain(
+						"Timed out waiting for the upload to be registered after 15 minutes",
+					);
+					// The caller can finish the job: the upload URL and what to ask it
+					expect(error.message).toContain("still processing");
+					expect(error.message).toContain(`poll ${uploadUrl} with HEAD`);
+					expect(error.message).toContain("Upload-Status: ready");
+					expect(error.statusCode).toBe(0);
+					expect(error.details.metadata.requestUrl).toBe(uploadUrl);
 					expect(calls.some((c) => c.method === "GET")).toBe(false);
 				} finally {
 					clock.mockRestore();
@@ -887,6 +1011,103 @@ describe("uploadFile function", () => {
 
 			expect(result).toEqual(mockResponse);
 			expect(calls[3].url).toContain("cid=bafyfinal");
+		});
+
+		describe("reading the file", () => {
+			it("cuts chunks from the file's stream, never with slice()", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					accepted(largeSize, "bafyfinal"),
+					fileInfo(),
+				);
+
+				const result = await uploadFile(mockConfig, streamOnly(), "public");
+
+				expect(result).toEqual(mockResponse);
+				expect(calls[0].length).toBe(largeSize.toString());
+				const patches = calls.filter((c) => c.method === "PATCH");
+				expect(patches).toEqual([
+					expect.objectContaining({
+						offset: "0",
+						size: chunkSize,
+						first: byteAt(0),
+						last: byteAt(chunkSize - 1),
+					}),
+					expect.objectContaining({
+						offset: chunkSize.toString(),
+						size: largeSize - chunkSize,
+						first: byteAt(chunkSize),
+						last: byteAt(largeSize - 1),
+					}),
+				]);
+			});
+
+			it("resends the same bytes when a PATCH fails", async () => {
+				const calls = script(
+					created(),
+					accepted(chunkSize),
+					new Response("boom", { status: 500 }),
+					uploadStatus(chunkSize),
+					accepted(largeSize, "bafyfinal"),
+					fileInfo(),
+				);
+
+				await uploadFile(mockConfig, streamOnly(), "public");
+
+				const patches = calls.filter((c) => c.method === "PATCH");
+				expect(patches[1]).toEqual(patches[2]);
+				expect(patches[2]).toMatchObject({
+					offset: chunkSize.toString(),
+					size: largeSize - chunkSize,
+					first: byteAt(chunkSize),
+					last: byteAt(largeSize - 1),
+				});
+			});
+
+			it("refuses to complete the upload when the file holds more bytes than its size", async () => {
+				// fs.openAsBlob of a file over 4 GiB: `size` wrapped, the stream has every byte
+				const calls = script(created(), accepted(chunkSize));
+
+				const error = await uploadFile(
+					mockConfig,
+					streamOnly(largeSize + 4096, largeSize),
+					"public",
+				).catch((e) => e);
+
+				expect(error).toBeInstanceOf(ValidationError);
+				expect(error.message).toContain("larger than its reported size");
+				expect(error.message).toContain("4 GiB");
+				// The PATCH that would complete a truncated upload is never sent
+				expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH"]);
+				expect(calls[1].offset).toBe("0");
+			});
+
+			it("refuses to complete the upload when one extra byte follows its size", async () => {
+				const calls = script(created(), accepted(chunkSize));
+
+				await expect(
+					uploadFile(
+						mockConfig,
+						streamOnly(largeSize + 1, largeSize),
+						"public",
+					),
+				).rejects.toThrow(ValidationError);
+				expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH"]);
+			});
+
+			it("stops when the file's stream ends before its size", async () => {
+				const calls = script(created(), accepted(chunkSize));
+
+				await expect(
+					uploadFile(
+						mockConfig,
+						streamOnly(largeSize - 1, largeSize),
+						"public",
+					),
+				).rejects.toThrow("smaller than its reported size");
+				expect(calls.map((c) => c.method)).toEqual(["POST", "PATCH"]);
+			});
 		});
 
 		it("rejects waitForCid: false with vectorize before uploading", async () => {
