@@ -39,10 +39,65 @@ export type UploadOptions = {
 	/**
 	 * Resumable uploads (files over 90 MiB) only. Defaults to true: wait until the server
 	 * has registered the file, then return it. With false, return once the bytes are
-	 * stored: the response holds only `size` and the CID the server sent with the last
-	 * chunk (empty if none), and registration can still fail. Not allowed with `vectorize`.
+	 * stored: the response holds only `size`, `network` and the CID the server sent with
+	 * the last chunk (empty if none), and registration can still fail. Not allowed with
+	 * `vectorize`.
 	 */
 	waitForCid?: boolean;
+};
+
+/** A file of a folder upload and its path in the folder, e.g. `photos/2024/a.jpg`. */
+export type FolderEntry = {
+	path: string;
+	file: File;
+};
+
+/** What happened to one file of a folder upload. */
+export type FolderUploadEvent = {
+	/**
+	 * `start`: the file's bytes start to be sent (again on each attempt).
+	 * `complete`: the file is registered in the folder.
+	 * `retry`: an attempt failed and the file will be sent again after `delayMs`.
+	 * `error`: the file failed for good; the upload goes on with the other files.
+	 */
+	type: "start" | "complete" | "retry" | "error";
+	/** The file's path in the folder, folder name included */
+	path: string;
+	size: number;
+	/** 1 for the first attempt */
+	attempt: number;
+	/** `complete`: the file's own CID */
+	cid?: string;
+	/** `retry` and `error`: why the attempt failed */
+	error?: Error;
+	/** `retry`: how long until the next attempt */
+	delayMs?: number;
+	/** Files registered so far */
+	completed: number;
+	/** Files that failed for good so far */
+	failed: number;
+	total: number;
+};
+
+export type FolderUploadOptions = UploadOptions & {
+	/** How many files send their bytes at the same time. Defaults to 4. */
+	concurrency?: number;
+	/** How many times a file is sent again after a transient failure. Defaults to 3. */
+	retries?: number;
+	/** Called for every file event, in order for each file. */
+	onProgress?: (event: FolderUploadEvent) => void;
+};
+
+/** A file of an uploaded folder */
+export type FolderFileResult = {
+	path: string;
+	size: number;
+	cid: string;
+};
+
+/** The uploaded folder (its CID covers every file) and its files */
+export type FolderUploadResponse = UploadResponse & {
+	files: FolderFileResult[];
 };
 
 export type SignedUploadUrlOptions = {

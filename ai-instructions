@@ -550,6 +550,39 @@ Response: "Revoked"
   pinata.upload.public.fileArray([File, File, ...])
     // Same options as file()
 
+  // Folder upload, file by file: each file is its own resumable upload, several at a
+  // time, each retried on its own. Suited to large folders.
+  pinata.upload.public.folder(files, options?)
+  pinata.upload.private.folder(files, options?)
+    // files: File[] (path = webkitRelativePath from <input webkitdirectory>, else name)
+    //        or { path: "photos/2024/a.jpg", file: File }[]
+    .name("folder name")    // Optional: renames the top folder (default: the folder all
+                            // paths share, else "folder_from_sdk")
+    .keyvalues({ key: "value" })  // Optional
+    .group(groupId)         // Optional
+    .cidVersion("v1")       // Optional
+    .key(apiKey)            // Optional
+    // Not supported: vectorize, url, car, streamable, peerAddress, waitForCid(false)
+
+  type FolderUploadOptions = {
+    concurrency?: number;   // files sending bytes at once (default 4)
+    retries?: number;       // retries per file after a transient failure (default 3)
+    onProgress?: (event: FolderUploadEvent) => void;
+  }
+  type FolderUploadEvent = {
+    type: "start" | "complete" | "retry" | "error";
+    path: string; size: number; attempt: number;
+    cid?: string;           // complete: the file's CID
+    error?: Error;          // retry / error
+    delayMs?: number;       // retry
+    completed: number; failed: number; total: number;
+  }
+
+  Response: UploadResponse of the folder (its CID covers every file), plus
+    files: { path: string; size: number; cid: string }[]
+  Throws FolderUploadError when files fail for good: .folderId, .uploaded, .failed
+    ({ path, size, error }); the other files are uploaded into that folder.
+
   // JSON content
   pinata.upload.public.json(JsonObject)
   pinata.upload.private.json(JsonObject)
