@@ -64,7 +64,7 @@ export type FolderUploadEvent = {
 	/** The file's path in the folder, folder name included */
 	path: string;
 	size: number;
-	/** 1 for the first attempt */
+	/** 1 for the first attempt; 0 for a file refused before it was sent */
 	attempt: number;
 	/** `complete`: the file's own CID */
 	cid?: string;

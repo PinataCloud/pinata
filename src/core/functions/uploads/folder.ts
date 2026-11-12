@@ -120,6 +120,17 @@ export const uploadFolder = async (
 		underWay.run(() => uploadOne(entry));
 	const uploadOne = async (entry: ResolvedEntry): Promise<void> => {
 		const { path, file } = entry;
+		// files-api leaves "%" unescaped in the upload URL, so checking the upload hits
+		// another path (404) and the file would be reported failed while it lands in the
+		// folder. Not sent until the server escapes it.
+		if (path.includes("%")) {
+			const error = new ValidationError(
+				`File paths containing "%" cannot be uploaded yet: "${path}"`,
+			);
+			failed.push({ path, size: file.size, error });
+			emit({ type: "error", path, size: file.size, attempt: 0, error });
+			return;
+		}
 		for (let attempt = 1; ; attempt++) {
 			try {
 				// Only sending the bytes takes a slot: waiting for registration doesn't.

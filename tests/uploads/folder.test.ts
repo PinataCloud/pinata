@@ -690,6 +690,26 @@ describe("uploadFolder", () => {
 		expect(heads).toBe(1);
 	});
 
+	it("fails a path holding '%' without sending it, and uploads the others", async () => {
+		const { created } = server();
+		const events: string[] = [];
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/100%.txt", file: file("a") },
+				{ path: "d/ok.txt", file: file("bb") },
+			],
+			"private",
+			{ onProgress: (e) => events.push(`${e.type} ${e.path} ${e.attempt}`) },
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.failed[0].error).toBeInstanceOf(ValidationError);
+		expect(created.map((c) => c.path)).toEqual(["d/ok.txt"]);
+		expect(events).toContain("error d/100%.txt 0");
+	});
+
 	it("refuses options a folder upload cannot honor", async () => {
 		server();
 		await expect(
