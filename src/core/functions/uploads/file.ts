@@ -10,7 +10,7 @@ import {
 	parseUploadOffset,
 	waitForRegistration,
 } from "./tusStatus";
-import { StreamChunks } from "./streamChunks";
+import { FileChunks } from "./fileChunks";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -124,14 +124,16 @@ export const uploadFile = async (
 		let cid: string | null = null;
 		let uploadStatus: string | null = null;
 
-		// Read the file as a stream rather than with file.slice(): see StreamChunks.
-		const chunks = new StreamChunks(file, chunkSize);
+		// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
+		const chunks = new FileChunks(file, chunkSize);
 
 		try {
 			while (offset < file.size) {
 				// The rest of the chunk that holds `offset`: after a PATCH that stored only part
 				// of a chunk, the next one resends the remainder.
 				const chunk = await chunks.at(offset);
+				const chunkLength =
+					chunk instanceof Uint8Array ? chunk.byteLength : chunk.size;
 				let failure: { status: number; error: string; requestUrl: string };
 
 				try {
@@ -151,7 +153,7 @@ export const uploadFile = async (
 						// (the server replayed an upload that had already finished).
 						const next =
 							parseUploadOffset(uploadReq.headers, file.size) ??
-							offset + chunk.byteLength;
+							offset + chunkLength;
 						if (next > offset) {
 							offset = next;
 							failures = 0;

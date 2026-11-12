@@ -19,6 +19,7 @@ export interface UploadStatus {
 	// TUS Upload-Status: receiving, processing, ready or failed. Null on servers that
 	// complete an upload on its last PATCH and never send it.
 	status: string | null;
+	// Why a `failed` upload failed, when the server says (Upload-Error)
 	error: string | null;
 }
 
@@ -115,8 +116,9 @@ export const waitForRegistration = async (
 			return status.cid;
 		}
 		if (status?.status === "failed") {
+			// Upload-Error is optional: a server may report the failure without a reason.
 			throw new NetworkError(
-				`The upload was received but not registered: ${status.error || "processing failed"}`,
+				`The upload was received but not registered${status.error ? `: ${status.error}` : ""}`,
 				422,
 				{
 					error: status.error || "upload failed",
@@ -132,8 +134,8 @@ export const waitForRegistration = async (
 	throw new NetworkError(
 		`Timed out waiting for the upload to be registered after ${Math.round(timeout / 60000)} minutes. ` +
 			`The server has every byte and is still processing it, so it may yet be registered: poll ${url} ` +
-			"with HEAD until it returns Upload-Status: ready (its Upload-Cid header then holds the CID), " +
-			"or failed (Upload-Error says why).",
+			"with HEAD until it returns Upload-Status: ready (its Upload-Cid header then holds the CID) " +
+			"or failed.",
 		0,
 		{
 			error: "upload still processing",
