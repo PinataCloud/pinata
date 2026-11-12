@@ -98,6 +98,12 @@ export type FolderFileResult = {
 /** The uploaded folder (its CID covers every file) and its files */
 export type FolderUploadResponse = UploadResponse & {
 	files: FolderFileResult[];
+	/**
+	 * The same content was already uploaded: the server kept that folder and removed this
+	 * one. `id`, `name`, `cid` and the files' paths are that folder's; `group_id` and
+	 * `keyvalues` are the ones requested, which it may not have.
+	 */
+	is_duplicate?: boolean;
 };
 
 export type SignedUploadUrlOptions = {

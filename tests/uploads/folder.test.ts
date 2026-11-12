@@ -411,10 +411,29 @@ describe("uploadFolder", () => {
 		expect(created.map((c) => c.path)).toEqual(["d/a1.txt", "d/a2.txt"]);
 	});
 
-	it("fails without sending the others when the first file cannot be uploaded", async () => {
+	it("stops when the first files fail for a reason every file shares", async () => {
 		const { created } = server(() =>
 			refused(413, "Feature (Resumable Buckets) not turned on"),
 		);
+
+		await expect(
+			uploadFolder(
+				config,
+				Array.from({ length: 6 }, (_, i) => ({
+					path: `d/${i}.txt`,
+					file: file("x".repeat(i + 1)),
+				})),
+				"private",
+			),
+		).rejects.toThrow(
+			"Could not start the upload (HTTP 413): Feature (Resumable Buckets) not turned on",
+		);
+		// Three first files refused alike: the others are not sent
+		expect(created).toHaveLength(3);
+	});
+
+	it("stops when the first file fails for any other reason", async () => {
+		const { created } = server(() => refused(503, "Service Unavailable"));
 
 		await expect(
 			uploadFolder(
@@ -424,32 +443,251 @@ describe("uploadFolder", () => {
 					{ path: "d/b.txt", file: file("bb") },
 				],
 				"private",
+				{ retries: 1 },
 			),
-		).rejects.toThrow(
-			"Could not start the upload (HTTP 413): Feature (Resumable Buckets) not turned on",
-		);
-		expect(created).toHaveLength(1);
+		).rejects.toThrow("HTTP 503");
+		expect(created.map((c) => c.path)).toEqual(["d/a.txt", "d/a.txt"]);
 	});
 
-	it("refuses a file the server registered outside the folder", async () => {
-		server(
+	it("lets the next file create the folder when the first is refused for its own reason", async () => {
+		const { created } = server((creation) =>
+			creation.path === "d/a.txt"
+				? refused(400, "file with too many subdirectories")
+				: undefined,
+		);
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/b.txt", file: file("bb") },
+				{ path: "d/c.txt", file: file("ccc") },
+			],
+			"private",
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.failed.map((f: { path: string }) => f.path)).toEqual([
+			"d/a.txt",
+		]);
+		expect(error.uploaded.map((f: { path: string }) => f.path).sort()).toEqual([
+			"d/b.txt",
+			"d/c.txt",
+		]);
+		expect(created.map((c) => c.path).slice(0, 2)).toEqual([
+			"d/a.txt",
+			"d/b.txt",
+		]);
+	});
+
+	it("creates the folder with the smallest of the shallowest files", async () => {
+		const { created } = server();
+
+		await uploadFolder(
+			config,
+			[
+				{ path: "d/x/y/tiny.txt", file: file("1") },
+				{ path: "d/top.txt", file: file("1234") },
+				{ path: "d/small.txt", file: file("12") },
+			],
+			"private",
+		);
+
+		expect(created[0].path).toBe("d/small.txt");
+	});
+
+	it("keeps a file reported as an earlier upload, with the CID of its own bytes", async () => {
+		// Alone, the first file matches an earlier one-file folder: the server registers it
+		// in this folder but reports the earlier upload's id and CID once it is ready
+		const { fetchMock } = server(
 			(creation) =>
 				new Response(null, {
 					status: 201,
 					headers: {
-						Location: `https://uploads.test/v3/files/${creation.folderId}/x`,
+						Location: `https://uploads.test/v3/files/${creation.folderId}/${encodeURIComponent(creation.path)}`,
 						"Upload-Offset": "1",
-						"Upload-Cid": "bafyearlier",
-						"Upload-Metadata": `filename ${encode(creation.path)},file_id ${encode("earlier-upload")}`,
+						"Upload-Cid": `bafy-own-${creation.path}`,
+						"Upload-Status": "processing",
 					},
 				}),
 		);
+		const realFetch = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			init.method === "HEAD"
+				? new Response(null, {
+						status: 200,
+						headers: {
+							"Upload-Offset": "1",
+							"Upload-Status": "ready",
+							"Upload-Cid": "bafy-earlier-folder",
+							"Upload-Metadata": `file_id ${encode("earlier-upload")}`,
+						},
+					})
+				: init.method === "PUT"
+					? new Response(
+							JSON.stringify({
+								data: {
+									id: "f",
+									name: "d",
+									cid: "bafyfolder",
+									size: 2,
+									number_of_files: 2,
+								},
+							}),
+							{ status: 200 },
+						)
+					: realFetch(url, init),
+		);
+
+		const result = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/b.txt", file: file("b") },
+			],
+			"private",
+		);
+
+		expect(result.files.map((f) => f.cid)).toEqual([
+			"bafy-own-d/a.txt",
+			"bafy-own-d/b.txt",
+		]);
+	});
+
+	it("answers with the earlier folder when the same content was already uploaded", async () => {
+		const { fetchMock } = server();
+		const realFetch = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			init.method === "PUT"
+				? new Response(
+						JSON.stringify({
+							data: {
+								id: "earlier-folder",
+								name: "photos",
+								cid: "bafy-earlier",
+								size: 3,
+								number_of_files: 2,
+								is_duplicate: true,
+							},
+						}),
+						{ status: 200 },
+					)
+				: realFetch(url, init),
+		);
+
+		const result = await uploadFolder(
+			config,
+			[
+				{ path: "v2/a.txt", file: file("a") },
+				{ path: "v2/sub/b.txt", file: file("b") },
+			],
+			"public",
+		);
+
+		expect(result).toMatchObject({
+			id: "earlier-folder",
+			name: "photos",
+			cid: "bafy-earlier",
+			is_duplicate: true,
+		});
+		expect(result.files.map((f) => f.path)).toEqual([
+			"photos/a.txt",
+			"photos/sub/b.txt",
+		]);
+	});
+
+	it("uses a JWT replaced during the upload for the next files", async () => {
+		const { fetchMock } = server();
+		const live: PinataConfig = { ...config, pinataJwt: "first-jwt" };
+
+		await uploadFolder(
+			live,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/b.txt", file: file("bb") },
+			],
+			"private",
+			{
+				onProgress: (e) => {
+					if (e.type === "complete") live.pinataJwt = "fresh-jwt";
+				},
+			},
+		);
+
+		const auth = fetchMock.mock.calls.map(
+			([, init]) => (init.headers as Record<string, string>).Authorization,
+		);
+		expect(auth[0]).toBe("Bearer first-jwt");
+		expect(auth.at(-1)).toBe("Bearer fresh-jwt");
+	});
+
+	it("fails a file at once when the server refuses a chunk for good", async () => {
+		let patches = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "PATCH") {
+				patches++;
+				return new Response("too large", { status: 413 });
+			}
+			return new Response(null, {
+				status: 200,
+				headers: { "Upload-Offset": "0" },
+			});
+		}) as unknown as typeof fetch;
 
 		await expect(
-			uploadFolder(config, [{ path: "d/a.txt", file: file("a") }], "private"),
-		).rejects.toThrow(
-			/registered d\/a\.txt as file earlier-upload, not in folder/,
-		);
+			uploadFolder(
+				config,
+				[
+					{
+						path: "d/large.bin",
+						file: new File([new Uint8Array(50 * 1024 * 1024 + 2)], "large.bin"),
+					},
+				],
+				"public",
+				{ retries: 0 },
+			),
+		).rejects.toThrow("too large");
+		expect(patches).toBe(1);
+	});
+
+	it("stops at once when the registration check is refused", async () => {
+		let heads = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/upload`,
+						"Upload-Offset": "1",
+						"Upload-Cid": "bafyfile",
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			heads++;
+			return new Response(null, { status: 401 });
+		}) as unknown as typeof fetch;
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+		).catch((e) => e);
+
+		expect(error.statusCode).toBe(401);
+		expect(heads).toBe(1);
 	});
 
 	it("refuses options a folder upload cannot honor", async () => {

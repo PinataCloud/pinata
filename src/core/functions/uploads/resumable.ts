@@ -141,6 +141,23 @@ export const sendResumable = async (
 			}
 
 			failures++;
+			// A refusal that sending again cannot change (a 4xx other than a timeout, a
+			// conflict or a rate limit) fails at once
+			const permanent =
+				failure.status >= 400 &&
+				failure.status < 500 &&
+				![408, 409, 423, 425, 429].includes(failure.status);
+			if (permanent) {
+				throw new NetworkError(
+					`HTTP error during chunk upload: ${failure.error}`,
+					failure.status,
+					{
+						error: failure.error,
+						code: "HTTP_ERROR",
+						metadata: { requestUrl: failure.requestUrl },
+					},
+				);
+			}
 			if (failures > MAX_RETRIES) {
 				throw new NetworkError(
 					`HTTP error during chunk upload after ${MAX_RETRIES} retries: ${failure.error}`,
@@ -200,7 +217,10 @@ export const registerResumable = async (
 		const ready = await waitForRegistration(upload.url, headers, size, signal);
 		registered = {
 			url: upload.url,
-			cid: ready.cid,
+			// The CID the server computed from these bytes, sent with the last of them, wins:
+			// the ready status reports the registered file's, which is an earlier upload's
+			// when this one matched it (files-tus checks the two agree for this upload)
+			cid: upload.cid ?? ready.cid,
 			status: ready.status,
 			metadata: ready.metadata,
 		};

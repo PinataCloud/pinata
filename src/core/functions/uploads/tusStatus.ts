@@ -1,4 +1,7 @@
-import { NetworkError } from "../../../utils/custom-errors";
+import {
+	AuthenticationError,
+	NetworkError,
+} from "../../../utils/custom-errors";
 
 const GIB = 1024 * 1024 * 1024;
 // How long to wait for a finished upload to be registered. Processing a large file
@@ -66,6 +69,19 @@ export const getUploadStatus = async (
 				metadata: {
 					requestUrl: res.url || url,
 				},
+			},
+		);
+	}
+	// No later request can succeed with these credentials: say so now, rather than
+	// polling until the registration wait runs out
+	if (res.status === 401 || res.status === 403) {
+		throw new AuthenticationError(
+			`Authentication failed while checking the upload (HTTP ${res.status})`,
+			res.status,
+			{
+				error: `HEAD returned ${res.status}`,
+				code: "AUTH_ERROR",
+				metadata: { requestUrl: res.url || url },
 			},
 		);
 	}

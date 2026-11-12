@@ -13,20 +13,23 @@ import {
 	ValidationError,
 } from "../../../utils/custom-errors";
 import { registerResumable, sendResumable } from "./resumable";
-import {
-	encodeMetadataValue,
-	parseUploadMetadata,
-	serverReason,
-} from "./tusMetadata";
+import { encodeMetadataValue, serverReason } from "./tusMetadata";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RETRIES = 3;
 const DEFAULT_FOLDER_NAME = "folder_from_sdk";
+// A file's bytes are stored seconds before the server registers it. Files waiting for that
+// don't hold a send slot, but at most this many per slot are under way at once, so that a
+// large folder doesn't poll the registration of thousands of files.
+const UNDER_WAY_PER_SLOT = 4;
+// The sync computes the folder's CID from every file within the request
+const SYNC_TIMEOUT_MS = 2 * 60 * 1000;
 
 // Uploads a folder file by file: each file is its own resumable upload into the folder,
 // several at a time, each retried on its own. A final sync gives the folder's CID.
 //
 // The first file is uploaded alone, so that the folder exists before the others join it.
+// If it fails for a reason of its own, the next one tries.
 export const uploadFolder = async (
 	config: PinataConfig | undefined,
 	files: File[] | FolderEntry[],
@@ -44,11 +47,14 @@ export const uploadFolder = async (
 	);
 	const retries = Math.max(0, Math.floor(options?.retries ?? DEFAULT_RETRIES));
 
-	const jwt = options?.keys || config.pinataJwt;
-	const headers: Record<string, string> =
-		config.customHeaders && Object.keys(config.customHeaders).length > 0
+	// Built for every file and request: a JWT set with setNewJwt during a long upload (the
+	// dashboard's tokens last 30 minutes) is used from then on
+	const headers = (): Record<string, string> => {
+		const jwt = options?.keys || config.pinataJwt;
+		return config.customHeaders && Object.keys(config.customHeaders).length > 0
 			? { Authorization: `Bearer ${jwt}`, ...config.customHeaders }
 			: { Authorization: `Bearer ${jwt}`, Source: "sdk/folder" };
+	};
 	const endpoint = config.uploadUrl || "https://uploads.pinata.cloud/v3";
 
 	const folderId = uuidv7();
@@ -95,6 +101,7 @@ export const uploadFolder = async (
 	};
 
 	const slots = new Semaphore(concurrency);
+	const underWay = new Semaphore(concurrency * UNDER_WAY_PER_SLOT);
 	// Set by a failure no other file can avoid (authentication): files not started yet fail
 	// with it instead of being sent.
 	let fatal: Error | undefined;
@@ -109,7 +116,9 @@ export const uploadFolder = async (
 		}
 	};
 
-	const uploadEntry = async (entry: ResolvedEntry): Promise<void> => {
+	const uploadEntry = (entry: ResolvedEntry) =>
+		underWay.run(() => uploadOne(entry));
+	const uploadOne = async (entry: ResolvedEntry): Promise<void> => {
 		const { path, file } = entry;
 		for (let attempt = 1; ; attempt++) {
 			try {
@@ -120,7 +129,7 @@ export const uploadFolder = async (
 					try {
 						return await sendResumable(
 							createUrl.toString(),
-							headers,
+							headers(),
 							file,
 							`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
 							true,
@@ -131,14 +140,14 @@ export const uploadFolder = async (
 						throw error;
 					}
 				});
-				const registered = await registerResumable(stored, headers, file.size);
-				// A file registered as another upload is not in this folder.
-				const registeredId = parseUploadMetadata(registered.metadata).file_id;
-				if (registeredId !== undefined && registeredId !== folderId) {
-					throw new PinataError(
-						`The server registered ${path} as file ${registeredId}, not in folder ${folderId}`,
-					);
-				}
+				// The file is in the folder once registered. It may be reported as an earlier
+				// upload when, alone, it matches one (a one-file folder of the same name and
+				// content): its object is in this folder all the same, and its CID is its own.
+				const registered = await registerResumable(
+					stored,
+					headers(),
+					file.size,
+				);
 				const result = { path, size: file.size, cid: registered.cid as string };
 				uploaded.push(result);
 				emit({
@@ -165,20 +174,43 @@ export const uploadFolder = async (
 		}
 	};
 
-	// The smallest file first: it creates the folder, and the others wait for it.
-	const first = entries.reduce((a, b) => (b.file.size < a.file.size ? b : a));
-	await uploadEntry(first);
-	if (failed.length > 0) {
-		const { error } = failed[0];
-		throw error instanceof PinataError
-			? error
-			: new PinataError(`Error uploading folder: ${error.message}`);
+	// The smallest of the shallowest files first: it creates the folder, and the others wait
+	// for it. If it fails for a reason of its own (its path, type or size), the next one
+	// tries. A failure every file would share stops the upload: any other error, or the same
+	// reason three times in a row (a missing group answers 400 to every file).
+	const pending = entries.slice();
+	const depth = (entry: ResolvedEntry) => entry.path.split("/").length;
+	let previousReason: string | undefined;
+	let repeats = 0;
+	for (;;) {
+		let pick = 0;
+		for (let i = 1; i < pending.length; i++) {
+			const [a, b] = [pending[i], pending[pick]];
+			if (
+				depth(a) < depth(b) ||
+				(depth(a) === depth(b) && a.file.size < b.file.size)
+			) {
+				pick = i;
+			}
+		}
+		const [first] = pending.splice(pick, 1);
+		await uploadEntry(first);
+		if (uploaded.length > 0) break;
+		const { error } = failed[failed.length - 1];
+		const status = error instanceof PinataError ? error.statusCode : undefined;
+		const reason = `${status} ${error.message}`;
+		repeats = reason === previousReason ? repeats + 1 : 1;
+		previousReason = reason;
+		const ownReason =
+			error instanceof ValidationError ||
+			[400, 413, 415, 422].includes(status ?? 0);
+		if (error === fatal || !ownReason || repeats >= 3 || pending.length === 0) {
+			throw error instanceof PinataError
+				? error
+				: new PinataError(`Error uploading folder: ${error.message}`);
+		}
 	}
-	await Promise.all(
-		entries
-			.filter((entry) => entry !== first)
-			.map((entry) => uploadEntry(entry)),
-	);
+	await Promise.all(pending.map((entry) => uploadEntry(entry)));
 
 	if (failed.length > 0) {
 		throw new FolderUploadError(
@@ -189,7 +221,7 @@ export const uploadFolder = async (
 		);
 	}
 
-	const folder = await syncFolder(endpoint, folderId, headers, retries);
+	const folder = await syncFolder(endpoint, folderId, headers(), retries);
 	if (folder.number_of_files !== total) {
 		throw new NetworkError(
 			`Folder ${folderId} holds ${folder.number_of_files} of the ${total} uploaded files`,
@@ -203,6 +235,12 @@ export const uploadFolder = async (
 	}
 
 	const byPath = new Map(uploaded.map((result) => [result.path, result]));
+	// Content already uploaded resolves to that earlier folder: its files' paths start with
+	// its name
+	const rename = (path: string) =>
+		folder.is_duplicate && folder.name
+			? `${folder.name}${path.slice(path.indexOf("/"))}`
+			: path;
 	return {
 		id: folder.id,
 		name: folder.name,
@@ -215,8 +253,12 @@ export const uploadFolder = async (
 		keyvalues: options?.metadata?.keyvalues ?? {},
 		vectorized: false,
 		network: folder.network ?? network,
+		...(folder.is_duplicate ? { is_duplicate: true } : {}),
 		// In the order they were given
-		files: entries.map((entry) => byPath.get(entry.path) as FolderFileResult),
+		files: entries.map((entry) => {
+			const result = byPath.get(entry.path) as FolderFileResult;
+			return { ...result, path: rename(result.path) };
+		}),
 	};
 };
 
@@ -231,6 +273,8 @@ interface SyncedFolder {
 	network?: string;
 	mime_type?: string;
 	created_at?: string;
+	/** The folder's content was already uploaded: this is that earlier folder */
+	is_duplicate?: boolean;
 }
 
 // Computes the folder's CID from every registered file and says how many files it holds.
@@ -246,6 +290,7 @@ const syncFolder = async (
 			const res = await fetch(`${endpoint}/buckets/${folderId}/sync`, {
 				method: "PUT",
 				headers,
+				signal: AbortSignal.timeout(SYNC_TIMEOUT_MS),
 			});
 			if (res.ok) {
 				const body = await res.json();
