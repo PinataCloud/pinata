@@ -81,12 +81,17 @@ export const uploadFolder = async (
 	const emit = (
 		event: Omit<FolderUploadEvent, "completed" | "failed" | "total">,
 	) => {
-		options?.onProgress?.({
-			...event,
-			completed: uploaded.length,
-			failed: failed.length,
-			total,
-		});
+		try {
+			options?.onProgress?.({
+				...event,
+				completed: uploaded.length,
+				failed: failed.length,
+				total,
+			});
+		} catch {
+			// The observer's failure, not the file's: it must not fail the file, send a
+			// registered file again, or leave the other files uploading unawaited.
+		}
 	};
 
 	const slots = new Semaphore(concurrency);
@@ -302,8 +307,9 @@ const folderEntries = (
 		({ segments }) => segments.length > 1 && segments[0] === top,
 	);
 	const folder = name || (sharedTop ? top : DEFAULT_FOLDER_NAME);
-	if (folder.includes("/")) {
-		throw new ValidationError(`Folder name cannot contain "/": "${folder}"`);
+	// One segment, checked as the input paths are
+	if (/[/\\]/.test(folder) || folder === "." || folder === "..") {
+		throw new ValidationError(`Invalid folder name: "${folder}"`);
 	}
 
 	const seen = new Set<string>();

@@ -183,6 +183,23 @@ describe("uploadFolder", () => {
 				ValidationError,
 			);
 		});
+
+		it("refuses a folder name that is not one path segment", async () => {
+			const { created } = server();
+			for (const name of ["..", ".", "a/b", "a\\b", "..\\x"]) {
+				await expect(
+					uploadFolder(
+						config,
+						[{ path: "a.txt", file: file("a") }],
+						"private",
+						{
+							metadata: { name },
+						},
+					),
+				).rejects.toThrow(ValidationError);
+			}
+			expect(created).toHaveLength(0);
+		});
 	});
 
 	it("registers one file before sending the others, then returns the synced folder", async () => {
@@ -330,6 +347,44 @@ describe("uploadFolder", () => {
 				(call) => (call[1] as RequestInit).method === "PUT",
 			),
 		).toHaveLength(0);
+	});
+
+	it("ignores what onProgress throws", async () => {
+		const { created } = server((creation) =>
+			creation.path === "d/bad.txt" ? refused(400, "invalid name") : undefined,
+		);
+		const events: string[] = [];
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/b.txt", file: file("bb") },
+				{ path: "d/bad.txt", file: file("bad") },
+			],
+			"private",
+			{
+				onProgress: (event) => {
+					events.push(`${event.type} ${event.path} ${event.completed}`);
+					throw new Error("observer failed");
+				},
+			},
+		).catch((e) => e);
+
+		// Each file sent once: neither a registered file nor one whose start event threw
+		// is sent again, and the failed file is reported as the folder's failure
+		expect(created.map((c) => c.path).sort()).toEqual([
+			"d/a.txt",
+			"d/b.txt",
+			"d/bad.txt",
+		]);
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.uploaded).toHaveLength(2);
+		expect(error.failed.map((f: { path: string }) => f.path)).toEqual([
+			"d/bad.txt",
+		]);
+		expect(events).toContain("complete d/b.txt 2");
+		expect(events.filter((e) => e.startsWith("start"))).toHaveLength(3);
 	});
 
 	it("stops sending files after an authentication failure", async () => {

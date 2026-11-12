@@ -84,7 +84,7 @@ export type FolderUploadOptions = UploadOptions & {
 	concurrency?: number;
 	/** How many times a file is sent again after a transient failure. Defaults to 3. */
 	retries?: number;
-	/** Called for every file event, in order for each file. */
+	/** Called for every file event, in order for each file. What it throws is ignored. */
 	onProgress?: (event: FolderUploadEvent) => void;
 };
 
