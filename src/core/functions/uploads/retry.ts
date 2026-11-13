@@ -35,6 +35,20 @@ export const isFinalizing = (error: Error): boolean =>
 	error.statusCode === 409 &&
 	/\bfinaliz/i.test(error.message);
 
+// What the body of a 5xx says when a service behind the server was rate limited
+const RATE_LIMITED_BODY = /\b429\b|too many requests/i;
+
+// The server is rate limited: a 429, or a 5xx whose body says a service behind it was (a
+// folder sync answers "500 …: 429 Too many requests")
+export const isRateLimited = (error: Error): boolean => {
+	if (!(error instanceof PinataError)) return false;
+	const status = error.statusCode ?? 0;
+	return (
+		status === 429 ||
+		(status >= 500 && RATE_LIMITED_BODY.test(error.details?.error ?? ""))
+	);
+};
+
 // The pause before retry `attempt` (1 for the first): 1 s, doubling up to 10 s
 export const backoff = (attempt: number): number =>
 	Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1), BACKOFF_MAX_MS);

@@ -148,7 +148,9 @@ class FolderUpload {
 			throw await this.partialFailure();
 		}
 
-		const folder = await this.finish();
+		const folder = await this.finish().catch((error) => {
+			throw this.unfinished(error);
+		});
 		// At least these files: a folder uploaded into (folderId) also holds the earlier ones
 		if (folder.number_of_files < entries.length) {
 			throw new NetworkError(
@@ -485,7 +487,9 @@ class FolderUpload {
 		return registered.cid;
 	}
 
-	private async finish(): Promise<SyncedFolder> {
+	// Syncs the folder. While the server is rate limited, waits up to `rateLimitBudgetMs`
+	// (see syncFolder).
+	private async finish(rateLimitBudgetMs?: number): Promise<SyncedFolder> {
 		const { folderId, retries } = this.plan;
 		try {
 			const auth = this.credentials.tracked();
@@ -496,6 +500,7 @@ class FolderUpload {
 				retries,
 				this.options.signal,
 				(error) => this.credentials.renew(error, auth.jwt()),
+				rateLimitBudgetMs,
 			);
 		} catch (error) {
 			// Only a one-file folder is merged into an earlier one
@@ -516,16 +521,40 @@ class FolderUpload {
 		}
 	}
 
+	// Every file is uploaded, but the sync of the folder failed with `error`. If sending it
+	// again could have helped (no answer, a server error, rate limiting), the server finishes
+	// the folder on its own: a FolderUploadError with every file uploaded and none failed
+	// says so. A cancel, a refusal (a refused JWT, a folder not found) are thrown as they are.
+	private unfinished(error: unknown): unknown {
+		if (
+			this.options.signal?.aborted ||
+			!(error instanceof Error) ||
+			!isTransient(error)
+		) {
+			return error;
+		}
+		const { folderId, folderName } = this.plan;
+		return new FolderUploadError(
+			`All ${this.uploaded.length} files were uploaded to folder ${folderId}, but the folder is still being finished: ${error.message}. Get the folder by its id later for its CID.`,
+			folderId,
+			this.uploaded,
+			[],
+			undefined,
+			folderName,
+		);
+	}
+
 	// The server completes the folder without the failed files: its CID, or the earlier
 	// folder it turned out to duplicate, is worth knowing. Best effort: a failed sync leaves
-	// it unknown and must not hide why the files failed.
+	// it unknown and must not hide why the files failed, so it doesn't wait while the server
+	// is rate limited.
 	private async partialFailure(): Promise<FolderUploadError> {
 		const { folderId, folderName, entries } = this.plan;
 		const folder =
 			this.uploaded.length > 0 &&
 			!this.options.signal?.aborted &&
 			!this.credentials.refused()
-				? await this.finish().then(
+				? await this.finish(0).then(
 						(synced) => ({
 							id: synced.id,
 							name: synced.name,

@@ -39,7 +39,14 @@ export class ValidationError extends PinataError {
 }
 
 /**
- * A folder upload in which some files failed for good, after their retries. `uploaded` are
+ * A folder upload that did not complete. Either some files failed for good, after their
+ * retries, or every file was uploaded but the folder could not be finished: the final sync
+ * kept failing (no answer, a server error, rate limiting, for up to about 5 minutes). Then
+ * `failed` is empty, `uploaded` holds every file, all registered, and `folder` is
+ * undefined; the server finishes the folder on its own, so getting the folder by
+ * `folderId` later gives its CID. Nothing needs to be sent again.
+ *
+ * When files failed for good: `uploaded` are
  * in the folder `folderId`; the server finishes that folder's CID on its own, without the
  * failed files. `index` is a file's position in the files given. `folder` is that folder as
  * the server finished it, when it could be asked (not after a cancel or an authentication

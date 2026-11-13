@@ -620,6 +620,11 @@ Response: "Revoked"
     removed: send every file again (uploaded and failed) without folderId, as files sent
     into folderId would make a folder without the uploaded ones. Without .folder, send the
     failed files within 30 minutes: an idle folder may be replaced by an earlier one too.
+  Every file uploaded but the final sync kept failing (no answer, 5xx, rate limiting:
+    a 429 or a 5xx saying so is retried for up to 5 minutes, following Retry-After, without
+    counting against retries): FolderUploadError with .failed empty, .uploaded holding
+    every file and no .folder. The server finishes the folder on its own: get it by
+    .folderId later for its CID; nothing needs to be sent again.
   Cancelled while the folder is being finished: rejects with an error named "AbortError".
   A new folder is created by its first file, uploaded alone: if it fails for a reason of
   its own (path, type, size), the next one creates the folder; any other failure of the

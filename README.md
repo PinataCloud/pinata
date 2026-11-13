@@ -94,6 +94,9 @@ try {
       // The files that made it matched an earlier folder, which replaced this one:
       // send every file again, into a new folder
       await pinata.upload.public.folder(files).name("photos");
+    } else if (error.failed.length === 0) {
+      // Every file is uploaded, but the folder is still being finished: get it by
+      // error.folderId later for its CID
     } else {
       // The other files are in the folder: send the failed ones again into it (within
       // 30 minutes when error.folder is undefined; see FolderUploadError)

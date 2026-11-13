@@ -114,7 +114,9 @@ export type FolderUploadOptions = UploadOptions & {
 	 * How many times a file is sent again after a transient failure (no answer, 408, 409,
 	 * 425, 429 or 5xx), after a growing pause or the one the server asks for (Retry-After,
 	 * up to 5 minutes). Attempts that fail while the browser is offline do not count: the
-	 * next one waits until it is back online. Defaults to 3.
+	 * next one waits until it is back online. Defaults to 3. Also how many times the final
+	 * sync of the folder is sent again, except while the server is rate limited (429, or a
+	 * 5xx saying so): that waits up to 5 minutes in all without counting.
 	 */
 	retries?: number;
 	/** Called for every file event, in order for each file. What it throws is ignored. */

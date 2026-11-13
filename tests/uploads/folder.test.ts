@@ -1826,6 +1826,142 @@ describe("uploadFolder", () => {
 		});
 	});
 
+	describe("finishing the folder", () => {
+		// The sync's answer while a service behind it is rate limited
+		const rateLimited = () =>
+			new Response(
+				"Failed to sync bucket: upstream answered 429 Too many requests",
+				{ status: 500 },
+			);
+		const twoFiles = () => [
+			{ path: "d/a.txt", file: file("a") },
+			{ path: "d/b.txt", file: file("bb") },
+		];
+
+		it("waits while the server is rate limited, without spending the retries", async () => {
+			const { fetchMock, respond } = server();
+			let syncs = 0;
+			fetchMock.mockImplementation(async (url, init) => {
+				if (init.method !== "PUT") return respond(url, init);
+				syncs++;
+				return syncs <= 2 ? rateLimited() : respond(url, init);
+			});
+
+			const result = await uploadFolder(config, twoFiles(), "public", {
+				retries: 0,
+			});
+
+			expect(result.cid).toBe("bafyfolder");
+			expect(syncs).toBe(3);
+			// 1 s, then 2 s, each with up to 0.5 s of jitter
+			expect(delays).toHaveLength(2);
+			expect(delays[0]).toBeGreaterThanOrEqual(1000);
+			expect(delays[0]).toBeLessThan(1500);
+			expect(delays[1]).toBeGreaterThanOrEqual(2000);
+			expect(delays[1]).toBeLessThan(2500);
+		});
+
+		it("waits as long as a rate-limited sync asks", async () => {
+			const { fetchMock, respond } = server();
+			let syncs = 0;
+			fetchMock.mockImplementation(async (url, init) => {
+				if (init.method !== "PUT") return respond(url, init);
+				syncs++;
+				return syncs === 1
+					? new Response("Too many requests", {
+							status: 429,
+							headers: { "Retry-After": "45" },
+						})
+					: respond(url, init);
+			});
+
+			await uploadFolder(config, twoFiles(), "public", { retries: 0 });
+
+			expect(delays).toEqual([45000]);
+		});
+
+		it("rejects with every file uploaded and none failed once the server stays rate limited past 5 minutes", async () => {
+			let now = 0;
+			const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+			setTimeoutSpy.mockImplementation(((callback: () => void, ms: number) => {
+				delays.push(ms);
+				now += ms;
+				callback();
+				return 0;
+			}) as unknown as typeof setTimeout);
+			const { fetchMock, respond, created } = server();
+			fetchMock.mockImplementation(async (url, init) =>
+				init.method === "PUT" ? rateLimited() : respond(url, init),
+			);
+			try {
+				const error = await uploadFolder(config, twoFiles(), "public", {
+					retries: 1,
+				}).catch((e) => e);
+
+				expect(error).toBeInstanceOf(FolderUploadError);
+				const { folderId } = created[0];
+				expect(error.folderId).toBe(folderId);
+				expect(error.folderName).toBe("d");
+				expect(error.failed).toEqual([]);
+				expect(
+					error.uploaded.map((f: { path: string }) => f.path).sort(),
+				).toEqual(["d/a.txt", "d/b.txt"]);
+				expect(error.folder).toBeUndefined();
+				expect(error.message).toBe(
+					`All 2 files were uploaded to folder ${folderId}, but the folder is still being finished: Could not finish the folder (HTTP 500): Failed to sync bucket: upstream answered 429 Too many requests. Get the folder by its id later for its CID.`,
+				);
+				// 5 minutes of waits, then the one retry
+				const waited = delays.reduce((sum, ms) => sum + ms, 0);
+				expect(waited).toBeGreaterThanOrEqual(5 * 60 * 1000 + 1000);
+				expect(waited).toBeLessThan(5 * 60 * 1000 + 1500);
+			} finally {
+				clock.mockRestore();
+			}
+		});
+
+		it("rejects with every file uploaded and none failed when the sync keeps failing", async () => {
+			const { fetchMock, respond } = server();
+			fetchMock.mockImplementation(async (url, init) =>
+				init.method === "PUT"
+					? new Response("Service Unavailable", { status: 503 })
+					: respond(url, init),
+			);
+
+			const error = await uploadFolder(config, twoFiles(), "public", {
+				retries: 1,
+			}).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.failed).toEqual([]);
+			expect(error.uploaded).toHaveLength(2);
+			expect(error.message).toContain("the folder is still being finished");
+		});
+
+		it("rejects as cancelled when cancelled while waiting for a rate-limited server", async () => {
+			// Pauses never end on their own: only the abort ends them
+			setTimeoutSpy.mockImplementation(((_: () => void, ms: number) => {
+				delays.push(ms);
+				return 0;
+			}) as unknown as typeof setTimeout);
+			const controller = new AbortController();
+			const { fetchMock, respond } = server();
+			fetchMock.mockImplementation(async (url, init) => {
+				if (init.method !== "PUT") return respond(url, init);
+				setImmediate(() => controller.abort());
+				return rateLimited();
+			});
+
+			const error = await uploadFolder(config, twoFiles(), "public", {
+				signal: controller.signal,
+			}).catch((e) => e);
+
+			expect(error).not.toBeInstanceOf(FolderUploadError);
+			expect(error.name).toBe("AbortError");
+			expect(error.message).toBe("The upload was cancelled");
+			expect(delays).toHaveLength(1);
+		});
+	});
+
 	describe("content already uploaded", () => {
 		it("keeps a file reported as an earlier upload, with the CID of its own bytes", async () => {
 			// Alone, the first file matches an earlier one-file folder: the server registers it
