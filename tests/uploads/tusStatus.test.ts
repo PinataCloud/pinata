@@ -92,6 +92,30 @@ describe("waitForRegistration", () => {
 			expect(now).toBeGreaterThan(59 * MINUTE);
 			expect(head).toHaveBeenCalled();
 		});
+
+		it("waits as long as a rate-limited lookup asks before the next one", async () => {
+			const at: number[] = [];
+			global.fetch = jest.fn(async () => {
+				at.push(now);
+				return at.length === 1
+					? new Response(null, {
+							status: 429,
+							headers: { "Retry-After": "60" },
+						})
+					: new Response(null, {
+							status: 200,
+							headers: {
+								"Upload-Offset": size.toString(),
+								"Upload-Status": "ready",
+								"Upload-Cid": "bafyregistered",
+							},
+						});
+			}) as unknown as typeof fetch;
+
+			await waitForRegistration(url, {}, size, undefined, 1000);
+
+			expect(at[1] - at[0]).toBe(60 * 1000);
+		});
 	});
 
 	it("stops polling as soon as its signal aborts", async () => {

@@ -2,7 +2,7 @@ import {
 	AuthenticationError,
 	NetworkError,
 } from "../../../utils/custom-errors";
-import { isFinalRefusal, sleep } from "./retry";
+import { isFinalRefusal, parseRetryAfter, sleep } from "./retry";
 
 const GIB = 1024 * 1024 * 1024;
 // How long to wait for a finished upload to be registered. Processing a large file
@@ -55,16 +55,24 @@ export const resolveHeaders = (
 ): Record<string, string> =>
 	typeof headers === "function" ? headers() : headers;
 
+// What a lookup that could not tell where the upload stands says about the next one
+export interface StatusHint {
+	// How long the server asked to wait (Retry-After), if it did
+	retryAfterMs?: number;
+}
+
 // Asks the server how much of a resumable upload it has stored (TUS HEAD).
 // Returns undefined when the server cannot tell right now, so the caller retries
-// at its own offset. Throws when no retry can succeed: the upload no longer exists,
-// or the server refuses to look it up for good.
+// at its own offset; `hint` then says how long to wait first. Throws when no retry can
+// succeed: the upload no longer exists, or the server refuses to look it up for good.
 export const getUploadStatus = async (
 	url: string,
 	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
+	hint?: StatusHint,
 ): Promise<UploadStatus | undefined> => {
+	if (hint) hint.retryAfterMs = undefined;
 	let res: Response;
 	try {
 		res = await fetch(url, {
@@ -115,6 +123,7 @@ export const getUploadStatus = async (
 		);
 	}
 	if (!res.ok) {
+		if (hint) hint.retryAfterMs = parseRetryAfter(res.headers);
 		return undefined;
 	}
 	const offset = parseUploadOffset(res.headers, size);
@@ -135,7 +144,8 @@ export const getUploadStatus = async (
 // file can only be looked up once HEAD reports `ready`; until then registration can
 // still fail. Polls HEAD until then and returns that `ready` status (its CID is null if
 // `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
-// The pause between two checks starts at 1 s and doubles up to `pollMaxMs`.
+// The pause between two checks starts at 1 s and doubles up to `pollMaxMs`, or is as long
+// as the server asks (Retry-After).
 export const waitForRegistration = async (
 	url: string,
 	headers: RequestHeaders,
@@ -146,11 +156,12 @@ export const waitForRegistration = async (
 	const timeout = registrationTimeout(size);
 	const deadline = Date.now() + timeout;
 	let delay = Math.min(1000, pollMaxMs);
+	const hint: StatusHint = {};
 	while (Date.now() + delay <= deadline) {
 		await sleep(delay, signal);
 		if (signal?.aborted) throw signal.reason;
-		delay = Math.min(delay * 2, pollMaxMs);
-		const status = await getUploadStatus(url, headers, size, signal);
+		const status = await getUploadStatus(url, headers, size, signal, hint);
+		delay = Math.max(Math.min(delay * 2, pollMaxMs), hint.retryAfterMs ?? 0);
 		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.
 		if (status?.status === "ready") {

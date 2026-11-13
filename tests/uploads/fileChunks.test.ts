@@ -61,6 +61,18 @@ describe("FileChunks", () => {
 		expect(file.streamCalls).toBe(1);
 	});
 
+	// Its last MiB spans both parts: the stream would copy the large one whole
+	it("slices a file held in memory as a large part followed by a small one", async () => {
+		const file = NodeLikeFile.of({ length: 64 * MiB }, { length: MiB / 2 });
+		const chunks = new FileChunks(file, chunkSize);
+
+		const body = await chunks.at(0);
+		await chunks.close();
+
+		expect(body).toBeInstanceOf(Blob);
+		expect(file.streamCalls).toBe(0);
+	});
+
 	it("slices a file of 2^32 - 1 bytes to its end", async () => {
 		const file = inMemory(SLICE_LIMIT);
 		const chunks = new FileChunks(file, chunkSize);

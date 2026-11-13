@@ -68,7 +68,7 @@ export class FolderCredentials {
 		const { refreshJwt: refresh, signal } = this.options;
 		if (this.current() === refused && refresh && !this.options.keys) {
 			if (this.renewal?.jwt !== refused) {
-				this.renewal = { jwt: refused, done: this.refresh(refresh) };
+				this.renewal = { jwt: refused, done: this.refresh(refresh, refused) };
 			}
 			// Not past a cancel: a refresh may wait for the user to sign in again
 			const pending = this.renewal.done;
@@ -94,11 +94,13 @@ export class FolderCredentials {
 
 	private async refresh(
 		refresh: NonNullable<FolderUploadOptions["refreshJwt"]>,
+		refused: string,
 	): Promise<void> {
 		try {
 			const jwt = await refresh();
-			// What setNewJwt does: the SDK uses it from then on
-			if (jwt) this.config.pinataJwt = jwt;
+			// What setNewJwt does: the SDK uses it from then on. Unless another JWT was set
+			// meanwhile (setNewJwt, another upload's refresh): it is newer.
+			if (jwt && this.current() === refused) this.config.pinataJwt = jwt;
 		} catch {
 			// No new JWT: the refusal stands
 		}

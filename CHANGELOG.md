@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 - A name or keyvalues given in an upload method's options is no longer dropped by the builder; the caller's options object is no longer modified.
 - Resumable uploads follow `Retry-After`, fail at once on a 4xx that a retry can't change, and continue from the offset the server holds after a failed chunk.
+- Checks of an upload's registration, and of where it stands after a failed chunk, follow the `Retry-After` the server sends with a 429 or 503.
+- A file held in memory as a large part followed by a few small ones (`new File([largeBuffer, smallBuffer])`) is cut with `slice()` instead of being copied part by part from its stream.
 
 ## [2.4.8] - 2025-06-11
 

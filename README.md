@@ -90,11 +90,17 @@ try {
   console.log(folder.cid, folder.files);
 } catch (error) {
   if (error instanceof FolderUploadError) {
-    // The other files are in the folder: send the failed ones again into it
-    await pinata.upload.public.folder(
-      error.failed.map((f) => ({ path: f.path, file: files[f.index] })),
-      { folderId: error.folderId },
-    );
+    if (error.folder?.is_duplicate) {
+      // The files that made it matched an earlier folder, which replaced this one:
+      // send every file again, into a new folder
+      await pinata.upload.public.folder(files).name("photos");
+    } else {
+      // The other files are in the folder: send the failed ones again into it
+      await pinata.upload.public.folder(
+        error.failed.map((f) => ({ path: f.path, file: files[f.index] })),
+        { folderId: error.folderId },
+      );
+    }
   }
 }
 ```

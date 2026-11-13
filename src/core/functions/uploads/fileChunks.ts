@@ -5,10 +5,16 @@ import { StreamChunks } from "./streamChunks";
 // exactly 2^32 included (nodejs/node#66207).
 export const SLICE_LIMIT = 2 ** 32 - 1;
 const PROBE_SIZE = 1024 * 1024;
+// The pieces Node's stream reads a file opened with fs.openAsBlob() in
+const DISK_PIECE = 64 * 1024;
+// At most this many pieces in the probe: the parts a memory-backed file ends with
+const MEMORY_PIECES = 4;
 
-// Whether the MiB before `end` comes out of the file's stream in one piece. Node's stream
-// hands over data held in memory (a Buffer, a string, a File parsed from FormData) a whole
-// part at a time, and reads a file opened with fs.openAsBlob() in small pieces.
+// Whether the MiB before `end` is held in memory. Node's stream hands over data held in
+// memory (a Buffer, a string, a File parsed from FormData) a whole part at a time, so the
+// probe arrives in as many pieces as there are parts in it, and reads a file opened with
+// fs.openAsBlob() in 64 KiB pieces. A File built from a large Buffer and a small one (or a
+// few) is held in memory too: its probe holds the end of each.
 async function inMemoryBefore(file: Blob, end: number): Promise<boolean> {
 	const probe = Math.min(end, PROBE_SIZE);
 	const reader = file
@@ -16,8 +22,15 @@ async function inMemoryBefore(file: Blob, end: number): Promise<boolean> {
 		.stream()
 		.getReader();
 	try {
-		const { value } = await reader.read();
-		return value?.byteLength === probe;
+		let pieces = 0;
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) return true;
+			if (!value?.byteLength) continue;
+			if (++pieces > MEMORY_PIECES || value.byteLength === DISK_PIECE) {
+				return false;
+			}
+		}
 	} finally {
 		await reader.cancel().catch(() => undefined);
 	}
@@ -33,9 +46,13 @@ async function inMemoryBefore(file: Blob, end: number): Promise<boolean> {
 //
 // slice() never reads past `size`, so it cannot see that a file holds more. A file can
 // only report too small a size when it, or one of its parts, comes from fs.openAsBlob()
-// (whose size is off by a multiple of 2^32): the stream then reads that part in small
-// pieces, and its real bytes cover the end of the reported size, so the probe sees them
-// and the file goes through StreamChunks.
+// (whose size is off by a multiple of 2^32). When that part covers the end of the reported
+// size, the probe reads it in 64 KiB pieces and the file goes through StreamChunks. A part
+// that does not (a File of a Buffer followed by such a part, which reports 0 bytes, say)
+// is out of reach of every slice(): only the whole stream shows its bytes (see
+// sendResumable, which reads it before sending a file of one chunk with the request that
+// creates its upload). A larger file of such parts is not checked: reading its stream would
+// copy each part held in memory whole.
 export class FileChunks {
 	private stream: StreamChunks | null = null;
 	private sliced: boolean | undefined;

@@ -611,7 +611,9 @@ Response: "Revoked"
     top directory, .name() renames that directory.
     .folder ({ id, name, cid, is_duplicate? }): that folder as synced without the failed
     files, when it could be (undefined after a cancel, an auth failure or a failed sync);
-    is_duplicate: it matched an earlier folder, which id/name/cid are.
+    is_duplicate: it matched an earlier folder, which id/name/cid are, and folderId was
+    removed: send every file again (uploaded and failed) without folderId, as files sent
+    into folderId would make a folder without the uploaded ones.
   Cancelled while the folder is being finished: rejects with an error named "AbortError".
   If the first file fails for a reason of its own (path, type, size), the next one
   creates the folder; any other failure of the first file stops the upload.

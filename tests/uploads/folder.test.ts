@@ -845,6 +845,31 @@ describe("uploadFolder", () => {
 				cid: "bafy-d/empty.txt",
 			});
 		});
+
+		it("refuses an inline file held in memory followed by a part that reports none of its bytes", async () => {
+			const posts: number[] = [];
+			mockFetch(async (url, init) => {
+				if (init.method === "PUT") return synced(1);
+				posts.push(1);
+				return registeredAt(url, init);
+			});
+
+			// A Buffer, then a file on disk of 4 GiB (fs.openAsBlob reports 0 bytes): every
+			// slice() of the File ends with the Buffer
+			const mixed = NodeLikeFile.of(
+				{ length: 1024 * 1024 },
+				{ length: 2 ** 32, reported: 0, disk: true },
+			);
+			const error = await uploadFolder(
+				config,
+				[{ path: "d/mixed.bin", file: mixed }],
+				"public",
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(ValidationError);
+			expect(error.message).toContain("larger than its reported size");
+			expect(posts).toHaveLength(0);
+		});
 	});
 
 	describe("retries", () => {
@@ -1267,6 +1292,54 @@ describe("uploadFolder", () => {
 			expect(result.files[0].cid).toBe("bafybig");
 			expect(calls.filter((c) => c === "POST")).toHaveLength(1);
 			expect(calls.filter((c) => c === "PATCH 0")).toHaveLength(1);
+		});
+
+		it("sends a file again when the response holding its CID was lost and the server reports an earlier folder's", async () => {
+			let patches = 0;
+			const posts: string[] = [];
+			mockFetch(async (url, init) => {
+				if (init.method === "PUT") return synced(2);
+				if (init.method === "POST") {
+					const path = pathOf(init);
+					posts.push(path);
+					if (path === "d/b.txt") return registeredAt(url, init);
+					return createdAt(`${url}/a`, { "Upload-Offset": "0" });
+				}
+				// The first PATCH of d/a.txt is stored, but its response is lost
+				if (init.method === "PATCH" && ++patches === 1) {
+					throw new TypeError("fetch failed");
+				}
+				if (init.method === "PATCH") {
+					return new Response(null, {
+						status: 204,
+						headers: {
+							"Upload-Offset": "1",
+							"Upload-Cid": "bafy-a",
+							"Upload-Status": "processing",
+						},
+					});
+				}
+				// Registered: alone in the folder, it matched an earlier one-file folder
+				return registration("ready", {
+					"Upload-Cid": "bafyearlier",
+					"Upload-Metadata": `filename ${encode("d")},file_id ${encode("earlier-folder")},cid ${encode("bafyearlier")}`,
+				});
+			});
+
+			const result = await uploadFolder(
+				config,
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/b.txt", file: file("bb") },
+				],
+				"public",
+			);
+
+			expect(result.files.map((f) => f.cid)).toEqual([
+				"bafy-a",
+				"bafy-d/b.txt",
+			]);
+			expect(posts).toEqual(["d/a.txt", "d/a.txt", "d/b.txt"]);
 		});
 	});
 
@@ -1852,6 +1925,26 @@ describe("uploadFolder", () => {
 					"HEAD Bearer new-jwt",
 					"PUT Bearer new-jwt",
 				]);
+			});
+
+			it("keeps a JWT set while refreshJwt was under way, rather than the one it returns", async () => {
+				const { auths } = authServer();
+				const settings = live();
+				const refreshJwt = jest.fn(async () => {
+					// setNewJwt lands before the refresh answers
+					settings.pinataJwt = "new-jwt";
+					return "stale-jwt";
+				});
+
+				await uploadFolder(
+					settings,
+					[{ path: "d/a.txt", file: file("a") }],
+					"public",
+					{ refreshJwt },
+				);
+
+				expect(settings.pinataJwt).toBe("new-jwt");
+				expect(auths.at(-1)).toBe("PUT Bearer new-jwt");
 			});
 		});
 

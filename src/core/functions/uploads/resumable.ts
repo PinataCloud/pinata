@@ -17,6 +17,7 @@ import {
 	getUploadStatus,
 	parseUploadOffset,
 	type RequestHeaders,
+	type StatusHint,
 	type UploadStatus,
 	resolveHeaders,
 	waitForRegistration,
@@ -30,10 +31,14 @@ const MAX_RETRIES = 5;
 export interface StoredUpload {
 	// The upload URL (TUS Location)
 	url: string;
-	// Upload-Cid, Upload-Status and Upload-Metadata of the response that completed it
+	// Upload-Cid, Upload-Status and Upload-Metadata of the response that completed it, or
+	// of the lookup (HEAD) that found it complete
 	cid: string | null;
 	status: string | null;
 	metadata: string | null;
+	// `cid` was computed from this upload's bytes. Not when a lookup of a registered upload
+	// gave it: that is the registered file's CID, an earlier upload's when this one matched it.
+	ownCid: boolean;
 }
 
 export interface ResumableOptions {
@@ -104,21 +109,12 @@ export const sendResumable = async (
 		}
 	}
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
-	// The body of the creation request as FileChunks cuts it, which refuses a file whose
-	// bytes don't match its size (fs.openAsBlob reports a file past 4 GiB modulo 2^32):
-	// the file itself as body would send `size` bytes and complete a truncated upload.
-	let body: Blob | Uint8Array<ArrayBuffer> | undefined;
-	if (withBody) {
-		const chunks = new FileChunks(file, CHUNK_SIZE);
-		try {
-			body = await chunks.at(0);
-		} finally {
-			await chunks.close();
-		}
-	} else if (file.size === 0) {
-		// A size of 0 completes the upload at once: make sure there really are no bytes
-		await assertEmpty(file);
-	}
+	// The file is the body of the creation request, once its stream is found to hold exactly
+	// its size: fs.openAsBlob() reports a file past 4 GiB modulo 2^32, and a body of `size`
+	// bytes would complete a truncated upload. Not a copy: fetch reads the file as it sends
+	// it, so files sent at once don't each hold a chunk in memory. A size of 0 completes the
+	// upload at once: the same check makes sure there really are no bytes.
+	if (withBody || file.size === 0) await assertSize(file);
 	let urlReq: Response;
 	try {
 		urlReq = await fetch(createUrl, {
@@ -134,7 +130,7 @@ export const sendResumable = async (
 				// last PATCH, and waits for `ready` (see waitForRegistration).
 				Prefer: "respond-async",
 			},
-			...(body ? { body } : {}),
+			...(withBody ? { body: file } : {}),
 			signal,
 		});
 	} catch (error) {
@@ -184,7 +180,13 @@ const sendChunks = async (
 	signal?: AbortSignal,
 	waitOnline = false,
 ): Promise<StoredUpload> => {
-	let stored: StoredUpload = { url, cid: null, status: null, metadata: null };
+	let stored: StoredUpload = {
+		url,
+		cid: null,
+		status: null,
+		metadata: null,
+		ownCid: false,
+	};
 	let offset = start;
 	let failures = 0;
 	// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
@@ -295,8 +297,9 @@ const sendChunks = async (
 			// response was lost. Ask the server where the upload stands and continue
 			// from there, instead of resending at our own offset (TUS: HEAD after a failure).
 			let status: UploadStatus | undefined;
+			const hint: StatusHint = {};
 			try {
-				status = await getUploadStatus(url, headers, file.size, signal);
+				status = await getUploadStatus(url, headers, file.size, signal, hint);
 			} catch (error) {
 				// The upload still exists (else 404 or 410): the next attempt continues it
 				if (
@@ -325,6 +328,10 @@ const sendChunks = async (
 				if (offset === file.size) {
 					stored = storedFromStatus(url, status);
 				}
+			} else if (hint.retryAfterMs) {
+				// The server can't say now and asks to wait before the next request
+				await sleep(hint.retryAfterMs, signal);
+				if (signal?.aborted) throw signal.reason;
 			}
 		}
 	} finally {
@@ -333,37 +340,57 @@ const sendChunks = async (
 	return stored;
 };
 
-// The upload at `url` as the response that completed it reports it
-const storedFromHeaders = (url: string, headers: Headers): StoredUpload => ({
-	url,
-	cid: headers.get("upload-cid"),
-	status: headers.get("upload-status"),
-	metadata: headers.get("upload-metadata"),
-});
+// The upload at `url` as the response that completed it reports it: its CID is the one
+// computed from its bytes
+const storedFromHeaders = (url: string, headers: Headers): StoredUpload => {
+	const cid = headers.get("upload-cid");
+	return {
+		url,
+		cid,
+		status: headers.get("upload-status"),
+		metadata: headers.get("upload-metadata"),
+		ownCid: cid !== null,
+	};
+};
 
-// The upload at `url` as a status check (HEAD) that found it complete reports it
+// The upload at `url` as a lookup (HEAD) that found it complete reports it. Before
+// registration the CID it reports is the one computed from the upload's bytes; once
+// registered (`ready`, or a server that never sends Upload-Status) it is the registered
+// file's.
 const storedFromStatus = (url: string, status: UploadStatus): StoredUpload => ({
 	url,
 	cid: status.cid,
 	status: status.status,
 	metadata: status.metadata,
+	ownCid:
+		status.cid !== null && status.status !== null && status.status !== "ready",
 });
 
-// Throws unless `file`, which reports a size of 0, holds no bytes
-const assertEmpty = async (file: Blob) => {
+// Throws unless the stream of `file` holds exactly `file.size` bytes. Reads it to the end
+// and drops each piece once counted: sendResumable only calls it for files of one chunk.
+const assertSize = async (file: Blob) => {
 	const reader = file.stream().getReader();
+	let read = 0;
 	try {
 		for (;;) {
 			const { done, value } = await reader.read();
-			if (done) return;
-			if (value.byteLength > 0) {
+			if (done) break;
+			read += value.byteLength;
+			if (read > file.size) {
 				throw new ValidationError(
-					"The file is larger than its reported size: it reports 0 bytes but holds more",
+					`The file is larger than its reported size of ${file.size} bytes: it has more bytes after that, ` +
+						"so uploading it would store a truncated file. Node's fs.openAsBlob() reports the size of files " +
+						"over 4 GiB modulo 2^32 (nodejs/node#66207); pass a File whose size matches its contents.",
 				);
 			}
 		}
 	} finally {
 		await reader.cancel().catch(() => undefined);
+	}
+	if (read < file.size) {
+		throw new ValidationError(
+			`The file is smaller than its reported size: its stream ended after ${read} of ${file.size} bytes`,
+		);
 	}
 };
 
@@ -401,6 +428,7 @@ export const registerResumable = async (
 			// the ready status reports the registered file's, which is an earlier upload's
 			// when this one matched it
 			cid: upload.cid ?? ready.cid,
+			ownCid: upload.cid !== null && upload.ownCid,
 		};
 	}
 	if (!registered.cid) {

@@ -52,7 +52,9 @@ export class ValidationError extends PinataError {
  * `{ path: failed[i].path, file: files[failed[i].index] }`, and `{ folderId }`: the paths
  * keep the folder name. Sending the original relative paths again with `.name(folderName)`
  * only works when they don't all share a top directory of their own, which `.name()`
- * would rename.
+ * would rename. Not when `folder.is_duplicate`: `folderId` was removed, and the files sent
+ * into it would make a folder of their own, without the uploaded ones. Send every file
+ * again, uploaded and failed, without `folderId`.
  */
 export class FolderUploadError extends PinataError {
 	constructor(

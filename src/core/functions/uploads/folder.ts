@@ -104,9 +104,8 @@ class FolderUpload {
 	private readonly uploaded: FolderFileResult[] = [];
 	private readonly failed: FailedFile[] = [];
 	private readonly credentials: FolderCredentials;
-	// Sending bytes takes a slot; waiting for registration doesn't, but is under way
+	// Sending bytes takes a slot; waiting for registration doesn't
 	private readonly slots: Semaphore;
-	private readonly underWay: Semaphore;
 	private readonly endpoint: string;
 	private readonly createUrl: string;
 	// The same folder options on every file
@@ -123,7 +122,6 @@ class FolderUpload {
 	) {
 		this.credentials = new FolderCredentials(config, options);
 		this.slots = new Semaphore(plan.concurrency);
-		this.underWay = new Semaphore(plan.concurrency * UNDER_WAY_PER_SLOT);
 		this.endpoint = config.uploadUrl || DEFAULT_UPLOAD_URL;
 		this.createUrl = creationUrl(
 			`${this.endpoint}/files/${plan.folderId}`,
@@ -135,7 +133,7 @@ class FolderUpload {
 	async run(): Promise<FolderUploadResponse> {
 		const { folderId, entries } = this.plan;
 		const pending = await this.createFolder();
-		await Promise.all(pending.map((entry) => this.uploadEntry(entry)));
+		await this.uploadAll(pending);
 		if (this.failed.length > 0) {
 			throw await this.partialFailure();
 		}
@@ -171,7 +169,7 @@ class FolderUpload {
 		let repeats = 0;
 		for (;;) {
 			const [first] = pending.splice(firstToSend(pending), 1);
-			await this.uploadEntry(first, true);
+			await this.uploadFile(first, true);
 			if (this.uploaded.length > 0 || this.options.signal?.aborted) {
 				return pending;
 			}
@@ -196,13 +194,31 @@ class FolderUpload {
 		}
 	}
 
-	// `gate`: the other files wait for this one's registration
-	private uploadEntry(entry: ResolvedEntry, gate = false): Promise<void> {
-		return this.underWay.run(() => this.uploadFile(entry, gate));
+	// A fixed set of workers, each taking the next file once done with one: at most
+	// UNDER_WAY_PER_SLOT files per slot under way, and no task held for each of the files
+	// waiting.
+	private async uploadAll(entries: ResolvedEntry[]): Promise<void> {
+		let next = 0;
+		const worker = async () => {
+			while (next < entries.length)
+				await this.uploadFile(entries[next++], false);
+		};
+		await Promise.all(
+			Array.from(
+				{
+					length: Math.min(
+						this.plan.concurrency * UNDER_WAY_PER_SLOT,
+						entries.length,
+					),
+				},
+				worker,
+			),
+		);
 	}
 
 	// Sends the file, then waits for its registration, retrying both until the file is
-	// registered or fails for good
+	// registered or fails for good. `gate`: the other files wait for this one's
+	// registration.
 	private async uploadFile(entry: ResolvedEntry, gate: boolean): Promise<void> {
 		const { index, path, file } = entry;
 		const { signal } = this.options;
@@ -270,7 +286,27 @@ class FolderUpload {
 					});
 				}
 				this.emit({ type: "sent", ...about, attempt: started });
-				return await this.register(about, stored, auth, gate, started);
+				const cid = await this.register(stored, auth, file.size, gate);
+				if (cid === undefined) {
+					// The response that completed the upload, which held the file's own CID, was
+					// lost: the server now reports the earlier folder's. Sent again, the file
+					// completes a new upload, whose last response holds its CID.
+					const requestUrl = stored.url;
+					stored = undefined;
+					unfinished = undefined;
+					throw new NetworkError(
+						"The file is registered, but its own CID was lost with the response that completed it",
+						0,
+						{
+							error: "file CID unknown",
+							code: "HTTP_ERROR",
+							metadata: { requestUrl },
+						},
+					);
+				}
+				this.uploaded.push({ ...about, cid });
+				this.emit({ type: "complete", ...about, attempt: started, cid });
+				return;
 			} catch (caught) {
 				if (signal?.aborted) return fail(cancelled(), started);
 				const error =
@@ -326,20 +362,20 @@ class FolderUpload {
 		}
 	}
 
-	// The file is in the folder once registered. It may be reported as an earlier upload
-	// when, alone, it matches one (a one-file folder of the same name and content): its
-	// object is in this folder all the same, and its CID is its own.
+	// Waits until the file is registered, which puts it in the folder, and returns its own
+	// CID. It may be reported as an earlier upload when, alone, it matches one (a one-file
+	// folder of the same name and content): its object is in this folder all the same, and
+	// its CID is its own, unless the response holding it was lost: then undefined.
 	private async register(
-		about: FileAbout,
 		stored: StoredUpload,
 		auth: TrackedHeaders,
+		size: number,
 		gate: boolean,
-		attempt: number,
-	): Promise<void> {
+	): Promise<string | undefined> {
 		const registered = await registerResumable(
 			stored,
 			auth.headers,
-			about.size,
+			size,
 			this.options.signal,
 			gate ? GATE_POLL_MS : undefined,
 		);
@@ -356,9 +392,9 @@ class FolderUpload {
 				name: reported.filename,
 				cid: reported.cid,
 			};
+			if (!registered.ownCid) return undefined;
 		}
-		this.uploaded.push({ ...about, cid: registered.cid });
-		this.emit({ type: "complete", ...about, attempt, cid: registered.cid });
+		return registered.cid;
 	}
 
 	private async finish(): Promise<SyncedFolder> {
