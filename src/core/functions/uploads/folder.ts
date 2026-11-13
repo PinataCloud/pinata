@@ -33,6 +33,7 @@ import {
 	type StoredUpload,
 } from "./resumable";
 import {
+	isFinalizing,
 	isOffline,
 	isTransient,
 	retryDelay,
@@ -45,6 +46,7 @@ import {
 	optionsMetadata,
 	parseUploadMetadata,
 } from "./tusMetadata";
+import { registrationTimeout } from "./tusStatus";
 import { cancelled } from "./uploadErrors";
 
 const DEFAULT_UPLOAD_URL = "https://uploads.pinata.cloud/v3";
@@ -59,7 +61,7 @@ const GATE_POLL_MS = 1000;
 // Refusals of a file for a reason of its own (its path, type or size), which another file
 // may not get
 const OWN_REFUSALS = [400, 413, 414, 415, 422, 431];
-// How many first files in a row failing alike show that every file would
+// How many files in a row failing alike show that every file would
 const SHARED_FAILURE_REPEATS = 3;
 
 type FileAbout = Pick<FolderFileResult, "index" | "path" | "size">;
@@ -76,8 +78,9 @@ interface FolderPlan {
 // Uploads a folder file by file: each file is its own resumable upload into the folder,
 // several at a time, each retried on its own. A final sync gives the folder's CID.
 //
-// The first file is uploaded alone, so that the folder exists before the others join it.
-// If it fails for a reason of its own, the next one tries.
+// A new folder's first file is uploaded alone, so that the folder exists before the others
+// join it. If it fails for a reason of its own, the next one tries. The files of a folder
+// given (folderId) all go at once: it exists already.
 export const uploadFolder = async (
 	config: PinataConfig | undefined,
 	files: File[] | FolderEntry[],
@@ -113,6 +116,11 @@ class FolderUpload {
 	// A file the server registered as an earlier folder (a one-file folder matching one):
 	// the server then removes this folder, and syncing it answers 404
 	private duplicateOf: { id: string; name: string; cid: string } | undefined;
+	// The reason the last files failed for good, and how many in a row failed for it
+	private lastFailure: { reason: string; repeats: number } | undefined;
+	// In a folder given (folderId): the failure SHARED_FAILURE_REPEATS files in a row met,
+	// which every file would. Files not sent yet fail with it instead of being sent.
+	private sharedFailure: Error | undefined;
 
 	constructor(
 		config: PinataConfig,
@@ -132,7 +140,9 @@ class FolderUpload {
 
 	async run(): Promise<FolderUploadResponse> {
 		const { folderId, entries } = this.plan;
-		const pending = await this.createFolder();
+		// A folder given exists already: no file has to create it first
+		const pending =
+			this.options.folderId === undefined ? await this.createFolder() : entries;
 		await this.uploadAll(pending);
 		if (this.failed.length > 0) {
 			throw await this.partialFailure();
@@ -161,12 +171,10 @@ class FolderUpload {
 	// Uploads the smallest of the shallowest files first: it creates the folder, and the
 	// others wait for it. If it fails for a reason of its own (its path, type or size), the
 	// next one tries. A failure every file would share stops the upload: any other error, or
-	// the same reason SHARED_FAILURE_REPEATS times in a row (a missing group answers 400 to
-	// every file). Returns the files left to upload.
+	// the same reason SHARED_FAILURE_REPEATS times in a row (see noteFailure; a missing
+	// group answers 400 to every file). Returns the files left to upload.
 	private async createFolder(): Promise<ResolvedEntry[]> {
 		const pending = this.plan.entries.slice();
-		let previousReason: string | undefined;
-		let repeats = 0;
 		for (;;) {
 			const [first] = pending.splice(firstToSend(pending), 1);
 			await this.uploadFile(first, true);
@@ -176,15 +184,12 @@ class FolderUpload {
 			const { error } = this.failed[this.failed.length - 1];
 			const status =
 				error instanceof PinataError ? error.statusCode : undefined;
-			const reason = `${status} ${error.message}`;
-			repeats = reason === previousReason ? repeats + 1 : 1;
-			previousReason = reason;
 			const ownReason =
 				error instanceof ValidationError || OWN_REFUSALS.includes(status ?? 0);
 			if (
 				error === this.credentials.refused() ||
 				!ownReason ||
-				repeats >= SHARED_FAILURE_REPEATS ||
+				(this.lastFailure?.repeats ?? 0) >= SHARED_FAILURE_REPEATS ||
 				pending.length === 0
 			) {
 				throw error instanceof PinataError
@@ -223,8 +228,11 @@ class FolderUpload {
 		const { index, path, file } = entry;
 		const { signal } = this.options;
 		const about: FileAbout = { index, path, size: file.size };
+		// A failure already noted (see noteFailure) before the file fails with it
+		let noted: Error | undefined;
 		const fail = (error: Error, attempt: number) => {
 			this.failed.push({ ...about, error });
+			if (error !== noted) this.noteFailure(error);
 			this.emit({ type: "error", ...about, attempt, error });
 		};
 		const unsendable = unsendablePath(path);
@@ -246,10 +254,16 @@ class FolderUpload {
 		let started = 0;
 		// Sent again because the response holding the file's own CID was lost (at most once)
 		let resent = false;
+		// Attempts refused while the server finishes an earlier upload of the path, which are
+		// not counted until `waitUntil` (see FolderUploadEvent.waitingForPreviousUpload)
+		let waits = 0;
+		let waitUntil: number | undefined;
 		for (;;) {
 			if (signal?.aborted) return fail(cancelled(), started);
 			// The attempt failed with another file's refusal of the JWT, before sending anything
 			let borrowed = false;
+			// The attempt found that every file fails alike (sharedFailure), before sending
+			let stopped = false;
 			// The attempt found the file registered without its own CID, and sends it again
 			let resend = false;
 			const auth = this.credentials.tracked();
@@ -265,6 +279,11 @@ class FolderUpload {
 						if (refusal) {
 							borrowed = true;
 							throw refusal;
+						}
+						// Not a file under way: only one never sent
+						if (started === 0 && this.sharedFailure) {
+							stopped = true;
+							throw this.sharedFailure;
 						}
 						if (signal?.aborted) throw cancelled();
 						this.emit({ type: "start", ...about, attempt: ++started });
@@ -283,8 +302,17 @@ class FolderUpload {
 							);
 						} catch (error) {
 							// Before the slot goes to the next file, which must not be sent with a
-							// JWT refused for good
-							await this.credentials.renew(error, auth.jwt());
+							// JWT refused for good, nor after files in a row failed alike
+							const renewed = await this.credentials.renew(error, auth.jwt());
+							if (
+								!renewed &&
+								error instanceof Error &&
+								!isTransient(error) &&
+								!signal?.aborted
+							) {
+								noted = error;
+								this.noteFailure(error);
+							}
 							throw error;
 						}
 					});
@@ -310,6 +338,7 @@ class FolderUpload {
 					);
 				}
 				this.uploaded.push({ ...about, cid });
+				this.lastFailure = undefined;
 				this.emit({ type: "complete", ...about, attempt: started, cid });
 				return;
 			} catch (caught) {
@@ -323,6 +352,7 @@ class FolderUpload {
 					if (this.credentials.refused()) return fail(error, started);
 					continue;
 				}
+				if (stopped) return fail(error, started);
 				// Not counted against `retries`: nothing failed, the CID was lost
 				if (resend) {
 					this.emit({
@@ -356,14 +386,25 @@ class FolderUpload {
 				const offline =
 					(!(error instanceof PinataError) || error.statusCode === 0) &&
 					isOffline();
+				// The server still finishes an earlier upload of the path: not counted, for as long
+				// as the server may take to register a file of this size
+				let previous = false;
+				if (isFinalizing(error)) {
+					waitUntil ??= Date.now() + registrationTimeout(file.size);
+					previous = Date.now() < waitUntil;
+				}
 				if (
 					renewed
 						? ++renewals > MAX_RENEWALS
-						: !isTransient(error) || (!offline && ++spent > this.plan.retries)
+						: !isTransient(error) ||
+							(!offline && !previous && ++spent > this.plan.retries)
 				) {
 					return fail(error, started);
 				}
-				const delayMs = renewed || offline ? 0 : retryDelay(spent, error);
+				const delayMs =
+					renewed || offline
+						? 0
+						: retryDelay(previous ? ++waits : spent, error);
 				this.emit({
 					type: "retry",
 					...about,
@@ -371,10 +412,34 @@ class FolderUpload {
 					error,
 					delayMs,
 					...(offline ? { waitingForOnline: true } : {}),
+					...(previous ? { waitingForPreviousUpload: true } : {}),
 				});
 				if (offline) await untilOnline(signal);
 				else await sleep(delayMs, signal);
 			}
+		}
+	}
+
+	// Notes a file that failed for good. Files failing in a row for the same reason (the same
+	// status and message) SHARED_FAILURE_REPEATS times show that every file would: in a folder
+	// given, the files not sent yet then fail with it (a new folder's first files stop the
+	// upload instead, see createFolder). Not a cancel, nor the failures that are already
+	// shared (a refused JWT, sharedFailure itself).
+	private noteFailure(error: Error): void {
+		if (
+			this.options.signal?.aborted ||
+			error === this.sharedFailure ||
+			error === this.credentials.refused()
+		) {
+			return;
+		}
+		const status = error instanceof PinataError ? error.statusCode : undefined;
+		const reason = `${status} ${error.message}`;
+		const repeats =
+			this.lastFailure?.reason === reason ? this.lastFailure.repeats + 1 : 1;
+		this.lastFailure = { reason, repeats };
+		if (repeats >= SHARED_FAILURE_REPEATS && this.options.folderId) {
+			this.sharedFailure ??= error;
 		}
 	}
 

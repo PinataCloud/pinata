@@ -158,7 +158,7 @@ export const sendResumable = async (
 		const errorData = await urlReq.text().catch(() => "");
 		const errorMetadata = {
 			requestUrl: urlReq.url,
-			requestHeaders: urlReq.headers,
+			responseHeaders: Object.fromEntries(urlReq.headers),
 			retryAfterMs: parseRetryAfter(urlReq.headers),
 		};
 		if (!urlReq.ok) {
@@ -281,24 +281,34 @@ const sendChunks = async (
 				failures++;
 				const final = isFinalRefusal(failure.status);
 				if (final || failures > MAX_RETRIES) {
+					const metadata = {
+						requestUrl: failure.requestUrl,
+						uploadUrl: url,
+						uploadOffset: offset,
+						...(final ? {} : { retriesAttempted: MAX_RETRIES }),
+						retryAfterMs: failure.retryAfterMs,
+					};
+					// A refusal no retry can change (a refused JWT: an AuthenticationError)
+					if (final) {
+						throw refused(
+							"Could not send the file",
+							failure.status,
+							failure.error,
+							metadata,
+						);
+					}
 					const reason =
 						failure.status === 0 ? failure.error : serverReason(failure.error);
 					const sent = failure.status
 						? `Could not send the file (HTTP ${failure.status})`
 						: "Could not reach the upload server while sending the file";
 					throw new NetworkError(
-						`${sent}${final ? "" : ` after ${MAX_RETRIES} retries`}${reason ? `: ${reason}` : ""}`,
+						`${sent} after ${MAX_RETRIES} retries${reason ? `: ${reason}` : ""}`,
 						failure.status,
 						{
 							error: failure.error,
 							code: failure.status ? "HTTP_ERROR" : "NETWORK_ERROR",
-							metadata: {
-								requestUrl: failure.requestUrl,
-								uploadUrl: url,
-								uploadOffset: offset,
-								...(final ? {} : { retriesAttempted: MAX_RETRIES }),
-								retryAfterMs: failure.retryAfterMs,
-							},
+							metadata,
 						},
 					);
 				}

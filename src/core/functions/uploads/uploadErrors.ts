@@ -1,6 +1,10 @@
 // What the requests of a resumable or folder upload fail with.
 
-import { NetworkError, PinataError } from "../../../utils/custom-errors";
+import {
+	AuthenticationError,
+	NetworkError,
+	PinataError,
+} from "../../../utils/custom-errors";
 import { serverReason } from "./tusMetadata";
 
 type ErrorMetadata = { requestUrl: string } & Record<string, unknown>;
@@ -22,19 +26,27 @@ export const unreachable = (
 };
 
 // A request the server refused with `status` and `body`: `<action> (HTTP <status>)`, with
-// the server's reason when it gave one
+// the server's reason when it gave one. An AuthenticationError for a refused JWT (401, 403),
+// as the other upload methods throw.
 export const refused = (
 	action: string,
 	status: number,
 	body: string,
 	metadata: ErrorMetadata,
-): NetworkError => {
+): NetworkError | AuthenticationError => {
 	const reason = serverReason(body);
-	return new NetworkError(
-		`${action} (HTTP ${status})${reason ? `: ${reason}` : ""}`,
-		status,
-		{ error: body, code: "HTTP_ERROR", metadata },
-	);
+	const message = `${action} (HTTP ${status})${reason ? `: ${reason}` : ""}`;
+	return status === 401 || status === 403
+		? new AuthenticationError(message, status, {
+				error: body,
+				code: "AUTH_ERROR",
+				metadata,
+			})
+		: new NetworkError(message, status, {
+				error: body,
+				code: "HTTP_ERROR",
+				metadata,
+			});
 };
 
 // What a folder file, or finishing the folder, fails with once the upload is cancelled

@@ -1,6 +1,6 @@
 // The final sync of a folder upload, which computes the folder's CID.
 
-import type { NetworkError } from "../../../utils/custom-errors";
+import type { PinataError } from "../../../utils/custom-errors";
 import { MAX_RENEWALS } from "./folderAuth";
 import {
 	isTransient,
@@ -38,7 +38,7 @@ export const syncFolder = async (
 	const requestUrl = `${endpoint}/buckets/${folderId}/sync`;
 	const action = "Could not finish the folder";
 	for (let spent = 0, renewals = 0; ; ) {
-		let error: NetworkError;
+		let error: PinataError;
 		try {
 			const res = await fetch(requestUrl, {
 				method: "PUT",

@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- `folder()`: a JWT the server refuses (401, 403) rejects with an `AuthenticationError`, as `file()` does, instead of a `NetworkError`, both as the rejection and as each `failed[].error`; so does a resumable upload's chunk refused the JWT. A refused creation's `details.metadata` holds the response headers as a plain object, `responseHeaders`, instead of a `Headers` object named `requestHeaders`.
+- `folder()`: a file refused with 409 because the server still finishes an earlier upload of the same path (a file sent again right after a cancel) waits for it, following `Retry-After`, for as long as a registration may take, without spending `retries`; its `retry` events say so with `waitingForPreviousUpload`.
+- `folder()` with a `folderId` sends every file at once instead of one first, and a file that fails ends in a `FolderUploadError` like any partial failure, instead of rejecting the whole upload with that file's error before the other files are tried. Once 3 files in a row fail for good with the same status and reason, the files not sent yet fail with that error without being sent.
 - A name or keyvalues given in an upload method's options is no longer dropped by the builder; the caller's options object is no longer modified.
 - Resumable uploads follow `Retry-After`, fail at once on a 4xx that a retry can't change, and continue from the offset the server holds after a failed chunk.
 - Checks of an upload's registration, and of where it stands after a failed chunk, follow the `Retry-After` the server sends with a 429 or 503.

@@ -28,6 +28,13 @@ export const isTransient = (error: Error): boolean => {
 	return TRANSIENT_STATUSES.includes(status) || status >= 500;
 };
 
+// The server refusing a new upload of a path while it still finishes an earlier upload of
+// that path (one cancelled after its last byte, say): it lets the new one in once done
+export const isFinalizing = (error: Error): boolean =>
+	error instanceof PinataError &&
+	error.statusCode === 409 &&
+	/\bfinaliz/i.test(error.message);
+
 // The pause before retry `attempt` (1 for the first): 1 s, doubling up to 10 s
 export const backoff = (attempt: number): number =>
 	Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1), BACKOFF_MAX_MS);

@@ -87,6 +87,15 @@ export type FolderUploadEvent = {
 	 * `retries`. Cancel with `signal` to give up sooner.
 	 */
 	waitingForOnline?: boolean;
+	/**
+	 * `retry`: the server is still finishing an earlier upload of the same path (one cancelled
+	 * after its last byte was sent, say) and refuses a new one until then (HTTP 409). The
+	 * next attempt starts after `delayMs`, and this one is not counted against `retries`,
+	 * for as long as the server may take to register a file of this size (10 minutes plus 5
+	 * per GiB); after that, the refusal counts as any other. Cancel with `signal` to give up
+	 * sooner.
+	 */
+	waitingForPreviousUpload?: boolean;
 	/** Files registered so far */
 	completed: number;
 	/** Files that failed for good so far */
@@ -113,7 +122,8 @@ export type FolderUploadOptions = UploadOptions & {
 	/**
 	 * The folder to upload into (a UUID). Defaults to a new one. Pass the `folderId` of a
 	 * FolderUploadError with its failed files to send them again into the same folder; a
-	 * file with a path already in the folder replaces it.
+	 * file with a path already in the folder replaces it. The folder exists, so every file is
+	 * sent at once (a new folder is created by one file first).
 	 */
 	folderId?: string;
 	/**

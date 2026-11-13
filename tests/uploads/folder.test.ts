@@ -2,9 +2,12 @@ import { uploadFolder } from "../../src/core/functions";
 import type { FolderUploadEvent, PinataConfig } from "../../src";
 import { PublicUpload } from "../../src/core/classes/uploads/PublicUpload";
 import {
+	AuthenticationError,
 	FolderUploadError,
+	type PinataError,
 	ValidationError,
 } from "../../src/utils/custom-errors";
+import { registrationTimeout } from "../../src/core/functions/uploads/tusStatus";
 import { NodeLikeFile } from "./nodeLikeFile";
 import { decodeMetadata } from "./uploadMetadata";
 
@@ -12,6 +15,9 @@ const config: PinataConfig = {
 	pinataJwt: "test-jwt",
 	uploadUrl: "https://uploads.test/v3",
 };
+
+// A folder an earlier upload created
+const givenFolderId = "01a1d1d0-c031-7430-8e84-34db001732c0";
 
 const file = (content: string, name = "f.txt", relativePath?: string) => {
 	const f = new File([content], name, { type: "text/plain" });
@@ -41,6 +47,13 @@ const refused = (status: number, message: string) =>
 	new Response(JSON.stringify({ error: { code: status, message } }), {
 		status,
 	});
+
+// The server's refusal of a new upload of a path while it still finishes an earlier one
+const finalizing = (headers: Record<string, string> = {}) =>
+	new Response(
+		"Upload is finalizing; poll HEAD on its Location for the outcome",
+		{ status: 409, headers },
+	);
 
 // A creation's answer: the upload at `location`, in the state `headers` tell
 const createdAt = (location: string, headers: Record<string, string> = {}) =>
@@ -503,6 +516,104 @@ describe("uploadFolder", () => {
 				),
 			).rejects.toThrow("HTTP 503");
 			expect(created.map((c) => c.path)).toEqual(["d/a.txt", "d/a.txt"]);
+		});
+
+		it("sends every file into a given folder at once, without waiting for a first one", async () => {
+			server();
+			const events: string[] = [];
+
+			await uploadFolder(
+				config,
+				[
+					{ path: "d/first.txt", file: file("a") },
+					{ path: "d/second.txt", file: file("b") },
+				],
+				"public",
+				{
+					folderId: givenFolderId,
+					onProgress: (e) => events.push(`${e.type} ${e.path}`),
+				},
+			);
+
+			// The second file starts while the first is under way, not once it is registered
+			expect(events.indexOf("start d/second.txt")).toBeLessThan(
+				events.indexOf("complete d/first.txt"),
+			);
+		});
+
+		it("reports the failed files of a given folder like any partial failure, after trying every file", async () => {
+			const { created } = server((creation) =>
+				creation.path === "d/a.txt"
+					? refused(503, "Service Unavailable")
+					: undefined,
+			);
+
+			const error = await uploadFolder(
+				config,
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/b.txt", file: file("bb") },
+					{ path: "d/c.txt", file: file("ccc") },
+				],
+				"private",
+				{ folderId: givenFolderId, retries: 1 },
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.folderId).toBe(givenFolderId);
+			expect(error.folderName).toBe("d");
+			expect(error.failed.map((f: { path: string }) => f.path)).toEqual([
+				"d/a.txt",
+			]);
+			expect(error.failed[0].error.statusCode).toBe(503);
+			expect(
+				error.uploaded.map((f: { path: string }) => f.path).sort(),
+			).toEqual(["d/b.txt", "d/c.txt"]);
+			expect(created.filter((c) => c.path === "d/a.txt")).toHaveLength(2);
+		});
+
+		it("stops sending files into a given folder once 3 in a row fail alike, failing the others unsent", async () => {
+			const { created } = server(() =>
+				refused(422, "This folder no longer accepts files"),
+			);
+			const events: FolderUploadEvent[] = [];
+
+			const error = await uploadFolder(
+				config,
+				Array.from({ length: 30 }, (_, i) => ({
+					path: `d/${i}.txt`,
+					file: file("x"),
+				})),
+				"public",
+				{ folderId: givenFolderId, onProgress: (e) => events.push(e) },
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.folderId).toBe(givenFolderId);
+			expect(error.folderName).toBe("d");
+			expect(error.failed).toHaveLength(30);
+			// The 3 that failed, and those still sending when the third did: at most one in each
+			// of the 3 other slots (concurrency 4)
+			expect(created.length).toBeGreaterThanOrEqual(3);
+			expect(created.length).toBeLessThanOrEqual(6);
+			for (const failed of error.failed) {
+				expect(failed.error.message).toBe(
+					"Could not start the upload (HTTP 422): This folder no longer accepts files",
+				);
+			}
+			// A file never sent reports attempt 0, and no start or retry
+			const sent = new Set(created.map((c) => c.path));
+			const unsent = error.failed.filter(
+				(f: { path: string }) => !sent.has(f.path),
+			);
+			expect(unsent.length).toBeGreaterThanOrEqual(24);
+			for (const { index } of unsent) {
+				expect(
+					events
+						.filter((e) => e.index === index)
+						.map((e) => `${e.type} ${e.attempt}`),
+				).toEqual(["error 0"]);
+			}
 		});
 
 		it("sends no more files at once than the concurrency", async () => {
@@ -1065,6 +1176,29 @@ describe("uploadFolder", () => {
 			expect(heads).toBe(1);
 		});
 
+		it("keeps the headers of a refused creation as a plain object", async () => {
+			mockFetch(
+				async () =>
+					new Response(JSON.stringify({ error: { message: "down" } }), {
+						status: 503,
+						headers: { "Content-Type": "application/json", "Retry-After": "3" },
+					}),
+			);
+
+			const error = await uploadFolder(
+				config,
+				[{ path: "d/a.txt", file: file("a") }],
+				"public",
+				{ retries: 0 },
+			).catch((e) => e);
+
+			expect(error.details.metadata.responseHeaders).toEqual({
+				"content-type": "application/json",
+				"retry-after": "3",
+			});
+			expect(error.details.metadata).not.toHaveProperty("requestHeaders");
+		});
+
 		describe("in a browser that goes offline", () => {
 			const online = new EventTarget();
 			const scope = globalThis as unknown as Record<string, unknown>;
@@ -1161,6 +1295,135 @@ describe("uploadFolder", () => {
 				expect(result.files[0].cid).toBe("bafybig");
 				// More failures than the 5 chunk retries, none of them counted
 				expect(patches).toHaveLength(9);
+			});
+		});
+
+		describe("while the server finishes an earlier upload of the same path", () => {
+			it("waits as long as the server asks, without spending the file's retries", async () => {
+				let creations = 0;
+				mockFetch(async (url, init) => {
+					if (init.method === "PUT") return synced(1);
+					creations++;
+					if (creations <= 2) return finalizing({ "Retry-After": "20" });
+					return registeredAt(url, init);
+				});
+				const events: FolderUploadEvent[] = [];
+
+				const result = await uploadFolder(
+					config,
+					[{ path: "d/a.txt", file: file("a") }],
+					"public",
+					{
+						folderId: givenFolderId,
+						retries: 0,
+						onProgress: (e) => events.push(e),
+					},
+				);
+
+				expect(result.files[0].cid).toBe("bafy-d/a.txt");
+				const retries = events.filter((e) => e.type === "retry");
+				expect(
+					retries.map((e) => [e.delayMs, e.waitingForPreviousUpload]),
+				).toEqual([
+					[20000, true],
+					[20000, true],
+				]);
+				expect(retries[0].error?.message).toBe(
+					"Could not start the upload (HTTP 409): Upload is finalizing; poll HEAD on its Location for the outcome",
+				);
+				expect(delays.filter((ms) => ms === 20000)).toHaveLength(2);
+			});
+
+			it("counts the refusals against the retries once it took longer than a registration may", async () => {
+				let now = 0;
+				const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+				setTimeoutSpy.mockImplementation(((
+					callback: () => void,
+					ms: number,
+				) => {
+					delays.push(ms);
+					now += ms;
+					callback();
+					return 0;
+				}) as unknown as typeof setTimeout);
+				mockFetch(async () => finalizing());
+				const events: FolderUploadEvent[] = [];
+				try {
+					const error = await uploadFolder(
+						config,
+						[{ path: "d/a.txt", file: file("a") }],
+						"public",
+						{
+							folderId: givenFolderId,
+							retries: 1,
+							onProgress: (e) => events.push(e),
+						},
+					).catch((e) => e);
+
+					expect(error).toBeInstanceOf(FolderUploadError);
+					const retries = events.filter((e) => e.type === "retry");
+					const waits = retries.filter((e) => e.waitingForPreviousUpload);
+					// The waits fill the registration timeout of a one-byte file
+					const waited = waits.reduce((sum, e) => sum + (e.delayMs ?? 0), 0);
+					expect(waited).toBeGreaterThanOrEqual(registrationTimeout(1));
+					expect(waited).toBeLessThan(registrationTimeout(1) + 11000);
+					// Then one counted retry, and the file fails
+					expect(retries.length - waits.length).toBe(1);
+					expect(retries.at(-1)?.waitingForPreviousUpload).toBeUndefined();
+					expect(events.at(-1)?.type).toBe("error");
+				} finally {
+					clock.mockRestore();
+				}
+			});
+
+			it("stops waiting once cancelled", async () => {
+				// Pauses never end on their own: only the abort ends them
+				setTimeoutSpy.mockImplementation(((_: () => void, ms: number) => {
+					delays.push(ms);
+					return 0;
+				}) as unknown as typeof setTimeout);
+				const controller = new AbortController();
+				let creations = 0;
+				mockFetch(async () => {
+					creations++;
+					setImmediate(() => controller.abort());
+					return finalizing();
+				});
+
+				const error = await uploadFolder(
+					config,
+					[{ path: "d/a.txt", file: file("a") }],
+					"public",
+					{ folderId: givenFolderId, signal: controller.signal },
+				).catch((e) => e);
+
+				expect(error).toBeInstanceOf(FolderUploadError);
+				expect(error.failed[0].error.name).toBe("AbortError");
+				expect(creations).toBe(1);
+			});
+
+			it("counts any other conflict against the file's retries", async () => {
+				let creations = 0;
+				mockFetch(async () => {
+					creations++;
+					return new Response(
+						"Upload changed; retrieve the current offset with HEAD",
+						{ status: 409 },
+					);
+				});
+				const events: FolderUploadEvent[] = [];
+
+				const error = await uploadFolder(
+					config,
+					[{ path: "d/a.txt", file: file("a") }],
+					"public",
+					{ retries: 1, onProgress: (e) => events.push(e) },
+				).catch((e) => e);
+
+				expect(error.statusCode).toBe(409);
+				expect(creations).toBe(2);
+				const retry = events.find((e) => e.type === "retry");
+				expect(retry?.waitingForPreviousUpload).toBeUndefined();
 			});
 		});
 	});
@@ -1754,6 +2017,85 @@ describe("uploadFolder", () => {
 	});
 
 	describe("JWTs", () => {
+		it("rejects with an AuthenticationError when the server refuses the JWT, as file() does", async () => {
+			server(() => refused(401, "Not Authorized"));
+
+			const error = await uploadFolder(
+				config,
+				[{ path: "d/a.txt", file: file("a") }],
+				"public",
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(AuthenticationError);
+			expect(error.statusCode).toBe(401);
+			expect(error.message).toBe(
+				"Could not start the upload (HTTP 401): Not Authorized",
+			);
+			expect(error.details.code).toBe("AUTH_ERROR");
+		});
+
+		it("fails each file of a given folder with an AuthenticationError when the server refuses the JWT", async () => {
+			server(() => refused(403, "Forbidden"));
+
+			const error = await uploadFolder(
+				config,
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/b.txt", file: file("bb") },
+					{ path: "d/c.txt", file: file("ccc") },
+				],
+				"public",
+				{ folderId: givenFolderId, concurrency: 1 },
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.failed).toHaveLength(3);
+			for (const failed of error.failed) {
+				expect(failed.error).toBeInstanceOf(AuthenticationError);
+				expect(failed.error.statusCode).toBe(403);
+			}
+		});
+
+		it("rejects with an AuthenticationError when a chunk is refused the JWT", async () => {
+			mockFetch(async (url, init) => {
+				if (init.method === "POST") return createdAt(`${url}/upload`);
+				if (init.method === "PATCH") return refused(401, "Not Authorized");
+				return storedUpTo(0);
+			});
+
+			const error = await uploadFolder(
+				config,
+				[{ path: "d/big.bin", file: big() }],
+				"public",
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(AuthenticationError);
+			expect(error.message).toBe(
+				"Could not send the file (HTTP 401): Not Authorized",
+			);
+			expect(error.details.metadata.uploadUrl).toMatch(/\/upload$/);
+		});
+
+		it("rejects with an AuthenticationError when the final sync is refused the JWT", async () => {
+			const { fetchMock, respond } = server();
+			fetchMock.mockImplementation(async (url, init) =>
+				init.method === "PUT"
+					? refused(401, "Not Authorized")
+					: respond(url, init),
+			);
+
+			const error = await uploadFolder(
+				config,
+				[{ path: "d/a.txt", file: file("a") }],
+				"public",
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(AuthenticationError);
+			expect(error.message).toBe(
+				"Could not finish the folder (HTTP 401): Not Authorized",
+			);
+		});
+
 		it("stops sending files after an authentication failure, which fail without being sent", async () => {
 			const { created } = server((creation) =>
 				creation.path === "d/a2.txt"
@@ -2285,6 +2627,93 @@ describe("uploadFolder", () => {
 			expect(error.name).toBe("AbortError");
 			expect(error.message).toBe("The upload was cancelled");
 			expect(syncs).toBe(1);
+		});
+
+		it("sends files cancelled after their last byte again into the folder once the server has finished their earlier upload", async () => {
+			const MiB = 1024 * 1024;
+			const files = Array.from({ length: 24 }, (_, i) => ({
+				path: `d/part-${i}.bin`,
+				file: new File([new Uint8Array(MiB)], `part-${i}.bin`),
+			}));
+			// Uploads the server is still registering. A new upload of one of those paths is
+			// refused until the earlier upload ends, after 5 refusals.
+			const finishing = new Set<string>();
+			const refusals = new Map<string, number>();
+			const registered = new Set<string>();
+			mockFetch(async (url, init) => {
+				if (init.method === "PUT") return synced(registered.size);
+				if (init.method === "HEAD") {
+					const path = decodeURIComponent(url.slice(url.lastIndexOf("/") + 1));
+					finishing.delete(path);
+					registered.add(path);
+					return new Response(null, {
+						status: 200,
+						headers: {
+							"Upload-Offset": `${MiB}`,
+							"Upload-Status": "ready",
+							"Upload-Cid": `bafy-${path}`,
+						},
+					});
+				}
+				const path = pathOf(init);
+				if (finishing.has(path)) {
+					const n = (refusals.get(path) ?? 0) + 1;
+					refusals.set(path, n);
+					if (n <= 5) return finalizing();
+					finishing.delete(path);
+				}
+				finishing.add(path);
+				return createdAt(`${url}/${encodeURIComponent(path)}`, {
+					"Upload-Offset": `${MiB}`,
+					"Upload-Cid": `bafy-${path}`,
+					"Upload-Status": "processing",
+				});
+			});
+			const controller = new AbortController();
+
+			const cancelledUpload = await uploadFolder(config, files, "public", {
+				concurrency: 2,
+				signal: controller.signal,
+				onProgress: (e) => {
+					if (e.type === "sent" && e.completed >= 3) controller.abort();
+				},
+			}).catch((e) => e);
+
+			expect(cancelledUpload).toBeInstanceOf(FolderUploadError);
+			const failed: { index: number; path: string }[] = cancelledUpload.failed;
+			// Cancelled after their last byte: the server is still finishing them
+			const unfinished = failed
+				.filter((f) => finishing.has(f.path))
+				.map((f) => f.path);
+			expect(unfinished.length).toBeGreaterThan(0);
+
+			const events: FolderUploadEvent[] = [];
+			const result = await uploadFolder(
+				config,
+				failed.map((f) => ({ path: f.path, file: files[f.index].file })),
+				"public",
+				{
+					folderId: cancelledUpload.folderId,
+					concurrency: 2,
+					onProgress: (e) => events.push(e),
+				},
+			);
+
+			expect(result.number_of_files).toBe(24);
+			expect(result.files).toHaveLength(failed.length);
+			for (const path of unfinished) {
+				expect(refusals.get(path)).toBe(6);
+				// More waits than the 3 retries, none of them counted
+				const retries = events.filter(
+					(e) => e.path === path && e.type === "retry",
+				);
+				expect(retries).toHaveLength(5);
+				for (const retry of retries) {
+					expect(retry.waitingForPreviousUpload).toBe(true);
+					expect(retry.delayMs).toBeGreaterThan(0);
+					expect((retry.error as PinataError).statusCode).toBe(409);
+				}
+			}
 		});
 	});
 });

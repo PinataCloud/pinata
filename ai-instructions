@@ -572,7 +572,10 @@ Response: "Revoked"
     retries?: number;       // retries per file after a transient failure (default 3):
                             // no answer, 408/409/425/429, 5xx; waits as long as Retry-After
                             // asks (up to 5 min); attempts while the browser is offline
-                            // (navigator.onLine false) don't count, the next waits for "online"
+                            // (navigator.onLine false) don't count, the next waits for "online";
+                            // a 409 while the server still finishes an earlier upload of the
+                            // same path (one cancelled after its last byte) doesn't count either
+                            // for as long as a registration may take (10 min + 5 min per GiB)
     onProgress?: (event: FolderUploadEvent) => void;
     folderId?: string;      // upload into this folder (UUID): resend a FolderUploadError's
                             // failed files with its folderId to complete that folder, as
@@ -596,6 +599,8 @@ Response: "Revoked"
     delayMs?: number;       // retry: pause before the next attempt
     waitingForOnline?: boolean; // retry while offline: delayMs is 0, the next attempt waits
                             // for the "online" event, with no time limit (cancel via signal)
+    waitingForPreviousUpload?: boolean; // retry after a 409: the server still finishes an
+                            // earlier upload of this path; next attempt after delayMs, not counted
     completed: number; failed: number; total: number;
   }
 
@@ -616,8 +621,12 @@ Response: "Revoked"
     into folderId would make a folder without the uploaded ones. Without .folder, send the
     failed files within 30 minutes: an idle folder may be replaced by an earlier one too.
   Cancelled while the folder is being finished: rejects with an error named "AbortError".
-  If the first file fails for a reason of its own (path, type, size), the next one
-  creates the folder; any other failure of the first file stops the upload.
+  A new folder is created by its first file, uploaded alone: if it fails for a reason of
+  its own (path, type, size), the next one creates the folder; any other failure of the
+  first file stops the upload. With folderId the folder exists: every file goes at once,
+  and failures end in a FolderUploadError like any partial failure; once 3 files in a row
+  fail for good alike (same status and reason), the files not sent yet fail with that
+  error without being sent (attempt 0).
   A file whose bytes are stored but whose registration check fails is checked again on
   retry, not sent again; a file whose chunks failed is continued on retry from the offset
   the server holds, not sent from the start. A HEAD the server refuses for good (4xx) fails the file at once.
