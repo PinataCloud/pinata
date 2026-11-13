@@ -1596,4 +1596,68 @@ describe("uploadFolder, a file sent again", () => {
 		expect(calls.filter((c) => c === "PATCH 0")).toHaveLength(1);
 		expect(calls.slice(-3)).toEqual(["HEAD", `PATCH ${chunk}`, "PUT"]);
 	});
+
+	it("keeps the unfinished upload when the server cannot say where it stands", async () => {
+		const chunk = 50 * 1024 * 1024 + 1;
+		const size = chunk + 10;
+		let stored = 0;
+		let lost = 0;
+		let heads = 0;
+		const calls: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			const offset = headers["Upload-Offset"];
+			calls.push(`${init.method}${offset ? ` ${offset}` : ""}`);
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 1 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "HEAD") {
+				heads++;
+				// No answer to the chunk retries' HEADs nor to the first one of the next attempt
+				if (heads <= 6) throw new TypeError("fetch failed");
+				return new Response(null, {
+					status: 200,
+					headers: { "Upload-Offset": `${stored}` },
+				});
+			}
+			if (offset === `${chunk}` && lost < 6) {
+				lost++;
+				throw new TypeError("fetch failed");
+			}
+			stored = offset === "0" ? chunk : size;
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Upload-Offset": `${stored}`,
+					...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			config,
+			[
+				{
+					path: "d/big.bin",
+					file: new File([new Uint8Array(size)], "big.bin"),
+				},
+			],
+			"public",
+		);
+
+		expect(result.files[0].cid).toBe("bafybig");
+		expect(calls.filter((c) => c === "POST")).toHaveLength(1);
+		expect(calls.slice(-4)).toEqual(["HEAD", "HEAD", `PATCH ${chunk}`, "PUT"]);
+	});
 });

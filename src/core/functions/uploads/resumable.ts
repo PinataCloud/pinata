@@ -40,13 +40,26 @@ export const sendResumable = async (
 	resumeUrl?: string,
 ): Promise<StoredUpload> => {
 	if (resumeUrl) {
+		// null: the server no longer has the upload, or refuses to say: a new one is created
 		const status = await getUploadStatus(
 			resumeUrl,
 			headers,
 			file.size,
 			signal,
-		).catch(() => undefined);
+		).catch(() => null);
 		if (signal?.aborted) throw signal.reason;
+		// The server cannot tell now: keep the upload for the next attempt
+		if (status === undefined) {
+			const error = unreachable(
+				"no answer about the upload to continue",
+				resumeUrl,
+			);
+			error.details = {
+				...error.details,
+				metadata: { requestUrl: resumeUrl, uploadUrl: resumeUrl },
+			};
+			throw error;
+		}
 		if (status) {
 			const upload: StoredUpload = {
 				url: resumeUrl,
