@@ -56,11 +56,14 @@ export type FolderEntry = {
 export type FolderUploadEvent = {
 	/**
 	 * `start`: the file's bytes start to be sent (again on each attempt).
+	 * `sent`: the server has every byte of the file and is registering it (it may take
+	 * seconds to minutes: the server is processing the file), then `complete`, `retry` or
+	 * `error`. Again on each attempt, also on one that only checks the registration.
 	 * `complete`: the file is registered in the folder.
 	 * `retry`: an attempt failed and the file will be sent again after `delayMs`.
 	 * `error`: the file failed for good; the upload goes on with the other files.
 	 */
-	type: "start" | "complete" | "retry" | "error";
+	type: "start" | "sent" | "complete" | "retry" | "error";
 	/** The file's position in the files given: tells files apart whatever their path */
 	index: number;
 	/** The file's path in the folder, folder name included */

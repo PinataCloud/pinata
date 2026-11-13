@@ -250,6 +250,7 @@ export const uploadFolder = async (
 						}
 					});
 				}
+				emit({ type: "sent", index, path, size: file.size, attempt });
 				// The file is in the folder once registered. It may be reported as an earlier
 				// upload when, alone, it matches one (a one-file folder of the same name and
 				// content): its object is in this folder all the same, and its CID is its own.

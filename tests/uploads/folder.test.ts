@@ -311,6 +311,7 @@ describe("uploadFolder", () => {
 			"start 2",
 			"retry 2",
 			"start 3",
+			"sent 3",
 			"complete 3",
 		]);
 		expect(forB[1].error?.message).toBe(
@@ -456,6 +457,7 @@ describe("uploadFolder", () => {
 		]);
 		expect(events.map((e) => `${e.type} ${e.index}`)).toEqual([
 			"start 0",
+			"sent 0",
 			"complete 0",
 			"start 1",
 			"error 1",
@@ -1590,7 +1592,13 @@ describe("uploadFolder, a file sent again", () => {
 		);
 
 		expect(result.files[0].cid).toBe("bafybig");
-		expect(events).toEqual(["start 1", "retry 1", "start 2", "complete 2"]);
+		expect(events).toEqual([
+			"start 1",
+			"retry 1",
+			"start 2",
+			"sent 2",
+			"complete 2",
+		]);
 		// One upload, continued from the stored chunk
 		expect(calls.filter((c) => c === "POST")).toHaveLength(1);
 		expect(calls.filter((c) => c === "PATCH 0")).toHaveLength(1);
@@ -1659,5 +1667,60 @@ describe("uploadFolder, a file sent again", () => {
 		expect(result.files[0].cid).toBe("bafybig");
 		expect(calls.filter((c) => c === "POST")).toHaveLength(1);
 		expect(calls.slice(-4)).toEqual(["HEAD", "HEAD", `PATCH ${chunk}`, "PUT"]);
+	});
+
+	it("reports a file sent once its bytes are stored, before its registration ends", async () => {
+		let heads = 0;
+		const timeline: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 1 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				timeline.push("POST");
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/upload`,
+						"Upload-Offset": "1",
+						"Upload-Cid": "bafyfile",
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			heads++;
+			timeline.push(`HEAD ${heads}`);
+			return new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": "1",
+					"Upload-Status": heads < 3 ? "processing" : "ready",
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+			{
+				onProgress: (e) => timeline.push(`${e.type} ${e.index} ${e.attempt}`),
+			},
+		);
+
+		expect(timeline).toEqual([
+			"start 0 1",
+			"POST",
+			"sent 0 1",
+			"HEAD 1",
+			"HEAD 2",
+			"HEAD 3",
+			"complete 0 1",
+		]);
 	});
 });

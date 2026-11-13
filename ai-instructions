@@ -583,7 +583,9 @@ Response: "Revoked"
                             // refused JWT fails the files until another is set (setNewJwt)
   }
   type FolderUploadEvent = {
-    type: "start" | "complete" | "retry" | "error";
+    type: "start" | "sent" | "complete" | "retry" | "error";
+                            // sent: every byte is stored, the server is registering the file
+                            // (processing, seconds to minutes) until complete/retry/error
     index: number;          // the file's position in `files`: match events by it, not path
     path: string; size: number; attempt: number;
     cid?: string;           // complete: the file's CID
