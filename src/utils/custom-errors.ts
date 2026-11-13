@@ -1,3 +1,5 @@
+import type { FolderFileResult } from "../core/types";
+
 interface ErrorDetails {
 	error?: string;
 	code?: string;
@@ -56,12 +58,7 @@ export class FolderUploadError extends PinataError {
 	constructor(
 		message: string,
 		public folderId: string,
-		public uploaded: {
-			index: number;
-			path: string;
-			size: number;
-			cid: string;
-		}[],
+		public uploaded: FolderFileResult[],
 		public failed: {
 			index: number;
 			path: string;

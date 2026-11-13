@@ -5,8 +5,17 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../../utils/custom-errors";
-import { registerResumable, registersLater, sendResumable } from "./resumable";
-import { encodeMetadataValue, parseUploadMetadata } from "./tusMetadata";
+import {
+	creationUrl,
+	registerResumable,
+	registersLater,
+	sendResumable,
+} from "./resumable";
+import {
+	fileMetadata,
+	optionsMetadata,
+	parseUploadMetadata,
+} from "./tusMetadata";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -48,52 +57,11 @@ export const uploadFile = async (
 		}
 
 		const name = options?.metadata?.name || file.name || "File from SDK";
-
-		let metadata: string = `filename ${encodeMetadataValue(name)},filetype ${encodeMetadataValue(file.type)},network ${encodeMetadataValue(network)}`;
-
-		if (options?.groupId) {
-			metadata += `,group_id ${encodeMetadataValue(options.groupId)}`;
-		}
-
-		if (options?.metadata?.keyvalues) {
-			metadata += `,keyvalues ${encodeMetadataValue(JSON.stringify(options.metadata.keyvalues))}`;
-		}
-
-		if (options?.streamable) {
-			metadata += `,streamable ${encodeMetadataValue("true")}`;
-		}
-
-		if (options?.car) {
-			metadata += `,car ${encodeMetadataValue("true")}`;
-		}
-
-		if (options?.cid_version !== undefined) {
-			metadata += `,cid_version ${encodeMetadataValue(options.cid_version)}`;
-		}
-
-		if (options?.expires_at !== undefined) {
-			metadata += `,expires_at ${encodeMetadataValue(options.expires_at.toString())}`;
-		}
-
-		// Build URL with query parameters for chunked uploads
-		let updatedEndpoint: string = `${endpoint}/files`;
-		if (options?.url) {
-			updatedEndpoint = options.url;
-		}
-
-		const requestUrl = new URL(updatedEndpoint);
-		if (options?.cid_version !== undefined) {
-			requestUrl.searchParams.set(
-				"X-Upload-Option-Cid-Version",
-				options.cid_version.toString(),
-			);
-		}
-
 		const stored = await sendResumable(
-			requestUrl.toString(),
+			creationUrl(options?.url || `${endpoint}/files`, options?.cid_version),
 			headers,
 			file,
-			metadata,
+			`${fileMetadata(name, file.type)},${optionsMetadata(network, options)}`,
 		);
 		const skipWait = registersLater(stored) && options?.waitForCid === false;
 		const registered = skipWait

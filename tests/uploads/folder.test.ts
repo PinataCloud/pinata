@@ -6,6 +6,7 @@ import {
 	ValidationError,
 } from "../../src/utils/custom-errors";
 import { NodeLikeFile } from "./nodeLikeFile";
+import { decodeMetadata } from "./uploadMetadata";
 
 const config: PinataConfig = {
 	pinataJwt: "test-jwt",
@@ -21,13 +22,83 @@ const file = (content: string, name = "f.txt", relativePath?: string) => {
 };
 
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64");
-const decodeMetadata = (header: string) =>
-	Object.fromEntries(
-		header.split(",").map((pair) => {
-			const [key, value = ""] = pair.split(" ");
-			return [key, Buffer.from(value, "base64").toString("utf8")];
-		}),
-	);
+
+type Handler = (url: string, init: RequestInit) => Promise<Response>;
+
+// Answers every request with `handler`
+const mockFetch = (handler: Handler) => {
+	const fetchMock = jest.fn(handler);
+	global.fetch = fetchMock as unknown as typeof fetch;
+	return fetchMock;
+};
+
+const headersOf = (init: RequestInit) => init.headers as Record<string, string>;
+const metadataOf = (init: RequestInit) =>
+	decodeMetadata(headersOf(init)["Upload-Metadata"]);
+const pathOf = (init: RequestInit) => metadataOf(init).filename;
+
+const refused = (status: number, message: string) =>
+	new Response(JSON.stringify({ error: { code: status, message } }), {
+		status,
+	});
+
+// A creation's answer: the upload at `location`, in the state `headers` tell
+const createdAt = (location: string, headers: Record<string, string> = {}) =>
+	new Response(null, {
+		status: 201,
+		headers: { Location: location, ...headers },
+	});
+// A creation that stores the file's one byte, whose registration is under way
+const processing = (location: string, cid = "bafyfile") =>
+	createdAt(location, {
+		"Upload-Offset": "1",
+		"Upload-Cid": cid,
+		"Upload-Status": "processing",
+	});
+// A creation that stores every byte and registers the file at once
+const registeredAt = (url: string, init: RequestInit) => {
+	const path = pathOf(init);
+	return createdAt(`${url}/${encodeURIComponent(path)}`, {
+		"Upload-Offset": headersOf(init)["Upload-Length"],
+		"Upload-Cid": `bafy-${path}`,
+	});
+};
+// A lookup's answer about a stored one-byte file
+const registration = (
+	status: "processing" | "ready",
+	headers: Record<string, string> = {},
+) =>
+	new Response(null, {
+		status: 200,
+		headers: { "Upload-Offset": "1", "Upload-Status": status, ...headers },
+	});
+// A lookup's answer: the upload holds `offset` bytes
+const storedUpTo = (offset: number) =>
+	new Response(null, {
+		status: 200,
+		headers: { "Upload-Offset": `${offset}` },
+	});
+// A chunk's answer: `offset` bytes stored, and the file's CID once all `size` are
+const chunkStored = (offset: number, size: number) =>
+	new Response(null, {
+		status: 204,
+		headers: {
+			"Upload-Offset": `${offset}`,
+			...(offset === size ? { "Upload-Cid": "bafybig" } : {}),
+		},
+	});
+// The folder sync's answer
+const syncedAs = (data: Record<string, unknown>) =>
+	new Response(JSON.stringify({ data }), { status: 200 });
+// A folder "d" holding `files` files; `{}` leaves its size out
+const synced = (files: number, { size }: { size?: number } = { size: 1 }) =>
+	syncedAs({
+		id: "f",
+		name: "d",
+		cid: "bafyfolder",
+		size,
+		number_of_files: files,
+	});
 
 type Creation = { path: string; folderId: string };
 type Answer = Response | undefined;
@@ -41,28 +112,21 @@ const server = (
 	const created: Creation[] = [];
 	const events: string[] = [];
 	let n = 0;
-	const fetchMock = jest.fn(async (url: string, init: RequestInit) => {
-		const headers = init.headers as Record<string, string>;
+	const respond: Handler = async (url, init) => {
 		if (init.method === "PUT") {
-			const folderId = url.split("/buckets/")[1].split("/")[0];
-			return new Response(
-				JSON.stringify({
-					data: {
-						id: folderId,
-						name: registered[0]?.split("/")[0],
-						cid: "bafyfolder",
-						size: 1,
-						number_of_files: registered.length,
-						network: "private",
-						mime_type: "directory",
-						created_at: "2026-11-12T00:00:00.000Z",
-					},
-				}),
-				{ status: 200 },
-			);
+			return syncedAs({
+				id: url.split("/buckets/")[1].split("/")[0],
+				name: registered[0]?.split("/")[0],
+				cid: "bafyfolder",
+				size: 1,
+				number_of_files: registered.length,
+				network: "private",
+				mime_type: "directory",
+				created_at: "2026-11-12T00:00:00.000Z",
+			});
 		}
 		const folderId = url.split("/files/")[1].split("?")[0];
-		const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+		const path = pathOf(init);
 		const creation = { path, folderId };
 		created.push(creation);
 		events.push(`create ${path}`);
@@ -70,24 +134,23 @@ const server = (
 		if (response) return response;
 		registered.push(path);
 		events.push(`registered ${path}`);
-		return new Response(null, {
-			status: 201,
-			headers: {
-				Location: `https://uploads.test/v3/files/${folderId}/${encodeURIComponent(path)}`,
-				"Upload-Offset": headers["Upload-Length"],
+		return createdAt(
+			`https://uploads.test/v3/files/${folderId}/${encodeURIComponent(path)}`,
+			{
+				"Upload-Offset": headersOf(init)["Upload-Length"],
 				"Upload-Cid": `bafy-${encodeURIComponent(path)}`,
 				"Upload-Metadata": `filename ${encode(path)},file_id ${encode(folderId)},cid ${encode(`bafy-${path}`)}`,
 			},
-		});
-	});
-	global.fetch = fetchMock as unknown as typeof fetch;
-	return { fetchMock, created, registered, events };
+		);
+	};
+	return {
+		fetchMock: mockFetch(respond),
+		respond,
+		created,
+		registered,
+		events,
+	};
 };
-
-const refused = (status: number, message: string) =>
-	new Response(JSON.stringify({ error: { code: status, message } }), {
-		status,
-	});
 
 // The size of a resumable upload's chunk, and a file just over one chunk
 const CHUNK = 50 * 1024 * 1024 + 1;
@@ -95,36 +158,6 @@ const big = () =>
 	new File([new Uint8Array(CHUNK + 1)], "big.bin", {
 		type: "application/octet-stream",
 	});
-const pathOf = (init: RequestInit) =>
-	decodeMetadata((init.headers as Record<string, string>)["Upload-Metadata"])
-		.filename;
-// A creation that stores every byte and registers the file at once
-const registeredAt = (url: string, init: RequestInit) => {
-	const headers = init.headers as Record<string, string>;
-	const path = pathOf(init);
-	return new Response(null, {
-		status: 201,
-		headers: {
-			Location: `${url}/${encodeURIComponent(path)}`,
-			"Upload-Offset": headers["Upload-Length"],
-			"Upload-Cid": `bafy-${path}`,
-		},
-	});
-};
-// The folder sync's answer: a folder holding `files` files
-const synced = (files: number) =>
-	new Response(
-		JSON.stringify({
-			data: {
-				id: "f",
-				name: "d",
-				cid: "bafyfolder",
-				size: 1,
-				number_of_files: files,
-			},
-		}),
-		{ status: 200 },
-	);
 // Each JWT is accepted `uses` times, then refused (401); refreshJwt hands out the next one
 const expiring = (uses: number) => {
 	const used = new Map<string, number>();
@@ -479,12 +512,8 @@ describe("uploadFolder", () => {
 				path: `d/f${i}.txt`,
 				file: file(`${i}`),
 			}));
-			const { fetchMock } = server();
-			const respond = fetchMock.getMockImplementation() as (
-				url: string,
-				init: RequestInit,
-			) => Promise<Response>;
-			fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+			const { fetchMock, respond } = server();
+			fetchMock.mockImplementation(async (url, init) => {
 				active++;
 				peak = Math.max(peak, active);
 				await new Promise((resolve) => setImmediate(resolve));
@@ -502,47 +531,23 @@ describe("uploadFolder", () => {
 			const polls = new Map<string, number>();
 			let waiting = 0;
 			let peak = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "PUT") {
-					return new Response(
-						JSON.stringify({
-							data: {
-								id: "f",
-								name: "d",
-								cid: "bafyfolder",
-								number_of_files: 40,
-							},
-						}),
-						{ status: 200 },
-					);
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "PUT") return synced(40, {});
 				if (init.method === "POST") {
-					const headers = init.headers as Record<string, string>;
-					const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+					const path = pathOf(init);
 					waiting++;
 					peak = Math.max(peak, waiting);
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `${url}/${encodeURIComponent(path)}`,
-							"Upload-Offset": "1",
-							"Upload-Cid": `bafy-${path}`,
-							"Upload-Status": "processing",
-						},
-					});
+					return processing(
+						`${url}/${encodeURIComponent(path)}`,
+						`bafy-${path}`,
+					);
 				}
 				const n = (polls.get(url) ?? 0) + 1;
 				polls.set(url, n);
 				const ready = n >= 200;
 				if (ready) waiting--;
-				return new Response(null, {
-					status: 200,
-					headers: {
-						"Upload-Offset": "1",
-						"Upload-Status": ready ? "ready" : "processing",
-					},
-				});
-			}) as unknown as typeof fetch;
+				return registration(ready ? "ready" : "processing");
+			});
 
 			await uploadFolder(
 				config,
@@ -558,52 +563,22 @@ describe("uploadFolder", () => {
 		});
 
 		it("checks the first file's registration every second, the others less often", async () => {
-			const delays: number[] = [];
-			setTimeoutSpy.mockImplementation(((callback: () => void, ms: number) => {
-				delays.push(ms);
-				callback();
-				return 0;
-			}) as unknown as typeof setTimeout);
 			const polls = new Map<string, number>();
 			const marks: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "PUT") {
-					return new Response(
-						JSON.stringify({
-							data: {
-								id: "f",
-								name: "d",
-								cid: "bafyfolder",
-								number_of_files: 2,
-							},
-						}),
-						{ status: 200 },
-					);
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "PUT") return synced(2, {});
 				if (init.method === "POST") {
-					const headers = init.headers as Record<string, string>;
-					const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+					const path = pathOf(init);
 					marks.push(`${delays.length} POST ${path}`);
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `${url}/${encodeURIComponent(path)}`,
-							"Upload-Offset": "1",
-							"Upload-Cid": `bafy-${path}`,
-							"Upload-Status": "processing",
-						},
-					});
+					return processing(
+						`${url}/${encodeURIComponent(path)}`,
+						`bafy-${path}`,
+					);
 				}
 				const n = (polls.get(url) ?? 0) + 1;
 				polls.set(url, n);
-				return new Response(null, {
-					status: 200,
-					headers: {
-						"Upload-Offset": "1",
-						"Upload-Status": n >= 6 ? "ready" : "processing",
-					},
-				});
-			}) as unknown as typeof fetch;
+				return registration(n >= 6 ? "ready" : "processing");
+			});
 
 			await uploadFolder(
 				config,
@@ -622,42 +597,16 @@ describe("uploadFolder", () => {
 		it("reports a file sent once its bytes are stored, before its registration ends", async () => {
 			let heads = 0;
 			const timeline: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "PUT") {
-					return new Response(
-						JSON.stringify({
-							data: {
-								id: "f",
-								name: "d",
-								cid: "bafyfolder",
-								number_of_files: 1,
-							},
-						}),
-						{ status: 200 },
-					);
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "PUT") return synced(1, {});
 				if (init.method === "POST") {
 					timeline.push("POST");
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `${url}/upload`,
-							"Upload-Offset": "1",
-							"Upload-Cid": "bafyfile",
-							"Upload-Status": "processing",
-						},
-					});
+					return processing(`${url}/upload`);
 				}
 				heads++;
 				timeline.push(`HEAD ${heads}`);
-				return new Response(null, {
-					status: 200,
-					headers: {
-						"Upload-Offset": "1",
-						"Upload-Status": heads < 3 ? "processing" : "ready",
-					},
-				});
-			}) as unknown as typeof fetch;
+				return registration(heads < 3 ? "processing" : "ready");
+			});
 
 			await uploadFolder(
 				config,
@@ -752,7 +701,7 @@ describe("uploadFolder", () => {
 			let creations = 0;
 			let active = 0;
 			let peak = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const fetchMock = mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(12);
 				creations++;
 				if (creations <= 1000 && pathOf(init) === "d/never.txt") {
@@ -763,7 +712,7 @@ describe("uploadFolder", () => {
 				await new Promise((resolve) => setImmediate(resolve));
 				active--;
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			const error = await uploadFolder(
 				config,
@@ -782,7 +731,7 @@ describe("uploadFolder", () => {
 			expect(error).toBeInstanceOf(FolderUploadError);
 			// 1 attempt + 3 retries (the default) for the file that always gets 503
 			expect(
-				(global.fetch as jest.Mock).mock.calls.filter(
+				fetchMock.mock.calls.filter(
 					([, init]) =>
 						init.method === "POST" && pathOf(init) === "d/never.txt",
 				),
@@ -793,16 +742,12 @@ describe("uploadFolder", () => {
 		it("asks for the CID version given, on every file of the folder", async () => {
 			const urls: string[] = [];
 			const versions: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(2);
 				urls.push(url);
-				versions.push(
-					decodeMetadata(
-						(init.headers as Record<string, string>)["Upload-Metadata"],
-					).cid_version,
-				);
+				versions.push(metadataOf(init).cid_version);
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			await new PublicUpload(config)
 				.folder([
@@ -821,15 +766,11 @@ describe("uploadFolder", () => {
 
 		it("lets .keyvalues() win over the keyvalues given in the options", async () => {
 			const sent: Record<string, string>[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(1);
-				sent.push(
-					decodeMetadata(
-						(init.headers as Record<string, string>)["Upload-Metadata"],
-					),
-				);
+				sent.push(metadataOf(init));
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			await new PublicUpload(config)
 				.folder([{ path: "d/a.txt", file: file("a") }], {
@@ -845,11 +786,11 @@ describe("uploadFolder", () => {
 	describe("file sizes", () => {
 		it("refuses an inline file whose stream holds more bytes than its size", async () => {
 			const posts: number[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(1);
 				posts.push(1);
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			// A file on disk read in pieces: 2 MiB of bytes, 1 MiB reported (fs.openAsBlob past
 			// 4 GiB reports its size modulo 2^32)
@@ -871,11 +812,11 @@ describe("uploadFolder", () => {
 
 		it("refuses a file that reports no bytes but holds some", async () => {
 			const posts: number[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(1);
 				posts.push(1);
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			const liar = NodeLikeFile.of({ length: 10, reported: 0, disk: true });
 			const error = await uploadFolder(
@@ -889,9 +830,9 @@ describe("uploadFolder", () => {
 		});
 
 		it("still uploads a really empty file", async () => {
-			global.fetch = jest.fn(async (url: string, init: RequestInit) =>
+			mockFetch(async (url, init) =>
 				init.method === "PUT" ? synced(1) : registeredAt(url, init),
-			) as unknown as typeof fetch;
+			);
 
 			const result = await uploadFolder(
 				config,
@@ -948,7 +889,7 @@ describe("uploadFolder", () => {
 
 		it("waits as long as a 429 asks before sending a file again", async () => {
 			let creations = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(2);
 				creations++;
 				if (creations === 2) {
@@ -961,7 +902,7 @@ describe("uploadFolder", () => {
 					);
 				}
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 			const events: FolderUploadEvent[] = [];
 
 			await uploadFolder(
@@ -984,13 +925,8 @@ describe("uploadFolder", () => {
 
 		it("waits as long as a refused chunk asks, and says why it failed without raw JSON", async () => {
 			let patches = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "POST") return createdAt(`${url}/upload`);
 				if (init.method === "PATCH") {
 					patches++;
 					return new Response(
@@ -998,11 +934,8 @@ describe("uploadFolder", () => {
 						{ status: 503, headers: { "Retry-After": "30" } },
 					);
 				}
-				return new Response(null, {
-					status: 200,
-					headers: { "Upload-Offset": "0" },
-				});
-			}) as unknown as typeof fetch;
+				return storedUpTo(0);
+			});
 
 			const error = await uploadFolder(
 				config,
@@ -1019,9 +952,9 @@ describe("uploadFolder", () => {
 		});
 
 		it("says the upload server could not be reached when a request gets no answer", async () => {
-			global.fetch = jest.fn(async () => {
+			mockFetch(async () => {
 				throw new TypeError("Failed to fetch");
-			}) as unknown as typeof fetch;
+			});
 
 			await expect(
 				uploadFolder(config, [{ path: "d/a.txt", file: file("a") }], "public", {
@@ -1032,22 +965,14 @@ describe("uploadFolder", () => {
 
 		it("fails a file at once when the server refuses a chunk for good", async () => {
 			let patches = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "POST") return createdAt(`${url}/upload`);
 				if (init.method === "PATCH") {
 					patches++;
 					return new Response("too large", { status: 413 });
 				}
-				return new Response(null, {
-					status: 200,
-					headers: { "Upload-Offset": "0" },
-				});
-			}) as unknown as typeof fetch;
+				return storedUpTo(0);
+			});
 
 			await expect(
 				uploadFolder(
@@ -1070,21 +995,11 @@ describe("uploadFolder", () => {
 
 		it("fails a file at once when the server refuses to look it up", async () => {
 			let heads = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `${url}/upload`,
-							"Upload-Offset": "1",
-							"Upload-Cid": "bafyfile",
-							"Upload-Status": "processing",
-						},
-					});
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "POST") return processing(`${url}/upload`);
 				heads++;
 				return new Response(null, { status: 400 });
-			}) as unknown as typeof fetch;
+			});
 
 			const error = await uploadFolder(
 				config,
@@ -1101,21 +1016,11 @@ describe("uploadFolder", () => {
 
 		it("stops at once when the registration check is refused", async () => {
 			let heads = 0;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `${url}/upload`,
-							"Upload-Offset": "1",
-							"Upload-Cid": "bafyfile",
-							"Upload-Status": "processing",
-						},
-					});
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "POST") return processing(`${url}/upload`);
 				heads++;
 				return new Response(null, { status: 401 });
-			}) as unknown as typeof fetch;
+			});
 
 			const error = await uploadFolder(
 				config,
@@ -1157,23 +1062,24 @@ describe("uploadFolder", () => {
 				delete scope.addEventListener;
 				delete scope.removeEventListener;
 			});
+			// Offline for this request: back online once the upload waits for it
+			const dropConnection = () => {
+				onLine = false;
+				setImmediate(() => {
+					onLine = true;
+					online.dispatchEvent(new Event("online"));
+				});
+				throw new TypeError("Failed to fetch");
+			};
 
 			it("waits until it is back online, without spending the file's retries", async () => {
 				let creations = 0;
-				global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				mockFetch(async (url, init) => {
 					if (init.method === "PUT") return synced(1);
 					creations++;
-					if (creations <= 3) {
-						onLine = false;
-						// Back online once the upload waits for it
-						setImmediate(() => {
-							onLine = true;
-							online.dispatchEvent(new Event("online"));
-						});
-						throw new TypeError("Failed to fetch");
-					}
+					if (creations <= 3) dropConnection();
 					return registeredAt(url, init);
-				}) as unknown as typeof fetch;
+				});
 
 				const events: FolderUploadEvent[] = [];
 				const result = await uploadFolder(
@@ -1195,30 +1101,13 @@ describe("uploadFolder", () => {
 
 			it("resumes a chunk once back online, without spending its retries", async () => {
 				const patches: string[] = [];
-				global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-					const headers = init.headers as Record<string, string>;
+				mockFetch(async (url, init) => {
+					const headers = headersOf(init);
 					if (init.method === "PUT") return synced(1);
-					if (init.method === "POST") {
-						return new Response(null, {
-							status: 201,
-							headers: { Location: `${url}/upload` },
-						});
-					}
-					if (init.method === "HEAD") {
-						return new Response(null, {
-							status: 200,
-							headers: { "Upload-Offset": "0" },
-						});
-					}
+					if (init.method === "POST") return createdAt(`${url}/upload`);
+					if (init.method === "HEAD") return storedUpTo(0);
 					patches.push(headers["Upload-Offset"]);
-					if (patches.length <= 7) {
-						onLine = false;
-						setImmediate(() => {
-							onLine = true;
-							online.dispatchEvent(new Event("online"));
-						});
-						throw new TypeError("Failed to fetch");
-					}
+					if (patches.length <= 7) dropConnection();
 					return new Response(null, {
 						status: 204,
 						headers: {
@@ -1227,7 +1116,7 @@ describe("uploadFolder", () => {
 							"Upload-Cid": "bafybig",
 						},
 					});
-				}) as unknown as typeof fetch;
+				});
 
 				const result = await uploadFolder(
 					config,
@@ -1245,54 +1134,24 @@ describe("uploadFolder", () => {
 
 	describe("resuming a file", () => {
 		it("continues the upload its last attempt left unfinished", async () => {
-			const chunk = 50 * 1024 * 1024 + 1;
-			const size = chunk + 10;
+			const size = CHUNK + 10;
 			let stored = 0;
 			let lost = 0;
 			const calls: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
-				const offset = headers["Upload-Offset"];
+			mockFetch(async (url, init) => {
+				const offset = headersOf(init)["Upload-Offset"];
 				calls.push(`${init.method}${offset ? ` ${offset}` : ""}`);
-				if (init.method === "PUT") {
-					return new Response(
-						JSON.stringify({
-							data: {
-								id: "f",
-								name: "d",
-								cid: "bafyfolder",
-								number_of_files: 1,
-							},
-						}),
-						{ status: 200 },
-					);
-				}
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
-				if (init.method === "HEAD") {
-					return new Response(null, {
-						status: 200,
-						headers: { "Upload-Offset": `${stored}` },
-					});
-				}
+				if (init.method === "PUT") return synced(1, {});
+				if (init.method === "POST") return createdAt(`${url}/upload`);
+				if (init.method === "HEAD") return storedUpTo(stored);
 				// The second chunk is lost more times than the chunk retries allow
-				if (offset === `${chunk}` && lost < 6) {
+				if (offset === `${CHUNK}` && lost < 6) {
 					lost++;
 					throw new TypeError("fetch failed");
 				}
-				stored = offset === "0" ? chunk : size;
-				return new Response(null, {
-					status: 204,
-					headers: {
-						"Upload-Offset": `${stored}`,
-						...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
-					},
-				});
-			}) as unknown as typeof fetch;
+				stored = offset === "0" ? CHUNK : size;
+				return chunkStored(stored, size);
+			});
 			const events: string[] = [];
 
 			const result = await uploadFolder(
@@ -1318,61 +1177,33 @@ describe("uploadFolder", () => {
 			// One upload, continued from the stored chunk
 			expect(calls.filter((c) => c === "POST")).toHaveLength(1);
 			expect(calls.filter((c) => c === "PATCH 0")).toHaveLength(1);
-			expect(calls.slice(-3)).toEqual(["HEAD", `PATCH ${chunk}`, "PUT"]);
+			expect(calls.slice(-3)).toEqual(["HEAD", `PATCH ${CHUNK}`, "PUT"]);
 		});
 
 		it("keeps the unfinished upload when the server cannot say where it stands", async () => {
-			const chunk = 50 * 1024 * 1024 + 1;
-			const size = chunk + 10;
+			const size = CHUNK + 10;
 			let stored = 0;
 			let lost = 0;
 			let heads = 0;
 			const calls: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
-				const offset = headers["Upload-Offset"];
+			mockFetch(async (url, init) => {
+				const offset = headersOf(init)["Upload-Offset"];
 				calls.push(`${init.method}${offset ? ` ${offset}` : ""}`);
-				if (init.method === "PUT") {
-					return new Response(
-						JSON.stringify({
-							data: {
-								id: "f",
-								name: "d",
-								cid: "bafyfolder",
-								number_of_files: 1,
-							},
-						}),
-						{ status: 200 },
-					);
-				}
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
+				if (init.method === "PUT") return synced(1, {});
+				if (init.method === "POST") return createdAt(`${url}/upload`);
 				if (init.method === "HEAD") {
 					heads++;
 					// No answer to the chunk retries' HEADs nor to the first one of the next attempt
 					if (heads <= 6) throw new TypeError("fetch failed");
-					return new Response(null, {
-						status: 200,
-						headers: { "Upload-Offset": `${stored}` },
-					});
+					return storedUpTo(stored);
 				}
-				if (offset === `${chunk}` && lost < 6) {
+				if (offset === `${CHUNK}` && lost < 6) {
 					lost++;
 					throw new TypeError("fetch failed");
 				}
-				stored = offset === "0" ? chunk : size;
-				return new Response(null, {
-					status: 204,
-					headers: {
-						"Upload-Offset": `${stored}`,
-						...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
-					},
-				});
-			}) as unknown as typeof fetch;
+				stored = offset === "0" ? CHUNK : size;
+				return chunkStored(stored, size);
+			});
 
 			const result = await uploadFolder(
 				config,
@@ -1390,7 +1221,7 @@ describe("uploadFolder", () => {
 			expect(calls.slice(-4)).toEqual([
 				"HEAD",
 				"HEAD",
-				`PATCH ${chunk}`,
+				`PATCH ${CHUNK}`,
 				"PUT",
 			]);
 		});
@@ -1400,40 +1231,26 @@ describe("uploadFolder", () => {
 			let stored = 0;
 			let failedOnce = false;
 			const calls: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
+			mockFetch(async (url, init) => {
+				const headers = headersOf(init);
 				const old = headers.Authorization === "Bearer t1";
 				calls.push(
 					`${init.method}${headers["Upload-Offset"] ? ` ${headers["Upload-Offset"]}` : ""}`,
 				);
 				if (init.method === "PUT") return synced(1);
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
+				if (init.method === "POST") return createdAt(`${url}/upload`);
 				if (init.method === "HEAD") {
 					// The JWT expired while the CHUNK failed
 					if (old) return new Response(null, { status: 401 });
-					return new Response(null, {
-						status: 200,
-						headers: { "Upload-Offset": `${stored}` },
-					});
+					return storedUpTo(stored);
 				}
 				if (headers["Upload-Offset"] === `${CHUNK}` && !failedOnce) {
 					failedOnce = true;
 					return new Response("busy", { status: 503 });
 				}
 				stored = Math.min(size, Number(headers["Upload-Offset"]) + CHUNK);
-				return new Response(null, {
-					status: 204,
-					headers: {
-						"Upload-Offset": `${stored}`,
-						...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
-					},
-				});
-			}) as unknown as typeof fetch;
+				return chunkStored(stored, size);
+			});
 
 			const result = await uploadFolder(
 				{ ...config, pinataJwt: "t1" },
@@ -1495,16 +1312,12 @@ describe("uploadFolder", () => {
 		});
 
 		it("keeps why files failed when the partly uploaded folder cannot be synced", async () => {
-			const { fetchMock } = server((creation) =>
+			const { fetchMock, respond } = server((creation) =>
 				creation.path === "d/bad.txt"
 					? refused(400, "invalid name")
 					: undefined,
 			);
-			const respond = fetchMock.getMockImplementation() as (
-				url: string,
-				init: RequestInit,
-			) => Promise<Response>;
-			fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			fetchMock.mockImplementation(async (url, init) =>
 				init.method === "PUT"
 					? new Response("down", { status: 503 })
 					: respond(url, init),
@@ -1545,7 +1358,7 @@ describe("uploadFolder", () => {
 		it("sends failed files again by their full paths, under the folder's name", async () => {
 			const created: string[] = [];
 			let refuseB = true;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(created.length);
 				const path = pathOf(init);
 				if (path.endsWith("docs/b.txt") && refuseB) {
@@ -1553,7 +1366,7 @@ describe("uploadFolder", () => {
 				}
 				created.push(path);
 				return registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 			// No shared top directory: the folder gets the default name
 			const files = [
 				{ path: "a.txt", file: file("a") },
@@ -1586,47 +1399,21 @@ describe("uploadFolder", () => {
 		it("keeps a file reported as an earlier upload, with the CID of its own bytes", async () => {
 			// Alone, the first file matches an earlier one-file folder: the server registers it
 			// in this folder but reports the earlier upload's id and CID once it is ready
-			const { fetchMock } = server(
-				(creation) =>
-					new Response(null, {
-						status: 201,
-						headers: {
-							Location: `https://uploads.test/v3/files/${creation.folderId}/${encodeURIComponent(creation.path)}`,
-							"Upload-Offset": "1",
-							"Upload-Cid": `bafy-own-${creation.path}`,
-							"Upload-Status": "processing",
-						},
-					}),
+			const { fetchMock, respond } = server((creation) =>
+				processing(
+					`https://uploads.test/v3/files/${creation.folderId}/${encodeURIComponent(creation.path)}`,
+					`bafy-own-${creation.path}`,
+				),
 			);
-			const realFetch = fetchMock.getMockImplementation() as (
-				url: string,
-				init: RequestInit,
-			) => Promise<Response>;
-			fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			fetchMock.mockImplementation(async (url, init) =>
 				init.method === "HEAD"
-					? new Response(null, {
-							status: 200,
-							headers: {
-								"Upload-Offset": "1",
-								"Upload-Status": "ready",
-								"Upload-Cid": "bafy-earlier-folder",
-								"Upload-Metadata": `file_id ${encode("earlier-upload")}`,
-							},
+					? registration("ready", {
+							"Upload-Cid": "bafy-earlier-folder",
+							"Upload-Metadata": `file_id ${encode("earlier-upload")}`,
 						})
 					: init.method === "PUT"
-						? new Response(
-								JSON.stringify({
-									data: {
-										id: "f",
-										name: "d",
-										cid: "bafyfolder",
-										size: 2,
-										number_of_files: 2,
-									},
-								}),
-								{ status: 200 },
-							)
-						: realFetch(url, init),
+						? synced(2, { size: 2 })
+						: respond(url, init),
 			);
 
 			const result = await uploadFolder(
@@ -1645,27 +1432,18 @@ describe("uploadFolder", () => {
 		});
 
 		it("answers with the earlier folder when the same content was already uploaded", async () => {
-			const { fetchMock } = server();
-			const realFetch = fetchMock.getMockImplementation() as (
-				url: string,
-				init: RequestInit,
-			) => Promise<Response>;
-			fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			const { fetchMock, respond } = server();
+			fetchMock.mockImplementation(async (url, init) =>
 				init.method === "PUT"
-					? new Response(
-							JSON.stringify({
-								data: {
-									id: "earlier-folder",
-									name: "photos",
-									cid: "bafy-earlier",
-									size: 3,
-									number_of_files: 2,
-									is_duplicate: true,
-								},
-							}),
-							{ status: 200 },
-						)
-					: realFetch(url, init),
+					? syncedAs({
+							id: "earlier-folder",
+							name: "photos",
+							cid: "bafy-earlier",
+							size: 3,
+							number_of_files: 2,
+							is_duplicate: true,
+						})
+					: respond(url, init),
 			);
 
 			const result = await uploadFolder(
@@ -1690,8 +1468,7 @@ describe("uploadFolder", () => {
 		});
 
 		it("answers with the earlier folder when syncing finds this one merged into it", async () => {
-			const encodeValue = (v: string) => Buffer.from(v).toString("base64");
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") {
 					return new Response(
 						JSON.stringify({ error: { message: "bucket not found" } }),
@@ -1699,16 +1476,12 @@ describe("uploadFolder", () => {
 					);
 				}
 				// The one file is registered as the earlier one-file folder of the same content
-				return new Response(null, {
-					status: 201,
-					headers: {
-						Location: `${url}/d/only.txt`,
-						"Upload-Offset": "1",
-						"Upload-Cid": "bafkonly",
-						"Upload-Metadata": `filename ${encodeValue("d")},file_id ${encodeValue("earlier-folder")},cid ${encodeValue("bafyearlier")}`,
-					},
+				return createdAt(`${url}/d/only.txt`, {
+					"Upload-Offset": "1",
+					"Upload-Cid": "bafkonly",
+					"Upload-Metadata": `filename ${encode("d")},file_id ${encode("earlier-folder")},cid ${encode("bafyearlier")}`,
 				});
-			}) as unknown as typeof fetch;
+			});
 
 			const result = await uploadFolder(
 				config,
@@ -1729,30 +1502,21 @@ describe("uploadFolder", () => {
 		});
 
 		it("reports the earlier folder a partly uploaded folder turned out to duplicate", async () => {
-			const { fetchMock } = server((creation) =>
+			const { fetchMock, respond } = server((creation) =>
 				creation.path === "d/bad.txt"
 					? refused(400, "invalid name")
 					: undefined,
 			);
-			const respond = fetchMock.getMockImplementation() as (
-				url: string,
-				init: RequestInit,
-			) => Promise<Response>;
-			fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			fetchMock.mockImplementation(async (url, init) =>
 				init.method === "PUT"
-					? new Response(
-							JSON.stringify({
-								data: {
-									id: "earlier-folder",
-									name: "first",
-									cid: "bafyearlier",
-									size: 1,
-									number_of_files: 1,
-									is_duplicate: true,
-								},
-							}),
-							{ status: 200 },
-						)
+					? syncedAs({
+							id: "earlier-folder",
+							name: "first",
+							cid: "bafyearlier",
+							size: 1,
+							number_of_files: 1,
+							is_duplicate: true,
+						})
 					: respond(url, init),
 			);
 
@@ -1775,7 +1539,7 @@ describe("uploadFolder", () => {
 		});
 
 		it("rejects a folder of several files whose sync answers 404, even if one file matched an earlier folder", async () => {
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			mockFetch(async (url, init) => {
 				if (init.method === "PUT") {
 					return refused(404, "bucket not found");
 				}
@@ -1788,7 +1552,7 @@ describe("uploadFolder", () => {
 					);
 				}
 				return response;
-			}) as unknown as typeof fetch;
+			});
 
 			await expect(
 				uploadFolder(
@@ -1804,9 +1568,9 @@ describe("uploadFolder", () => {
 		});
 
 		it("rejects when the synced folder holds fewer files than were uploaded", async () => {
-			global.fetch = jest.fn(async (url: string, init: RequestInit) =>
+			mockFetch(async (url, init) =>
 				init.method === "PUT" ? synced(1) : registeredAt(url, init),
-			) as unknown as typeof fetch;
+			);
 
 			await expect(
 				uploadFolder(
@@ -1877,7 +1641,7 @@ describe("uploadFolder", () => {
 
 			const auth = (path: string) =>
 				fetchMock.mock.calls
-					.map(([, init]) => init.headers as Record<string, string>)
+					.map(([, init]) => headersOf(init))
 					.filter(
 						(h) => decodeMetadata(h["Upload-Metadata"] ?? "").filename === path,
 					)
@@ -1888,46 +1652,20 @@ describe("uploadFolder", () => {
 
 		it("checks a file's registration with a JWT replaced while it was being sent", async () => {
 			const live: PinataConfig = { ...config, pinataJwt: "first-jwt" };
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const auth = (init.headers as Record<string, string>).Authorization;
+			mockFetch(async (url, init) => {
+				const auth = headersOf(init).Authorization;
 				if (init.method === "POST") {
 					// The token expires: the app sets a fresh one
 					live.pinataJwt = "fresh-jwt";
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `${url}/upload`,
-							"Upload-Offset": "1",
-							"Upload-Cid": "bafyfile",
-							"Upload-Status": "processing",
-						},
-					});
+					return processing(`${url}/upload`);
 				}
 				if (init.method === "HEAD") {
 					return auth === "Bearer fresh-jwt"
-						? new Response(null, {
-								status: 200,
-								headers: {
-									"Upload-Offset": "1",
-									"Upload-Status": "ready",
-									"Upload-Cid": "bafyfile",
-								},
-							})
+						? registration("ready", { "Upload-Cid": "bafyfile" })
 						: new Response(null, { status: 401 });
 				}
-				return new Response(
-					JSON.stringify({
-						data: {
-							id: "f",
-							name: "d",
-							cid: "bafyfolder",
-							size: 1,
-							number_of_files: 1,
-						},
-					}),
-					{ status: 200 },
-				);
-			}) as unknown as typeof fetch;
+				return synced(1);
+			});
 
 			const result = await uploadFolder(
 				live,
@@ -1941,29 +1679,20 @@ describe("uploadFolder", () => {
 		it("never sends a file into the upload of another file refused the JWT", async () => {
 			const live: PinataConfig = { ...config, pinataJwt: "J0" };
 			const requests: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
+			mockFetch(async (url, init) => {
+				const headers = headersOf(init);
 				if (init.method === "PUT") return synced(2);
 				if (init.method === "POST") {
 					const path = pathOf(init);
 					requests.push(`POST ${path} ${headers.Authorization}`);
 					if (path === "d/0.txt") return registeredAt(url, init);
 					// The creation stores none of the body
-					return new Response(null, {
-						status: 201,
-						headers: {
-							Location: `https://u.test/up/${encodeURIComponent(path)}`,
-							"Upload-Offset": "0",
-						},
+					return createdAt(`https://u.test/up/${encodeURIComponent(path)}`, {
+						"Upload-Offset": "0",
 					});
 				}
 				requests.push(`${init.method} ${url} ${headers.Authorization}`);
-				if (init.method === "HEAD") {
-					return new Response(null, {
-						status: 200,
-						headers: { "Upload-Offset": "0" },
-					});
-				}
+				if (init.method === "HEAD") return storedUpTo(0);
 				if (headers.Authorization === "Bearer J0") {
 					return refused(401, "Invalid/expired token");
 				}
@@ -1976,7 +1705,7 @@ describe("uploadFolder", () => {
 						"Upload-Cid": `bafy-${decodeURIComponent(url.split("/up/")[1])}`,
 					},
 				});
-			}) as unknown as typeof fetch;
+			});
 			const events: string[] = [];
 
 			const error = await uploadFolder(
@@ -2023,20 +1752,20 @@ describe("uploadFolder", () => {
 			// 401 for every request with the old JWT
 			const authServer = () => {
 				const auths: string[] = [];
-				global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-					const headers = init.headers as Record<string, string>;
+				const respond: Handler = async (url, init) => {
+					const headers = headersOf(init);
 					auths.push(`${init.method} ${headers.Authorization}`);
 					if (headers.Authorization === "Bearer old-jwt") {
 						return refused(401, "Invalid/expired token");
 					}
 					if (init.method === "PUT") return synced(3);
 					return registeredAt(url, init);
-				}) as unknown as typeof fetch;
-				return auths;
+				};
+				return { fetchMock: mockFetch(respond), respond, auths };
 			};
 
 			it("asks refreshJwt once for a new one and sends the refused files again", async () => {
-				const auths = authServer();
+				const { auths } = authServer();
 				const refreshJwt = jest.fn(async () => "new-jwt");
 				const entries = Array.from({ length: 3 }, (_, i) => ({
 					path: `d/${i}.txt`,
@@ -2058,15 +1787,10 @@ describe("uploadFolder", () => {
 			});
 
 			it("sends a refused file again when the JWT was replaced meanwhile", async () => {
-				authServer();
+				const { fetchMock, respond } = authServer();
 				const settings = live();
-				const fetchMock = global.fetch as jest.Mock;
-				const respond = fetchMock.getMockImplementation() as (
-					url: string,
-					init: RequestInit,
-				) => Promise<Response>;
 				// setNewJwt lands while the refused request is under way
-				fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+				fetchMock.mockImplementation(async (url, init) => {
 					const response = await respond(url, init);
 					if (response.status === 401) settings.pinataJwt = "new-jwt";
 					return response;
@@ -2103,29 +1827,16 @@ describe("uploadFolder", () => {
 
 			it("checks a stored file's registration again with the new JWT, without sending it again", async () => {
 				const calls: string[] = [];
-				global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-					const headers = init.headers as Record<string, string>;
+				mockFetch(async (url, init) => {
+					const headers = headersOf(init);
 					calls.push(`${init.method} ${headers.Authorization}`);
 					if (init.method === "PUT") return synced(1);
-					if (init.method === "POST") {
-						return new Response(null, {
-							status: 201,
-							headers: {
-								Location: `${url}/upload`,
-								"Upload-Offset": "1",
-								"Upload-Cid": "bafyfile",
-								"Upload-Status": "processing",
-							},
-						});
-					}
+					if (init.method === "POST") return processing(`${url}/upload`);
 					if (headers.Authorization === "Bearer old-jwt") {
 						return new Response(null, { status: 401 });
 					}
-					return new Response(null, {
-						status: 200,
-						headers: { "Upload-Offset": "1", "Upload-Status": "ready" },
-					});
-				}) as unknown as typeof fetch;
+					return registration("ready");
+				});
 
 				const result = await uploadFolder(
 					live(),
@@ -2147,13 +1858,13 @@ describe("uploadFolder", () => {
 		it("renews a JWT the final sync is refused, without spending its retries", async () => {
 			const auth = expiring(1);
 			const calls: string[] = [];
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
+			mockFetch(async (url, init) => {
+				const headers = headersOf(init);
 				calls.push(`${init.method} ${headers.Authorization}`);
 				if (!auth.accepts(headers))
 					return refused(401, "Invalid/expired token");
 				return init.method === "PUT" ? synced(1) : registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			const result = await uploadFolder(
 				auth.config,
@@ -2173,17 +1884,13 @@ describe("uploadFolder", () => {
 
 		it("renews a JWT the sync of a partly uploaded folder is refused", async () => {
 			const auth = expiring(1);
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
-				const path =
-					init.method === "POST"
-						? decodeMetadata(headers["Upload-Metadata"]).filename
-						: "";
+			mockFetch(async (url, init) => {
+				const path = init.method === "POST" ? pathOf(init) : "";
 				if (path === "d/bad.txt") return refused(400, "invalid name");
-				if (!auth.accepts(headers))
+				if (!auth.accepts(headersOf(init)))
 					return refused(401, "Invalid/expired token");
 				return init.method === "PUT" ? synced(1) : registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			const error = await uploadFolder(
 				auth.config,
@@ -2204,32 +1911,16 @@ describe("uploadFolder", () => {
 			const auth = expiring(2);
 			let stored = 0;
 			const size = 3 * CHUNK + 10;
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
+			mockFetch(async (url, init) => {
+				const headers = headersOf(init);
 				if (!auth.accepts(headers))
 					return refused(401, "Invalid/expired token");
 				if (init.method === "PUT") return synced(1);
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
-				if (init.method === "HEAD") {
-					return new Response(null, {
-						status: 200,
-						headers: { "Upload-Offset": `${stored}` },
-					});
-				}
+				if (init.method === "POST") return createdAt(`${url}/upload`);
+				if (init.method === "HEAD") return storedUpTo(stored);
 				stored = Math.min(size, Number(headers["Upload-Offset"]) + CHUNK);
-				return new Response(null, {
-					status: 204,
-					headers: {
-						"Upload-Offset": `${stored}`,
-						...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
-					},
-				});
-			}) as unknown as typeof fetch;
+				return chunkStored(stored, size);
+			});
 
 			const result = await uploadFolder(
 				auth.config,
@@ -2254,9 +1945,8 @@ describe("uploadFolder", () => {
 			const posts: string[] = [];
 			let issued = 1;
 			const refreshJwt = jest.fn(async () => `t${++issued}`);
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				const headers = init.headers as Record<string, string>;
-				const jwt = headers.Authorization.replace("Bearer ", "");
+			mockFetch(async (url, init) => {
+				const jwt = headersOf(init).Authorization.replace("Bearer ", "");
 				const n = (used.get(jwt) ?? 0) + 1;
 				used.set(jwt, n);
 				if (init.method === "POST") posts.push(jwt);
@@ -2264,7 +1954,7 @@ describe("uploadFolder", () => {
 					return refused(401, "Invalid/expired token");
 				}
 				return init.method === "PUT" ? synced(3) : registeredAt(url, init);
-			}) as unknown as typeof fetch;
+			});
 
 			await uploadFolder(
 				{ ...config, pinataJwt: "t1" },
@@ -2346,16 +2036,11 @@ describe("uploadFolder", () => {
 				return 0;
 			}) as unknown as typeof setTimeout);
 			const controller = new AbortController();
-			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
-				if (init.method === "POST") {
-					return new Response(null, {
-						status: 201,
-						headers: { Location: `${url}/upload` },
-					});
-				}
+			mockFetch(async (url, init) => {
+				if (init.method === "POST") return createdAt(`${url}/upload`);
 				setImmediate(() => controller.abort());
 				return new Response("busy", { status: 503 });
-			}) as unknown as typeof fetch;
+			});
 
 			const error = await uploadFolder(
 				config,
@@ -2371,9 +2056,7 @@ describe("uploadFolder", () => {
 
 		it("stops at once when cancelled while a new JWT is being asked for", async () => {
 			const controller = new AbortController();
-			global.fetch = jest.fn(async () =>
-				refused(401, "Invalid/expired token"),
-			) as unknown as typeof fetch;
+			mockFetch(async () => refused(401, "Invalid/expired token"));
 
 			const error = await uploadFolder(
 				{ ...config, pinataJwt: "t1" },
@@ -2394,14 +2077,10 @@ describe("uploadFolder", () => {
 		});
 
 		it("stops finishing the folder once cancelled", async () => {
-			const { fetchMock } = server();
-			const respond = fetchMock.getMockImplementation() as (
-				url: string,
-				init: RequestInit,
-			) => Promise<Response>;
+			const { fetchMock, respond } = server();
 			const controller = new AbortController();
 			let syncs = 0;
-			fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+			fetchMock.mockImplementation(async (url, init) => {
 				if (init.method !== "PUT") return respond(url, init);
 				syncs++;
 				controller.abort();

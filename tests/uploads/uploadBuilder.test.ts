@@ -1,19 +1,12 @@
 import type { PinataConfig, UploadOptions } from "../../src";
 import { PrivateUpload } from "../../src/core/classes/uploads/PrivateUpload";
 import { PublicUpload } from "../../src/core/classes/uploads/PublicUpload";
+import { decodeMetadata } from "./uploadMetadata";
 
 const config: PinataConfig = {
 	pinataJwt: "test-jwt",
 	uploadUrl: "https://uploads.test/v3",
 };
-
-const decodeMetadata = (header: string) =>
-	Object.fromEntries(
-		header.split(",").map((pair) => {
-			const [key, value = ""] = pair.split(" ");
-			return [key, Buffer.from(value, "base64").toString("utf8")];
-		}),
-	);
 
 describe("UploadBuilder", () => {
 	const originalFetch = global.fetch;

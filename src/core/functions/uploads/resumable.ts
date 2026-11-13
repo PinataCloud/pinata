@@ -3,9 +3,16 @@ import {
 	PinataError,
 	ValidationError,
 } from "../../../utils/custom-errors";
+import type { CidVersion } from "../../types";
 import { FileChunks } from "./fileChunks";
+import {
+	backoff,
+	isFinalRefusal,
+	parseRetryAfter,
+	sleep,
+	untilOnline,
+} from "./retry";
 import { serverReason } from "./tusMetadata";
-import { parseRetryAfter, sleep, untilOnline } from "./wait";
 import {
 	getUploadStatus,
 	parseUploadOffset,
@@ -14,6 +21,7 @@ import {
 	resolveHeaders,
 	waitForRegistration,
 } from "./tusStatus";
+import { refused, unreachable } from "./uploadErrors";
 
 const CHUNK_SIZE = 50 * 1024 * 1024 + 1; // 50MB in bytes
 const MAX_RETRIES = 5;
@@ -28,25 +36,43 @@ export interface StoredUpload {
 	metadata: string | null;
 }
 
+export interface ResumableOptions {
+	// A file that fits in one request travels with the creation request (TUS
+	// creation-with-upload), so a small file takes one request instead of two
+	inline?: boolean;
+	// Cancels the upload: the request under way is aborted and it rejects with the reason
+	signal?: AbortSignal;
+	// The uploadUrl of an error an earlier call threw: that upload is continued from where
+	// the server stands, if the server still has it; else a new upload is created
+	resumeUrl?: string;
+	// A chunk that gets no answer while the browser is offline waits until it is back
+	// online, without counting as a retry. For uploads that can be cancelled (folder
+	// uploads): otherwise it counts, so the upload fails after its retries.
+	waitOnline?: boolean;
+}
+
+// Where a resumable upload is created: `base`, asking for `cidVersion` if given
+export const creationUrl = (base: string, cidVersion?: CidVersion): string => {
+	const url = new URL(base);
+	if (cidVersion !== undefined) {
+		url.searchParams.set("X-Upload-Option-Cid-Version", cidVersion.toString());
+	}
+	return url.toString();
+};
+
 // Creates a resumable upload at `createUrl` and sends every byte of `file`, resuming after
 // failed chunks from the offset the server reports. Returns once the server has all of it.
-// With `inline`, a file that fits in one request travels with the creation request
-// (TUS creation-with-upload), so a small file takes one request instead of two.
-// `signal` cancels it: the request under way is aborted and it rejects with the reason.
-// `resumeUrl`, the uploadUrl of an error an earlier call threw, continues that upload from
-// where the server stands, if the server still has it; else a new upload is created.
-// With `waitOnline` (folder uploads, which can be cancelled), a chunk that gets no answer
-// while the browser is offline waits until it is back online, without counting as a
-// retry; otherwise it counts, so the upload fails after its retries.
 export const sendResumable = async (
 	createUrl: string,
 	headers: RequestHeaders,
 	file: File,
 	metadata: string,
-	inline = false,
-	signal?: AbortSignal,
-	resumeUrl?: string,
-	waitOnline = false,
+	{
+		inline = false,
+		signal,
+		resumeUrl,
+		waitOnline = false,
+	}: ResumableOptions = {},
 ): Promise<StoredUpload> => {
 	if (resumeUrl) {
 		// null: the server no longer has the upload, or refuses to say: a new one is created
@@ -59,26 +85,22 @@ export const sendResumable = async (
 		if (signal?.aborted) throw signal.reason;
 		// The server cannot tell now: keep the upload for the next attempt
 		if (status === undefined) {
-			const error = unreachable(
-				"no answer about the upload to continue",
-				resumeUrl,
-			);
-			error.details = {
-				...error.details,
-				metadata: { requestUrl: resumeUrl, uploadUrl: resumeUrl },
-			};
-			throw error;
+			throw unreachable("no answer about the upload to continue", {
+				requestUrl: resumeUrl,
+				uploadUrl: resumeUrl,
+			});
 		}
 		if (status) {
-			const upload: StoredUpload = {
-				url: resumeUrl,
-				cid: status.cid,
-				status: status.status,
-				metadata: status.metadata,
-			};
 			return status.offset === file.size
-				? upload
-				: sendChunks(upload, status.offset, headers, file, signal, waitOnline);
+				? storedFromStatus(resumeUrl, status)
+				: sendChunks(
+						resumeUrl,
+						status.offset,
+						headers,
+						file,
+						signal,
+						waitOnline,
+					);
 		}
 	}
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
@@ -117,55 +139,52 @@ export const sendResumable = async (
 		});
 	} catch (error) {
 		if (signal?.aborted) throw signal.reason;
-		throw unreachable(error, createUrl);
+		throw unreachable(error, { requestUrl: createUrl });
 	}
 	const url = urlReq.headers.get("Location");
 	if (!url) {
 		const errorData = await urlReq.text().catch(() => "");
-		const reason = serverReason(errorData);
+		const errorMetadata = {
+			requestUrl: urlReq.url,
+			requestHeaders: urlReq.headers,
+			retryAfterMs: parseRetryAfter(urlReq.headers),
+		};
+		if (!urlReq.ok) {
+			throw refused(
+				"Could not start the upload",
+				urlReq.status,
+				errorData,
+				errorMetadata,
+			);
+		}
 		throw new NetworkError(
-			urlReq.ok
-				? `Upload URL not provided: the server answered ${urlReq.status} without a Location header`
-				: `Could not start the upload (HTTP ${urlReq.status})${reason ? `: ${reason}` : ""}`,
+			`Upload URL not provided: the server answered ${urlReq.status} without a Location header`,
 			urlReq.status,
-			{
-				error: errorData,
-				code: "HTTP_ERROR",
-				metadata: {
-					requestUrl: urlReq.url,
-					requestHeaders: urlReq.headers,
-					retryAfterMs: parseRetryAfter(urlReq.headers),
-				},
-			},
+			{ error: errorData, code: "HTTP_ERROR", metadata: errorMetadata },
 		);
 	}
 
-	const upload: StoredUpload = { url, cid: null, status: null, metadata: null };
 	// The creation request stored the body, or the whole of an empty file.
-	let offset = withBody
+	const offset = withBody
 		? (parseUploadOffset(urlReq.headers, file.size) ?? 0)
 		: 0;
-	if (offset === file.size) {
-		upload.cid = urlReq.headers.get("upload-cid");
-		upload.status = urlReq.headers.get("upload-status");
-		upload.metadata = urlReq.headers.get("upload-metadata");
-		return upload;
-	}
-	return sendChunks(upload, offset, headers, file, signal, waitOnline);
+	return offset === file.size
+		? storedFromHeaders(url, urlReq.headers)
+		: sendChunks(url, offset, headers, file, signal, waitOnline);
 };
 
-// Sends the bytes of `file` from `offset` on to the upload, resuming after failed chunks
-// from the offset the server reports. What it throws holds the upload's URL (uploadUrl) to
-// continue it later.
+// Sends the bytes of `file` from `start` on to the upload at `url`, resuming after failed
+// chunks from the offset the server reports. What it throws holds the upload's URL
+// (uploadUrl) to continue it later.
 const sendChunks = async (
-	upload: StoredUpload,
+	url: string,
 	start: number,
 	headers: RequestHeaders,
 	file: File,
 	signal?: AbortSignal,
 	waitOnline = false,
 ): Promise<StoredUpload> => {
-	const { url } = upload;
+	let stored: StoredUpload = { url, cid: null, status: null, metadata: null };
 	let offset = start;
 	let failures = 0;
 	// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
@@ -208,9 +227,7 @@ const sendChunks = async (
 						offset = next;
 						failures = 0;
 						if (offset === file.size) {
-							upload.cid = uploadReq.headers.get("upload-cid");
-							upload.status = uploadReq.headers.get("upload-status");
-							upload.metadata = uploadReq.headers.get("upload-metadata");
+							stored = storedFromHeaders(url, uploadReq.headers);
 						}
 						continue;
 					}
@@ -243,20 +260,15 @@ const sendChunks = async (
 			if (signal?.aborted) throw signal.reason;
 			if (!waited) {
 				failures++;
-				const reason =
-					failure.status === 0 ? failure.error : serverReason(failure.error);
-				const sent = failure.status
-					? `Could not send the file (HTTP ${failure.status})`
-					: "Could not reach the upload server while sending the file";
-				// A refusal that sending again cannot change (a 4xx other than a timeout, a
-				// conflict or a rate limit) fails at once
-				const permanent =
-					failure.status >= 400 &&
-					failure.status < 500 &&
-					![408, 409, 423, 425, 429].includes(failure.status);
-				if (permanent || failures > MAX_RETRIES) {
+				const final = isFinalRefusal(failure.status);
+				if (final || failures > MAX_RETRIES) {
+					const reason =
+						failure.status === 0 ? failure.error : serverReason(failure.error);
+					const sent = failure.status
+						? `Could not send the file (HTTP ${failure.status})`
+						: "Could not reach the upload server while sending the file";
 					throw new NetworkError(
-						`${sent}${permanent ? "" : ` after ${MAX_RETRIES} retries`}${reason ? `: ${reason}` : ""}`,
+						`${sent}${final ? "" : ` after ${MAX_RETRIES} retries`}${reason ? `: ${reason}` : ""}`,
 						failure.status,
 						{
 							error: failure.error,
@@ -265,18 +277,17 @@ const sendChunks = async (
 								requestUrl: failure.requestUrl,
 								uploadUrl: url,
 								uploadOffset: offset,
-								...(permanent ? {} : { retriesAttempted: MAX_RETRIES }),
+								...(final ? {} : { retriesAttempted: MAX_RETRIES }),
 								retryAfterMs: failure.retryAfterMs,
 							},
 						},
 					);
 				}
-				// Cap at 10 seconds, unless the server asks for longer (Retry-After)
-				const delay = Math.max(
-					Math.min(1000 * Math.pow(2, failures - 1), 10000),
-					failure.retryAfterMs ?? 0,
+				// Unless the server asks for longer (Retry-After)
+				await sleep(
+					Math.max(backoff(failures), failure.retryAfterMs ?? 0),
+					signal,
 				);
-				await sleep(delay, signal);
 				if (signal?.aborted) throw signal.reason;
 			}
 
@@ -312,17 +323,31 @@ const sendChunks = async (
 				}
 				offset = status.offset;
 				if (offset === file.size) {
-					upload.cid = status.cid;
-					upload.status = status.status;
-					upload.metadata = status.metadata;
+					stored = storedFromStatus(url, status);
 				}
 			}
 		}
 	} finally {
 		await chunks.close();
 	}
-	return upload;
+	return stored;
 };
+
+// The upload at `url` as the response that completed it reports it
+const storedFromHeaders = (url: string, headers: Headers): StoredUpload => ({
+	url,
+	cid: headers.get("upload-cid"),
+	status: headers.get("upload-status"),
+	metadata: headers.get("upload-metadata"),
+});
+
+// The upload at `url` as a status check (HEAD) that found it complete reports it
+const storedFromStatus = (url: string, status: UploadStatus): StoredUpload => ({
+	url,
+	cid: status.cid,
+	status: status.status,
+	metadata: status.metadata,
+});
 
 // Throws unless `file`, which reports a size of 0, holds no bytes
 const assertEmpty = async (file: Blob) => {
@@ -342,15 +367,8 @@ const assertEmpty = async (file: Blob) => {
 	}
 };
 
-// What a request that got no answer (offline, DNS, connection reset) fails with
-const unreachable = (error: unknown, requestUrl: string) => {
-	const message = error instanceof Error ? error.message : String(error);
-	return new NetworkError(`Could not reach the upload server: ${message}`, 0, {
-		error: message,
-		code: "NETWORK_ERROR",
-		metadata: { requestUrl },
-	});
-};
+// A stored upload the server registered, and its CID
+export type RegisteredUpload = StoredUpload & { cid: string };
 
 // A server that sends Upload-Status registers the file after its last byte, and may
 // already return the CID: only `ready` means the file can be looked up.
@@ -367,7 +385,7 @@ export const registerResumable = async (
 	size: number,
 	signal?: AbortSignal,
 	pollMaxMs?: number,
-): Promise<StoredUpload> => {
+): Promise<RegisteredUpload> => {
 	let registered = upload;
 	if (registersLater(upload)) {
 		const ready = await waitForRegistration(
@@ -378,13 +396,11 @@ export const registerResumable = async (
 			pollMaxMs,
 		);
 		registered = {
-			url: upload.url,
+			...storedFromStatus(upload.url, ready),
 			// The CID the server computed from these bytes, sent with the last of them, wins:
 			// the ready status reports the registered file's, which is an earlier upload's
 			// when this one matched it
 			cid: upload.cid ?? ready.cid,
-			status: ready.status,
-			metadata: ready.metadata,
 		};
 	}
 	if (!registered.cid) {
@@ -400,5 +416,5 @@ export const registerResumable = async (
 			},
 		);
 	}
-	return registered;
+	return { ...registered, cid: registered.cid };
 };

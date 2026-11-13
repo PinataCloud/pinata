@@ -2,6 +2,7 @@ import {
 	AuthenticationError,
 	NetworkError,
 } from "../../../utils/custom-errors";
+import { isFinalRefusal, sleep } from "./retry";
 
 const GIB = 1024 * 1024 * 1024;
 // How long to wait for a finished upload to be registered. Processing a large file
@@ -102,11 +103,7 @@ export const getUploadStatus = async (
 	}
 	// Asking again cannot change a refusal other than a timeout, a conflict or a rate
 	// limit (a name the server cannot address answers 400 to every HEAD)
-	if (
-		res.status >= 400 &&
-		res.status < 500 &&
-		![408, 409, 423, 425, 429].includes(res.status)
-	) {
+	if (isFinalRefusal(res.status)) {
 		throw new NetworkError(
 			`The server refused to look up the upload (HTTP ${res.status})`,
 			res.status,
@@ -150,18 +147,8 @@ export const waitForRegistration = async (
 	const deadline = Date.now() + timeout;
 	let delay = Math.min(1000, pollMaxMs);
 	while (Date.now() + delay <= deadline) {
-		await new Promise<void>((resolve, reject) => {
-			if (signal?.aborted) return reject(signal.reason);
-			const onAbort = () => {
-				clearTimeout(timer);
-				reject(signal?.reason);
-			};
-			const timer = setTimeout(() => {
-				signal?.removeEventListener("abort", onAbort);
-				resolve();
-			}, delay);
-			signal?.addEventListener("abort", onAbort, { once: true });
-		});
+		await sleep(delay, signal);
+		if (signal?.aborted) throw signal.reason;
 		delay = Math.min(delay * 2, pollMaxMs);
 		const status = await getUploadStatus(url, headers, size, signal);
 		if (signal?.aborted) throw signal.reason;
