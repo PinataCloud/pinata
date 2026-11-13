@@ -42,7 +42,15 @@ export class ValidationError extends PinataError {
  * failed files. `index` is a file's position in the files given. `folder` is that folder as
  * the server finished it, when it could be asked (not after a cancel or an authentication
  * failure): with `is_duplicate`, its content matched an earlier folder, which `id`, `name`
- * and `cid` are, and `folderId` was removed.
+ * and `cid` are, and `folderId` was removed. `folderName` is the folder's name as this
+ * upload resolved it (the name given, else the top directory all paths share, else the
+ * default); every path starts with it.
+ *
+ * To send the failed files again into the same folder, pass each one with its full path,
+ * `{ path: failed[i].path, file: files[failed[i].index] }`, and `{ folderId }`: the paths
+ * keep the folder name. Sending the original relative paths again with `.name(folderName)`
+ * only works when they don't all share a top directory of their own, which `.name()`
+ * would rename.
  */
 export class FolderUploadError extends PinataError {
 	constructor(
@@ -66,6 +74,7 @@ export class FolderUploadError extends PinataError {
 			cid: string;
 			is_duplicate?: boolean;
 		},
+		public folderName?: string,
 	) {
 		super(message, undefined, { code: "FOLDER_UPLOAD_ERROR" });
 		this.name = "FolderUploadError";

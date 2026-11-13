@@ -55,12 +55,18 @@ export const uploadFolder = async (
 		throw new ValidationError("Pinata configuration is missing");
 	}
 	rejectUnsupported(options);
-	const entries = folderEntries(files, options?.metadata?.name);
+	const { folderName, entries } = folderEntries(files, options?.metadata?.name);
+	// Not a finite number (NaN from an empty form field): the default
+	const finite = (value: number | undefined, fallback: number) =>
+		value !== undefined && Number.isFinite(value) ? value : fallback;
 	const concurrency = Math.max(
 		1,
-		Math.floor(options?.concurrency ?? DEFAULT_CONCURRENCY),
+		Math.floor(finite(options?.concurrency, DEFAULT_CONCURRENCY)),
 	);
-	const retries = Math.max(0, Math.floor(options?.retries ?? DEFAULT_RETRIES));
+	const retries = Math.max(
+		0,
+		Math.floor(finite(options?.retries, DEFAULT_RETRIES)),
+	);
 
 	// Built for every file and request: a JWT set with setNewJwt during a long upload (the
 	// dashboard's tokens last 30 minutes) is used from then on
@@ -207,8 +213,10 @@ export const uploadFolder = async (
 				(error) => renewJwt(error, auth.jwt()),
 			);
 		} catch (error) {
+			// Only a one-file folder is merged into an earlier one
 			if (
 				!duplicateOf ||
+				uploaded.length !== 1 ||
 				!(error instanceof PinataError) ||
 				error.statusCode !== 404
 			) {
@@ -255,24 +263,43 @@ export const uploadFolder = async (
 		let renewals = 0;
 		// How far the server holds the file's bytes, as the last failed attempt reported
 		let reached = 0;
-		for (let attempt = 1; ; attempt++) {
+		// Attempts that started (sent a request): the `attempt` of the file's events
+		let started = 0;
+		for (;;) {
 			if (signal?.aborted) {
-				fail(cancelled(), attempt - 1);
+				fail(cancelled(), started);
 				return;
 			}
+			// The attempt failed with another file's refusal of the JWT, before sending anything
+			let borrowed = false;
 			const auth = tracked();
 			const wasStored = stored !== undefined;
 			const wasStarted = unfinished !== undefined;
 			try {
 				if (stored) {
-					emit({ type: "start", index, path, size: file.size, attempt });
+					emit({
+						type: "start",
+						index,
+						path,
+						size: file.size,
+						attempt: ++started,
+					});
 				} else {
 					// Only sending the bytes takes a slot: waiting for registration doesn't.
 					stored = await slots.run(async () => {
 						const refused = fatalNow();
-						if (refused) throw refused;
+						if (refused) {
+							borrowed = true;
+							throw refused;
+						}
 						if (signal?.aborted) throw cancelled();
-						emit({ type: "start", index, path, size: file.size, attempt });
+						emit({
+							type: "start",
+							index,
+							path,
+							size: file.size,
+							attempt: ++started,
+						});
 						try {
 							return await sendResumable(
 								createUrl.toString(),
@@ -292,7 +319,13 @@ export const uploadFolder = async (
 						}
 					});
 				}
-				emit({ type: "sent", index, path, size: file.size, attempt });
+				emit({
+					type: "sent",
+					index,
+					path,
+					size: file.size,
+					attempt: started,
+				});
 				// The file is in the folder once registered. It may be reported as an earlier
 				// upload when, alone, it matches one (a one-file folder of the same name and
 				// content): its object is in this folder all the same, and its CID is its own.
@@ -329,17 +362,27 @@ export const uploadFolder = async (
 					index,
 					path,
 					size: file.size,
-					attempt,
+					attempt: started,
 					cid: result.cid,
 				});
 				return;
 			} catch (caught) {
 				if (signal?.aborted) {
-					fail(cancelled(), attempt);
+					fail(cancelled(), started);
 					return;
 				}
 				const error =
 					caught instanceof Error ? caught : new Error(String(caught));
+				// Another file's refusal: none of its upload state (uploadUrl, uploadOffset)
+				// is this file's. It fails with it, unless the JWT was replaced since: then
+				// it is sent for real, as an attempt of its own.
+				if (borrowed) {
+					if (fatalNow()) {
+						fail(error, started);
+						return;
+					}
+					continue;
+				}
 				// Progress: the server accepted something of this attempt (its bytes, the upload,
 				// or some of its chunks)
 				let progressed = !wasStored && stored !== undefined;
@@ -367,7 +410,7 @@ export const uploadFolder = async (
 						? ++renewals > MAX_RENEWALS
 						: !isTransient(error) || (!offline && ++spent > retries)
 				) {
-					fail(error, attempt);
+					fail(error, started);
 					return;
 				}
 				const delayMs =
@@ -377,7 +420,7 @@ export const uploadFolder = async (
 					index,
 					path,
 					size: file.size,
-					attempt,
+					attempt: started,
 					error,
 					delayMs,
 					...(offline ? { waitingForOnline: true } : {}),
@@ -453,6 +496,7 @@ export const uploadFolder = async (
 			uploaded,
 			failed,
 			folder,
+			folderName,
 		);
 	}
 
@@ -602,7 +646,7 @@ const syncFolder = async (
 const folderEntries = (
 	files: File[] | FolderEntry[],
 	name?: string,
-): ResolvedEntry[] => {
+): { folderName: string; entries: ResolvedEntry[] } => {
 	if (!Array.isArray(files) || files.length === 0) {
 		throw new ValidationError("A folder upload needs at least one file");
 	}
@@ -631,7 +675,7 @@ const folderEntries = (
 	}
 
 	const seen = new Set<string>();
-	return split.map(({ file, segments }, index) => {
+	const entries = split.map(({ file, segments }, index) => {
 		const path = [folder, ...(sharedTop ? segments.slice(1) : segments)].join(
 			"/",
 		);
@@ -643,6 +687,7 @@ const folderEntries = (
 		seen.add(path);
 		return { index, path, file };
 	});
+	return { folderName: folder, entries };
 };
 
 const isFolderEntry = (item: File | FolderEntry): item is FolderEntry =>
