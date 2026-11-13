@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Resumable uploads follow `Retry-After`, fail at once on a 4xx that a retry can't change, and continue from the offset the server holds after a failed chunk.
 - Checks of an upload's registration, and of where it stands after a failed chunk, follow the `Retry-After` the server sends with a 429 or 503.
 - A file held in memory as a large part followed by a few small ones (`new File([largeBuffer, smallBuffer])`) is cut with `slice()` instead of being copied part by part from its stream.
+- A resumable upload of a File holding more bytes than its size reports (a part from `fs.openAsBlob()` past 4 GiB, which Node reports modulo 2^32) is refused before any byte is sent, wherever that part is in the File, instead of completing cut short.
 
 ## [2.4.8] - 2025-06-11
 

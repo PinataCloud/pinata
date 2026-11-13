@@ -244,10 +244,14 @@ class FolderUpload {
 		let reached = 0;
 		// Attempts that started (sent a request): the `attempt` of the file's events
 		let started = 0;
+		// Sent again because the response holding the file's own CID was lost (at most once)
+		let resent = false;
 		for (;;) {
 			if (signal?.aborted) return fail(cancelled(), started);
 			// The attempt failed with another file's refusal of the JWT, before sending anything
 			let borrowed = false;
+			// The attempt found the file registered without its own CID, and sends it again
+			let resend = false;
 			const auth = this.credentials.tracked();
 			const wasStored = stored !== undefined;
 			const wasStarted = unfinished !== undefined;
@@ -286,19 +290,20 @@ class FolderUpload {
 					});
 				}
 				this.emit({ type: "sent", ...about, attempt: started });
-				const cid = await this.register(stored, auth, file.size, gate);
+				const cid = await this.register(stored, auth, file.size, gate, !resent);
 				if (cid === undefined) {
 					// The response that completed the upload, which held the file's own CID, was
-					// lost: the server now reports the earlier folder's. Sent again, the file
-					// completes a new upload, whose last response holds its CID.
+					// lost: the server now reports the earlier folder's. Sent again (once), the
+					// file completes a new upload, whose last response holds its CID.
 					const requestUrl = stored.url;
+					resent = resend = true;
 					stored = undefined;
 					unfinished = undefined;
 					throw new NetworkError(
-						"The file is registered, but its own CID was lost with the response that completed it",
+						"The file is registered, but the response holding its own CID was lost",
 						0,
 						{
-							error: "file CID unknown",
+							error: "file CID lost",
 							code: "HTTP_ERROR",
 							metadata: { requestUrl },
 						},
@@ -316,6 +321,17 @@ class FolderUpload {
 				// it is sent for real, as an attempt of its own.
 				if (borrowed) {
 					if (this.credentials.refused()) return fail(error, started);
+					continue;
+				}
+				// Not counted against `retries`: nothing failed, the CID was lost
+				if (resend) {
+					this.emit({
+						type: "retry",
+						...about,
+						attempt: started,
+						error,
+						delayMs: 0,
+					});
 					continue;
 				}
 				// Progress: the server accepted something of this attempt (its bytes, the upload,
@@ -365,12 +381,15 @@ class FolderUpload {
 	// Waits until the file is registered, which puts it in the folder, and returns its own
 	// CID. It may be reported as an earlier upload when, alone, it matches one (a one-file
 	// folder of the same name and content): its object is in this folder all the same, and
-	// its CID is its own, unless the response holding it was lost: then undefined.
+	// its CID is its own. Only the response that completed the upload holds that CID: when
+	// that response was lost, undefined if `mayResend` (the file is to be sent again), else
+	// empty, as when the response held none: unknown, rather than the earlier folder's.
 	private async register(
 		stored: StoredUpload,
 		auth: TrackedHeaders,
 		size: number,
 		gate: boolean,
+		mayResend: boolean,
 	): Promise<string | undefined> {
 		const registered = await registerResumable(
 			stored,
@@ -392,7 +411,11 @@ class FolderUpload {
 				name: reported.filename,
 				cid: reported.cid,
 			};
-			if (!registered.ownCid) return undefined;
+			if (!registered.ownCid) {
+				return registered.completedBy === "lookup" && mayResend
+					? undefined
+					: "";
+			}
 		}
 		return registered.cid;
 	}

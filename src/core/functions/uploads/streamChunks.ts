@@ -1,5 +1,13 @@
 import { ValidationError } from "../../../utils/custom-errors";
 
+// What a file whose stream holds more bytes than its size fails with
+export const largerThanSize = (size: number) =>
+	new ValidationError(
+		`The file is larger than its reported size of ${size} bytes: it has more bytes after that, ` +
+			"so uploading it would store a truncated file. Node's fs.openAsBlob() reports the size of files " +
+			"over 4 GiB modulo 2^32 (nodejs/node#66207); pass a File whose size matches its contents.",
+	);
+
 // Cuts a file into the chunks of a resumable upload by reading `file.stream()` once,
 // front to back, instead of calling `file.slice()`.
 //
@@ -74,11 +82,7 @@ export class StreamChunks {
 
 		// The PATCH with this chunk completes the upload: make sure the file ends here.
 		if (offset + length === this.file.size && (await this.hasMore())) {
-			throw new ValidationError(
-				`The file is larger than its reported size of ${this.file.size} bytes: it has more bytes after that, ` +
-					"so uploading it would store a truncated file. Node's fs.openAsBlob() reports the size of files " +
-					"over 4 GiB modulo 2^32 (nodejs/node#66207); pass a File whose size matches its contents.",
-			);
+			throw largerThanSize(this.file.size);
 		}
 
 		this.chunk = chunk;

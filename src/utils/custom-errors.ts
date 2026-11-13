@@ -54,7 +54,9 @@ export class ValidationError extends PinataError {
  * only works when they don't all share a top directory of their own, which `.name()`
  * would rename. Not when `folder.is_duplicate`: `folderId` was removed, and the files sent
  * into it would make a folder of their own, without the uploaded ones. Send every file
- * again, uploaded and failed, without `folderId`.
+ * again, uploaded and failed, without `folderId`. Without `folder` (the folder could not be
+ * finished), send the failed files within 30 minutes: a folder left without new files for
+ * longer may be replaced by an earlier one of the same content as well.
  */
 export class FolderUploadError extends PinataError {
 	constructor(

@@ -72,7 +72,10 @@ export type FolderUploadEvent = {
 	size: number;
 	/** 1 for the first attempt; 0 for a file refused before it was sent */
 	attempt: number;
-	/** `complete`: the file's own CID */
+	/**
+	 * `complete`: the file's own CID. Empty in the rare case the server registered the file
+	 * as an earlier folder without returning the file's own CID.
+	 */
 	cid?: string;
 	/** `retry` and `error`: why the attempt failed */
 	error?: Error;
@@ -140,6 +143,7 @@ export type FolderFileResult = {
 	index: number;
 	path: string;
 	size: number;
+	/** The file's own CID; empty when the server did not return it (see FolderUploadEvent) */
 	cid: string;
 };
 

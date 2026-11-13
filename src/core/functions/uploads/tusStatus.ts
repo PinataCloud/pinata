@@ -55,16 +55,18 @@ export const resolveHeaders = (
 ): Record<string, string> =>
 	typeof headers === "function" ? headers() : headers;
 
-// What a lookup that could not tell where the upload stands says about the next one
+// Why a lookup could not tell where an upload stands
 export interface StatusHint {
+	// The HTTP status of the answer (none without an answer)
+	status?: number;
 	// How long the server asked to wait (Retry-After), if it did
 	retryAfterMs?: number;
 }
 
 // Asks the server how much of a resumable upload it has stored (TUS HEAD).
 // Returns undefined when the server cannot tell right now, so the caller retries
-// at its own offset; `hint` then says how long to wait first. Throws when no retry can
-// succeed: the upload no longer exists, or the server refuses to look it up for good.
+// at its own offset; `hint` then says why. Throws when no retry can succeed: the
+// upload no longer exists, or the server refuses to look it up for good.
 export const getUploadStatus = async (
 	url: string,
 	headers: RequestHeaders,
@@ -72,7 +74,10 @@ export const getUploadStatus = async (
 	signal?: AbortSignal,
 	hint?: StatusHint,
 ): Promise<UploadStatus | undefined> => {
-	if (hint) hint.retryAfterMs = undefined;
+	if (hint) {
+		hint.status = undefined;
+		hint.retryAfterMs = undefined;
+	}
 	let res: Response;
 	try {
 		res = await fetch(url, {
@@ -123,7 +128,10 @@ export const getUploadStatus = async (
 		);
 	}
 	if (!res.ok) {
-		if (hint) hint.retryAfterMs = parseRetryAfter(res.headers);
+		if (hint) {
+			hint.status = res.status;
+			hint.retryAfterMs = parseRetryAfter(res.headers);
+		}
 		return undefined;
 	}
 	const offset = parseUploadOffset(res.headers, size);
@@ -145,7 +153,7 @@ export const getUploadStatus = async (
 // still fail. Polls HEAD until then and returns that `ready` status (its CID is null if
 // `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
 // The pause between two checks starts at 1 s and doubles up to `pollMaxMs`, or is as long
-// as the server asks (Retry-After).
+// as the server asks (Retry-After), and the last check is at the end of the wait.
 export const waitForRegistration = async (
 	url: string,
 	headers: RequestHeaders,
@@ -157,11 +165,10 @@ export const waitForRegistration = async (
 	const deadline = Date.now() + timeout;
 	let delay = Math.min(1000, pollMaxMs);
 	const hint: StatusHint = {};
-	while (Date.now() + delay <= deadline) {
+	for (;;) {
 		await sleep(delay, signal);
 		if (signal?.aborted) throw signal.reason;
 		const status = await getUploadStatus(url, headers, size, signal, hint);
-		delay = Math.max(Math.min(delay * 2, pollMaxMs), hint.retryAfterMs ?? 0);
 		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.
 		if (status?.status === "ready") {
@@ -181,6 +188,12 @@ export const waitForRegistration = async (
 				},
 			);
 		}
+		const left = deadline - Date.now();
+		if (left <= 0) break;
+		delay = Math.min(
+			Math.max(Math.min(delay * 2, pollMaxMs), hint.retryAfterMs ?? 0),
+			left,
+		);
 	}
 	// Not a failure of the upload: the server has every byte and may still register it.
 	throw new NetworkError(

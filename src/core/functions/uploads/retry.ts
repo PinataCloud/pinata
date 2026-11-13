@@ -12,9 +12,9 @@ const BACKOFF_JITTER_MS = 500;
 // rate limiting
 const RETRYABLE_CLIENT_ERRORS = [408, 409, 423, 425, 429];
 // What a folder file is sent again after (see FolderUploadOptions.retries): no answer, a
-// timeout, a conflict with an upload of the same path still finishing, too early, rate
-// limiting and server errors
-const TRANSIENT_STATUSES = [0, 408, 409, 425, 429];
+// timeout, a conflict with an upload of the same path still finishing (409, 423 locked),
+// too early, rate limiting and server errors
+const TRANSIENT_STATUSES = [0, 408, 409, 423, 425, 429];
 
 // A refusal that sending the same request again cannot change
 export const isFinalRefusal = (status: number): boolean =>

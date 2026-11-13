@@ -93,6 +93,34 @@ describe("waitForRegistration", () => {
 			expect(head).toHaveBeenCalled();
 		});
 
+		it("checks once more at the end of the wait when the server asks to wait past it", async () => {
+			// 1 byte: a 15-minute wait. Rate limited for 5 minutes at 14 minutes, ready at 14.5
+			let limited = false;
+			global.fetch = jest.fn(async () => {
+				if (now >= 14 * MINUTE && !limited) {
+					limited = true;
+					return new Response(null, {
+						status: 429,
+						headers: { "Retry-After": "300" },
+					});
+				}
+				return new Response(null, {
+					status: 200,
+					headers: {
+						"Upload-Offset": "1",
+						...(now >= 14.5 * MINUTE
+							? { "Upload-Status": "ready", "Upload-Cid": "bafyregistered" }
+							: { "Upload-Status": "processing" }),
+					},
+				});
+			}) as unknown as typeof fetch;
+
+			await expect(waitForRegistration(url, {}, 1)).resolves.toMatchObject({
+				cid: "bafyregistered",
+			});
+			expect(now).toBe(15 * MINUTE);
+		});
+
 		it("waits as long as a rate-limited lookup asks before the next one", async () => {
 			const at: number[] = [];
 			global.fetch = jest.fn(async () => {

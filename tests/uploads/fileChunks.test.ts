@@ -4,6 +4,15 @@ import {
 } from "../../src/core/functions/uploads/fileChunks";
 import { ValidationError } from "../../src/utils/custom-errors";
 import { NodeLikeFile, byteAt } from "./nodeLikeFile";
+import {
+	closeSync,
+	ftruncateSync,
+	openAsBlob,
+	openSync,
+	rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;
@@ -127,6 +136,33 @@ describe("FileChunks", () => {
 		await chunks.close();
 		expect(slicedPast(file)).toEqual([]);
 	});
+
+	// Real Node Blobs: fs.openAsBlob() of 2^32 + r bytes reports r, and every slice() of the
+	// File ends where its reported size does
+	it.each([
+		["reports 0 bytes", 0],
+		["reports less than 64 KiB", 30 * 1024],
+	])(
+		"refuses a Buffer followed by a file on disk past 4 GiB that %s, before cutting a chunk",
+		async (_, rest) => {
+			const path = join(tmpdir(), `fileChunks-${process.pid}-${rest}.bin`);
+			const fd = openSync(path, "w");
+			try {
+				ftruncateSync(fd, 2 ** 32 + rest);
+				closeSync(fd);
+				const disk = await openAsBlob(path);
+				const file = new File([new Uint8Array(2 * MiB), disk], "mixed.bin");
+				const chunks = new FileChunks(file, MiB);
+
+				await expect(chunks.at(0)).rejects.toThrow(
+					"larger than its reported size",
+				);
+				await chunks.close();
+			} finally {
+				rmSync(path, { force: true });
+			}
+		},
+	);
 
 	it("keeps resending the rest of the chunk that holds an offset", async () => {
 		const file = inMemory(120 * MiB);

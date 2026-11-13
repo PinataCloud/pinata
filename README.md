@@ -95,7 +95,8 @@ try {
       // send every file again, into a new folder
       await pinata.upload.public.folder(files).name("photos");
     } else {
-      // The other files are in the folder: send the failed ones again into it
+      // The other files are in the folder: send the failed ones again into it (within
+      // 30 minutes when error.folder is undefined; see FolderUploadError)
       await pinata.upload.public.folder(
         error.failed.map((f) => ({ path: f.path, file: files[f.index] })),
         { folderId: error.folderId },

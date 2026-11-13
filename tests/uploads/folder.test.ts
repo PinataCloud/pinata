@@ -1326,6 +1326,7 @@ describe("uploadFolder", () => {
 				});
 			});
 
+			// Not counted against retries: nothing failed
 			const result = await uploadFolder(
 				config,
 				[
@@ -1333,6 +1334,7 @@ describe("uploadFolder", () => {
 					{ path: "d/b.txt", file: file("bb") },
 				],
 				"public",
+				{ retries: 0 },
 			);
 
 			expect(result.files.map((f) => f.cid)).toEqual([
@@ -1340,6 +1342,91 @@ describe("uploadFolder", () => {
 				"bafy-d/b.txt",
 			]);
 			expect(posts).toEqual(["d/a.txt", "d/a.txt", "d/b.txt"]);
+		});
+
+		it("reports no CID, rather than an earlier folder's, when the response completing the file held none", async () => {
+			let posts = 0;
+			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				if (init.method === "PUT") return refused(404, "bucket not found");
+				if (init.method === "POST") {
+					posts++;
+					return new Response(null, {
+						status: 201,
+						headers: {
+							Location: `${url}/only`,
+							"Upload-Offset": "1",
+							"Upload-Status": "processing",
+						},
+					});
+				}
+				return new Response(null, {
+					status: 200,
+					headers: {
+						"Upload-Offset": "1",
+						"Upload-Status": "ready",
+						"Upload-Cid": "bafyearlier",
+						"Upload-Metadata": `filename ${encode("d")},file_id ${encode("earlier-folder")},cid ${encode("bafyearlier")}`,
+					},
+				});
+			}) as unknown as typeof fetch;
+
+			const result = await uploadFolder(
+				config,
+				[{ path: "d/only.txt", file: file("a") }],
+				"public",
+			);
+
+			expect(result).toMatchObject({ cid: "bafyearlier", is_duplicate: true });
+			expect(result.files[0].cid).toBe("");
+			expect(posts).toBe(1);
+		});
+
+		it("doesn't send a resumed file again when the response completing it arrived without a CID", async () => {
+			const calls: string[] = [];
+			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				const headers = init.headers as Record<string, string>;
+				const jwt = headers.Authorization.replace("Bearer ", "");
+				calls.push(`${init.method} ${jwt}`);
+				if (init.method === "PUT") return refused(404, "bucket not found");
+				if (init.method === "POST") {
+					return new Response(null, {
+						status: 201,
+						headers: { Location: `${url}/only`, "Upload-Offset": "0" },
+					});
+				}
+				if (init.method === "PATCH") {
+					if (jwt === "old-jwt") return refused(401, "Invalid/expired token");
+					return new Response(null, {
+						status: 204,
+						headers: { "Upload-Offset": "1", "Upload-Status": "processing" },
+					});
+				}
+				// HEAD: where the upload to continue stands, then its registration
+				return calls.includes("PATCH new-jwt")
+					? new Response(null, {
+							status: 200,
+							headers: {
+								"Upload-Offset": "1",
+								"Upload-Status": "ready",
+								"Upload-Cid": "bafyearlier",
+								"Upload-Metadata": `filename ${encode("d")},file_id ${encode("earlier-folder")},cid ${encode("bafyearlier")}`,
+							},
+						})
+					: new Response(null, {
+							status: 200,
+							headers: { "Upload-Offset": "0", "Upload-Status": "receiving" },
+						});
+			}) as unknown as typeof fetch;
+
+			const result = await uploadFolder(
+				{ ...config, pinataJwt: "old-jwt" },
+				[{ path: "d/only.txt", file: file("a") }],
+				"public",
+				{ refreshJwt: async () => "new-jwt" },
+			);
+
+			expect(result.files[0].cid).toBe("");
+			expect(calls.filter((c) => c.startsWith("POST"))).toHaveLength(1);
 		});
 	});
 
