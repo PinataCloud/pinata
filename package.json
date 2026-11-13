@@ -1,11 +1,13 @@
 {
 	"name": "pinata",
-	"version": "2.5.8",
+	"version": "2.6.0-beta.2",
 	"description": "The official Pinata SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -28,7 +30,11 @@
 		"type": "git",
 		"url": "git+https://github.com/PinataCloud/pinata.git"
 	},
-	"keywords": ["ipfs", "sdk", "typescript"],
+	"keywords": [
+		"ipfs",
+		"sdk",
+		"typescript"
+	],
 	"author": "Steve Simkins",
 	"license": "MIT",
 	"bugs": {
