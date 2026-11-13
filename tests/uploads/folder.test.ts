@@ -527,14 +527,24 @@ describe("uploadFolder", () => {
 		});
 
 		it("has at most 8 files per slot under way, sending or waiting for registration", async () => {
-			// Each file is registered after many checks, so the others pile up behind the cap
-			const polls = new Map<string, number>();
+			// No file is registered until as many are waiting as the cap lets in (or every file
+			// was sent), so the peak is the cap itself, whatever order the promises run in.
+			// The first file, which creates the folder, is registered at once. Pauses end on the
+			// next turn of the event loop, as real timers do, so a file polling its registration
+			// lets the others send theirs.
+			setTimeoutSpy.mockImplementation(((callback: () => void, ms: number) => {
+				delays.push(ms);
+				setImmediate(callback);
+				return 0;
+			}) as unknown as typeof setTimeout);
+			let posted = 0;
 			let waiting = 0;
 			let peak = 0;
 			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(40, {});
 				if (init.method === "POST") {
 					const path = pathOf(init);
+					posted++;
 					waiting++;
 					peak = Math.max(peak, waiting);
 					return processing(
@@ -542,9 +552,7 @@ describe("uploadFolder", () => {
 						`bafy-${path}`,
 					);
 				}
-				const n = (polls.get(url) ?? 0) + 1;
-				polls.set(url, n);
-				const ready = n >= 200;
+				const ready = posted === 1 || waiting >= 16 || posted === 40;
 				if (ready) waiting--;
 				return registration(ready ? "ready" : "processing");
 			});
