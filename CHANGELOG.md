@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- `upload.public.folder()` / `upload.private.folder()`: upload a folder file by file, each file a resumable upload into one folder, several at a time and retried on their own. Per-file progress events (`start`, `sent`, `complete`, `retry`, `error`, with the file's `index`), `concurrency`, `retries`, `folderId` to upload into an existing folder, `signal` to cancel, `refreshJwt` to renew a refused JWT. Resolves with the folder's CID and every file's CID; rejects with `FolderUploadError` (`folderId`, `folderName`, `uploaded`, `failed`, `folder`) when files fail for good.
+
+### 🐛 Bug Fixes
+
+- A name or keyvalues given in an upload method's options is no longer dropped by the builder; the caller's options object is no longer modified.
+- Resumable uploads follow `Retry-After`, fail at once on a 4xx that a retry can't change, and continue from the offset the server holds after a failed chunk.
+
 ## [2.4.8] - 2025-06-11
 
 ### 🐛 Bug Fixes
