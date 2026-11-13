@@ -240,16 +240,19 @@ describe("uploadFolder", () => {
 		});
 		expect(result.files).toEqual([
 			{
+				index: 0,
 				path: "d/large.txt",
 				size: 13,
 				cid: `bafy-${encodeURIComponent("d/large.txt")}`,
 			},
 			{
+				index: 1,
 				path: "d/s.txt",
 				size: 1,
 				cid: `bafy-${encodeURIComponent("d/s.txt")}`,
 			},
 			{
+				index: 2,
 				path: "d/m.txt",
 				size: 2,
 				cid: `bafy-${encodeURIComponent("d/m.txt")}`,
@@ -341,12 +344,137 @@ describe("uploadFolder", () => {
 		expect(error.failed[0].error.message).toBe(
 			"Could not start the upload (HTTP 400): invalid name",
 		);
-		// Not retried, and the incomplete folder is not synced
+		expect(error.failed[0].index).toBe(1);
+		// Not retried; the folder is synced once, without the failed file
 		expect(
 			fetchMock.mock.calls.filter(
 				(call) => (call[1] as RequestInit).method === "PUT",
 			),
-		).toHaveLength(0);
+		).toHaveLength(1);
+		expect(error.folder).toEqual({
+			id: error.folderId,
+			name: "d",
+			cid: "bafyfolder",
+		});
+	});
+
+	it("reports the earlier folder a partly uploaded folder turned out to duplicate", async () => {
+		const { fetchMock } = server((creation) =>
+			creation.path === "d/bad.txt" ? refused(400, "invalid name") : undefined,
+		);
+		const respond = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			init.method === "PUT"
+				? new Response(
+						JSON.stringify({
+							data: {
+								id: "earlier-folder",
+								name: "first",
+								cid: "bafyearlier",
+								size: 1,
+								number_of_files: 1,
+								is_duplicate: true,
+							},
+						}),
+						{ status: 200 },
+					)
+				: respond(url, init),
+		);
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/bad.txt", file: file("bad") },
+			],
+			"public",
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.folder).toEqual({
+			id: "earlier-folder",
+			name: "first",
+			cid: "bafyearlier",
+			is_duplicate: true,
+		});
+	});
+
+	it("keeps why files failed when the partly uploaded folder cannot be synced", async () => {
+		const { fetchMock } = server((creation) =>
+			creation.path === "d/bad.txt" ? refused(400, "invalid name") : undefined,
+		);
+		const respond = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			init.method === "PUT"
+				? new Response("down", { status: 503 })
+				: respond(url, init),
+		);
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/bad.txt", file: file("bad") },
+			],
+			"public",
+			{ retries: 1 },
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.message).toContain("d/bad.txt: Could not start the upload");
+		expect(error.folder).toBeUndefined();
+	});
+
+	it("tells files apart by their position, whatever their path", async () => {
+		const { created } = server((creation) =>
+			creation.path === "d/back\\slash.txt"
+				? refused(400, "invalid file path")
+				: undefined,
+		);
+		const events: FolderUploadEvent[] = [];
+
+		const error = await uploadFolder(
+			config,
+			[
+				file("a", "a.txt", "d/a.txt"),
+				// A File's path never uses "\\" as separator: it is part of the name
+				file("b", "back\\slash.txt", "d/back\\slash.txt"),
+			],
+			"public",
+			{ onProgress: (event) => events.push(event) },
+		).catch((e) => e);
+
+		expect(created.map((c) => c.path)).toEqual([
+			"d/a.txt",
+			"d/back\\slash.txt",
+		]);
+		expect(events.map((e) => `${e.type} ${e.index}`)).toEqual([
+			"start 0",
+			"complete 0",
+			"start 1",
+			"error 1",
+		]);
+		expect(error.uploaded.map((f: { index: number }) => f.index)).toEqual([0]);
+		expect(error.failed.map((f: { index: number }) => f.index)).toEqual([1]);
+	});
+
+	it("reads '\\' in an entry's path as a separator (a Windows path)", async () => {
+		const { created } = server();
+
+		const result = await uploadFolder(
+			config,
+			[{ path: "d\\sub\\a.txt", file: file("a") }],
+			"public",
+		);
+
+		expect(created.map((c) => c.path)).toEqual(["d/sub/a.txt"]);
+		expect(result.files[0]).toMatchObject({ index: 0, path: "d/sub/a.txt" });
 	});
 
 	it("ignores what onProgress throws", async () => {
@@ -858,6 +986,33 @@ describe("uploadFolder", () => {
 		]);
 		expect(created).toHaveLength(1);
 		expect(events.filter((e) => e.startsWith("error"))).toHaveLength(4);
+	});
+
+	it("stops finishing the folder once cancelled", async () => {
+		const { fetchMock } = server();
+		const respond = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		const controller = new AbortController();
+		let syncs = 0;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+			if (init.method !== "PUT") return respond(url, init);
+			syncs++;
+			controller.abort();
+			throw new DOMException("This operation was aborted", "AbortError");
+		});
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+			{ signal: controller.signal },
+		).catch((e) => e);
+
+		expect(error.name).toBe("AbortError");
+		expect(error.message).toBe("The upload was cancelled");
+		expect(syncs).toBe(1);
 	});
 
 	it("sends nothing when cancelled before it starts", async () => {

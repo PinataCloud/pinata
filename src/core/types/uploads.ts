@@ -61,6 +61,8 @@ export type FolderUploadEvent = {
 	 * `error`: the file failed for good; the upload goes on with the other files.
 	 */
 	type: "start" | "complete" | "retry" | "error";
+	/** The file's position in the files given: tells files apart whatever their path */
+	index: number;
 	/** The file's path in the folder, folder name included */
 	path: string;
 	size: number;
@@ -102,6 +104,8 @@ export type FolderUploadOptions = UploadOptions & {
 
 /** A file of an uploaded folder */
 export type FolderFileResult = {
+	/** The file's position in the files given */
+	index: number;
 	path: string;
 	size: number;
 	cid: string;

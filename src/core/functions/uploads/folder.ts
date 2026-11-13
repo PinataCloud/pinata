@@ -67,12 +67,6 @@ export const uploadFolder = async (
 	}
 	const folderId = options?.folderId ?? uuidv7();
 	const signal = options?.signal;
-	// What a file fails with once the upload is cancelled
-	const cancelled = () => {
-		const error = new PinataError("The upload was cancelled");
-		error.name = "AbortError";
-		return error;
-	};
 	const createUrl = new URL(`${endpoint}/files/${folderId}`);
 	if (options?.cid_version !== undefined) {
 		createUrl.searchParams.set(
@@ -98,7 +92,8 @@ export const uploadFolder = async (
 
 	const total = entries.length;
 	const uploaded: FolderFileResult[] = [];
-	const failed: { path: string; size: number; error: Error }[] = [];
+	const failed: { index: number; path: string; size: number; error: Error }[] =
+		[];
 	const emit = (
 		event: Omit<FolderUploadEvent, "completed" | "failed" | "total">,
 	) => {
@@ -134,10 +129,10 @@ export const uploadFolder = async (
 	const uploadEntry = (entry: ResolvedEntry) =>
 		underWay.run(() => uploadOne(entry));
 	const uploadOne = async (entry: ResolvedEntry): Promise<void> => {
-		const { path, file } = entry;
+		const { index, path, file } = entry;
 		const fail = (error: Error, attempt: number) => {
-			failed.push({ path, size: file.size, error });
-			emit({ type: "error", path, size: file.size, attempt, error });
+			failed.push({ index, path, size: file.size, error });
+			emit({ type: "error", index, path, size: file.size, attempt, error });
 		};
 		// files-api leaves "%" unescaped in the upload URL, so checking the upload hits
 		// another path (404) and the file would be reported failed while it lands in the
@@ -161,7 +156,7 @@ export const uploadFolder = async (
 				const stored = await slots.run(async () => {
 					if (fatal) throw fatal;
 					if (signal?.aborted) throw cancelled();
-					emit({ type: "start", path, size: file.size, attempt });
+					emit({ type: "start", index, path, size: file.size, attempt });
 					try {
 						return await sendResumable(
 							createUrl.toString(),
@@ -186,10 +181,16 @@ export const uploadFolder = async (
 					file.size,
 					signal,
 				);
-				const result = { path, size: file.size, cid: registered.cid as string };
+				const result = {
+					index,
+					path,
+					size: file.size,
+					cid: registered.cid as string,
+				};
 				uploaded.push(result);
 				emit({
 					type: "complete",
+					index,
 					path,
 					size: file.size,
 					attempt,
@@ -209,7 +210,15 @@ export const uploadFolder = async (
 					return;
 				}
 				const delayMs = backoff(attempt);
-				emit({ type: "retry", path, size: file.size, attempt, error, delayMs });
+				emit({
+					type: "retry",
+					index,
+					path,
+					size: file.size,
+					attempt,
+					error,
+					delayMs,
+				});
 				await sleep(delayMs, signal);
 			}
 		}
@@ -254,15 +263,37 @@ export const uploadFolder = async (
 	await Promise.all(pending.map((entry) => uploadEntry(entry)));
 
 	if (failed.length > 0) {
+		// The server completes the folder without the failed files: its CID, or the earlier
+		// folder it turned out to duplicate, is worth knowing. Best effort: a failed sync
+		// leaves it unknown and must not hide why the files failed.
+		const folder =
+			uploaded.length > 0 && !signal?.aborted && !fatal
+				? await syncFolder(endpoint, folderId, headers(), retries, signal).then(
+						(synced) => ({
+							id: synced.id,
+							name: synced.name,
+							cid: synced.cid,
+							...(synced.is_duplicate ? { is_duplicate: true } : {}),
+						}),
+						() => undefined,
+					)
+				: undefined;
 		throw new FolderUploadError(
 			`${failed.length} of ${total} files could not be uploaded to folder ${folderId}: ${failed[0].path}: ${failed[0].error.message}`,
 			folderId,
 			uploaded,
 			failed,
+			folder,
 		);
 	}
 
-	const folder = await syncFolder(endpoint, folderId, headers(), retries);
+	const folder = await syncFolder(
+		endpoint,
+		folderId,
+		headers(),
+		retries,
+		signal,
+	);
 	// At least these files: a folder uploaded into (folderId) also holds the earlier ones
 	if (folder.number_of_files < total) {
 		throw new NetworkError(
@@ -276,7 +307,7 @@ export const uploadFolder = async (
 		);
 	}
 
-	const byPath = new Map(uploaded.map((result) => [result.path, result]));
+	const byIndex = new Map(uploaded.map((result) => [result.index, result]));
 	// Content already uploaded resolves to that earlier folder: its files' paths start with
 	// its name
 	const rename = (path: string) =>
@@ -298,13 +329,14 @@ export const uploadFolder = async (
 		...(folder.is_duplicate ? { is_duplicate: true } : {}),
 		// In the order they were given
 		files: entries.map((entry) => {
-			const result = byPath.get(entry.path) as FolderFileResult;
+			const result = byIndex.get(entry.index) as FolderFileResult;
 			return { ...result, path: rename(result.path) };
 		}),
 	};
 };
 
-type ResolvedEntry = { path: string; file: File };
+// `index`: the file's position in the files given
+type ResolvedEntry = { index: number; path: string; file: File };
 
 interface SyncedFolder {
 	id: string;
@@ -319,12 +351,20 @@ interface SyncedFolder {
 	is_duplicate?: boolean;
 }
 
+// What a file, or finishing the folder, fails with once the upload is cancelled
+const cancelled = () => {
+	const error = new PinataError("The upload was cancelled");
+	error.name = "AbortError";
+	return error;
+};
+
 // Computes the folder's CID from every registered file and says how many files it holds.
 const syncFolder = async (
 	endpoint: string,
 	folderId: string,
 	headers: Record<string, string>,
 	retries: number,
+	signal?: AbortSignal,
 ): Promise<SyncedFolder> => {
 	for (let attempt = 1; ; attempt++) {
 		let error: NetworkError;
@@ -332,6 +372,7 @@ const syncFolder = async (
 			const res = await fetch(`${endpoint}/buckets/${folderId}/sync`, {
 				method: "PUT",
 				headers,
+				signal,
 			});
 			if (res.ok) {
 				const body = await res.json();
@@ -345,6 +386,7 @@ const syncFolder = async (
 				{ error: text, code: "HTTP_ERROR", metadata: { requestUrl: res.url } },
 			);
 		} catch (caught) {
+			if (signal?.aborted) throw cancelled();
 			const message = caught instanceof Error ? caught.message : String(caught);
 			error = new NetworkError(
 				`Could not finish folder ${folderId}: ${message}`,
@@ -358,7 +400,8 @@ const syncFolder = async (
 		if (!isTransient(error) || attempt > retries) {
 			throw error;
 		}
-		await sleep(backoff(attempt));
+		await sleep(backoff(attempt), signal);
+		if (signal?.aborted) throw cancelled();
 	}
 };
 
@@ -373,19 +416,17 @@ const folderEntries = (
 		throw new ValidationError("A folder upload needs at least one file");
 	}
 	const split = files.map((item) => {
-		const entry: FolderEntry = isFolderEntry(item)
-			? item
-			: { file: item, path: item.webkitRelativePath || item.name };
-		const segments = entry.path
-			.replace(/\\/g, "/")
-			.replace(/^(\.?\/)+/, "")
-			.split("/");
+		// An entry's path may use "\\" as separator (a Windows path). A File's path never
+		// does (webkitRelativePath uses "/"), so there "\\" is part of a name, which the
+		// server refuses.
+		const [file, path] = isFolderEntry(item)
+			? [item.file, item.path.replace(/\\/g, "/")]
+			: [item, item.webkitRelativePath || item.name];
+		const segments = path.replace(/^(\.?\/)+/, "").split("/");
 		if (segments.some((s) => s === "" || s === "." || s === "..")) {
-			throw new ValidationError(
-				`Invalid path in folder upload: "${entry.path}"`,
-			);
+			throw new ValidationError(`Invalid path in folder upload: "${path}"`);
 		}
-		return { file: entry.file, segments };
+		return { file, segments };
 	});
 
 	const top = split[0].segments[0];
@@ -399,7 +440,7 @@ const folderEntries = (
 	}
 
 	const seen = new Set<string>();
-	return split.map(({ file, segments }) => {
+	return split.map(({ file, segments }, index) => {
 		const path = [folder, ...(sharedTop ? segments.slice(1) : segments)].join(
 			"/",
 		);
@@ -409,7 +450,7 @@ const folderEntries = (
 			);
 		}
 		seen.add(path);
-		return { path, file };
+		return { index, path, file };
 	});
 };
 

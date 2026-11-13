@@ -39,14 +39,33 @@ export class ValidationError extends PinataError {
 /**
  * A folder upload in which some files failed for good, after their retries. `uploaded` are
  * in the folder `folderId`; the server finishes that folder's CID on its own, without the
- * failed files.
+ * failed files. `index` is a file's position in the files given. `folder` is that folder as
+ * the server finished it, when it could be asked (not after a cancel or an authentication
+ * failure): with `is_duplicate`, its content matched an earlier folder, which `id`, `name`
+ * and `cid` are, and `folderId` was removed.
  */
 export class FolderUploadError extends PinataError {
 	constructor(
 		message: string,
 		public folderId: string,
-		public uploaded: { path: string; size: number; cid: string }[],
-		public failed: { path: string; size: number; error: Error }[],
+		public uploaded: {
+			index: number;
+			path: string;
+			size: number;
+			cid: string;
+		}[],
+		public failed: {
+			index: number;
+			path: string;
+			size: number;
+			error: Error;
+		}[],
+		public folder?: {
+			id: string;
+			name: string;
+			cid: string;
+			is_duplicate?: boolean;
+		},
 	) {
 		super(message, undefined, { code: "FOLDER_UPLOAD_ERROR" });
 		this.name = "FolderUploadError";
