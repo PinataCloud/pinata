@@ -579,8 +579,10 @@ Response: "Revoked"
     signal?: AbortSignal;   // cancel: files not uploaded yet fail with an "AbortError"
     refreshJwt?: () => Promise<string | undefined> | string | undefined;
                             // on a 401/403: a new JWT (used as with setNewJwt), asked once per
-                            // refused JWT; the refused files are sent again. Without it, a
-                            // refused JWT fails the files until another is set (setNewJwt)
+                            // refused JWT; the refused requests (final sync included) are sent
+                            // again. A file fails after 2 renewed JWTs refused in a row with no
+                            // byte accepted in between. Without it, a refused JWT fails the
+                            // files until another is set (setNewJwt)
   }
   type FolderUploadEvent = {
     type: "start" | "sent" | "complete" | "retry" | "error";
@@ -590,7 +592,9 @@ Response: "Revoked"
     path: string; size: number; attempt: number;
     cid?: string;           // complete: the file's CID
     error?: Error;          // retry / error
-    delayMs?: number;       // retry
+    delayMs?: number;       // retry: pause before the next attempt
+    waitingForOnline?: true; // retry while offline: delayMs is 0 and the next attempt waits
+                            // for the "online" event, with no time limit (cancel via signal)
     completed: number; failed: number; total: number;
   }
 

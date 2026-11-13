@@ -163,18 +163,49 @@ export const uploadFolder = async (
 					})(),
 				};
 			}
-			await renewal.done;
+			// Not past a cancel: a refresh may wait for the user to sign in again
+			const pending = renewal.done;
+			await new Promise<void>((resolve) => {
+				if (signal?.aborted) return resolve();
+				const done = () => {
+					signal?.removeEventListener("abort", done);
+					resolve();
+				};
+				signal?.addEventListener("abort", done, { once: true });
+				pending.then(done);
+			});
+			if (signal?.aborted) return false;
 		}
 		if (currentJwt() !== refused) return true;
 		if (!fatalNow()) fatal = { error, jwt: refused };
 		return false;
+	};
+	// Headers built for each request, which note the JWT of the last request they were built
+	// for: the one a refusal is about
+	const tracked = () => {
+		let jwt = currentJwt();
+		return {
+			headers: () => {
+				jwt = currentJwt();
+				return headers();
+			},
+			jwt: () => jwt,
+		};
 	};
 	// A file the server registered as an earlier folder (a one-file folder matching one):
 	// the server then removes this folder, and syncing it answers 404
 	let duplicateOf: { id: string; name: string; cid: string } | undefined;
 	const finishFolder = async (): Promise<SyncedFolder> => {
 		try {
-			return await syncFolder(endpoint, folderId, headers, retries, signal);
+			const auth = tracked();
+			return await syncFolder(
+				endpoint,
+				folderId,
+				auth.headers,
+				retries,
+				signal,
+				(error) => renewJwt(error, auth.jwt()),
+			);
 		} catch (error) {
 			if (
 				!duplicateOf ||
@@ -219,15 +250,19 @@ export const uploadFolder = async (
 		// An upload an attempt left unfinished, which the next one continues
 		let unfinished: string | undefined;
 		// Failed attempts counted against `retries`: not those made while offline, nor those
-		// refused a JWT since replaced (at most MAX_RENEWALS of them)
+		// refused a JWT since replaced (at most MAX_RENEWALS of them in a row without progress)
 		let spent = 0;
 		let renewals = 0;
+		// How far the server holds the file's bytes, as the last failed attempt reported
+		let reached = 0;
 		for (let attempt = 1; ; attempt++) {
 			if (signal?.aborted) {
 				fail(cancelled(), attempt - 1);
 				return;
 			}
-			const jwt = currentJwt();
+			const auth = tracked();
+			const wasStored = stored !== undefined;
+			const wasStarted = unfinished !== undefined;
 			try {
 				if (stored) {
 					emit({ type: "start", index, path, size: file.size, attempt });
@@ -241,7 +276,7 @@ export const uploadFolder = async (
 						try {
 							return await sendResumable(
 								createUrl.toString(),
-								headers,
+								auth.headers,
 								file,
 								`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
 								true,
@@ -251,7 +286,7 @@ export const uploadFolder = async (
 						} catch (error) {
 							// Before the slot goes to the next file, which must not be sent with a
 							// JWT refused for good
-							await renewJwt(error, jwt);
+							await renewJwt(error, auth.jwt());
 							throw error;
 						}
 					});
@@ -262,7 +297,7 @@ export const uploadFolder = async (
 				// content): its object is in this folder all the same, and its CID is its own.
 				const registered = await registerResumable(
 					stored,
-					headers,
+					auth.headers,
 					file.size,
 					signal,
 					gate ? GATE_POLL_MS : undefined,
@@ -304,10 +339,23 @@ export const uploadFolder = async (
 				}
 				const error =
 					caught instanceof Error ? caught : new Error(String(caught));
+				// Progress: the server accepted something of this attempt (its bytes, the upload,
+				// or some of its chunks)
+				let progressed = !wasStored && stored !== undefined;
 				if (error instanceof PinataError) {
-					unfinished = error.details?.metadata?.uploadUrl ?? unfinished;
+					const metadata = error.details?.metadata;
+					unfinished = metadata?.uploadUrl ?? unfinished;
+					if (!wasStarted && unfinished !== undefined) progressed = true;
+					if (
+						typeof metadata?.uploadOffset === "number" &&
+						metadata.uploadOffset > reached
+					) {
+						reached = metadata.uploadOffset;
+						progressed = true;
+					}
 				}
-				const renewed = await renewJwt(error, jwt);
+				if (progressed) renewals = 0;
+				const renewed = await renewJwt(error, auth.jwt());
 				// No answer while the browser is offline: the next attempt waits until it is
 				// back online, and this one is not counted
 				const offline =
@@ -331,6 +379,7 @@ export const uploadFolder = async (
 					attempt,
 					error,
 					delayMs,
+					...(offline ? { waitingForOnline: true } : {}),
 				});
 				if (offline) await untilOnline(signal);
 				else await sleep(delayMs, signal);
@@ -478,9 +527,11 @@ const syncFolder = async (
 	headers: RequestHeaders,
 	retries: number,
 	signal?: AbortSignal,
+	// After a refusal: true if another JWT is now in use (see renewJwt in uploadFolder)
+	renew?: (error: Error) => Promise<boolean>,
 ): Promise<SyncedFolder> => {
 	const requestUrl = `${endpoint}/buckets/${folderId}/sync`;
-	for (let attempt = 1, spent = 0; ; attempt++) {
+	for (let spent = 0, renewals = 0; ; ) {
 		let error: NetworkError;
 		try {
 			const res = await fetch(requestUrl, {
@@ -520,6 +571,17 @@ const syncFolder = async (
 				},
 			);
 		}
+		// Refused a JWT since replaced: sent again at once, without counting the attempt
+		if (
+			(error.statusCode === 401 || error.statusCode === 403) &&
+			renewals < MAX_RENEWALS &&
+			renew &&
+			(await renew(error))
+		) {
+			renewals++;
+			continue;
+		}
+		if (signal?.aborted) throw cancelled();
 		// Offline in a browser: wait until back online, without counting the attempt
 		if (error.statusCode === 0 && (await untilOnline(signal))) {
 			if (signal?.aborted) throw cancelled();

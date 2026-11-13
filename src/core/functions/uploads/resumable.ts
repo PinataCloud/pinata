@@ -1,4 +1,4 @@
-import { NetworkError } from "../../../utils/custom-errors";
+import { NetworkError, PinataError } from "../../../utils/custom-errors";
 import { FileChunks } from "./fileChunks";
 import { serverReason } from "./tusMetadata";
 import { parseRetryAfter, sleep, untilOnline } from "./wait";
@@ -6,6 +6,7 @@ import {
 	getUploadStatus,
 	parseUploadOffset,
 	type RequestHeaders,
+	type UploadStatus,
 	resolveHeaders,
 	waitForRegistration,
 } from "./tusStatus";
@@ -238,6 +239,7 @@ const sendChunks = async (
 							metadata: {
 								requestUrl: failure.requestUrl,
 								uploadUrl: url,
+								uploadOffset: offset,
 								...(permanent ? {} : { retriesAttempted: MAX_RETRIES }),
 								retryAfterMs: failure.retryAfterMs,
 							},
@@ -256,7 +258,27 @@ const sendChunks = async (
 			// The failed PATCH may have been stored, in full or in part, before its
 			// response was lost. Ask the server where the upload stands and continue
 			// from there, instead of resending at our own offset (TUS: HEAD after a failure).
-			const status = await getUploadStatus(url, headers, file.size, signal);
+			let status: UploadStatus | undefined;
+			try {
+				status = await getUploadStatus(url, headers, file.size, signal);
+			} catch (error) {
+				// The upload still exists (else 404 or 410): the next attempt continues it
+				if (
+					error instanceof PinataError &&
+					error.statusCode !== 404 &&
+					error.statusCode !== 410
+				) {
+					error.details = {
+						...error.details,
+						metadata: {
+							...error.details?.metadata,
+							uploadUrl: url,
+							uploadOffset: offset,
+						},
+					};
+				}
+				throw error;
+			}
 			if (status) {
 				// The server stored more of the upload, so this retry made progress. Reset
 				// the retry budget and the backoff, as tus-js-client does.

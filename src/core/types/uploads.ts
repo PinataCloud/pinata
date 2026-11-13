@@ -60,7 +60,8 @@ export type FolderUploadEvent = {
 	 * seconds to minutes: the server is processing the file), then `complete`, `retry` or
 	 * `error`. Again on each attempt, also on one that only checks the registration.
 	 * `complete`: the file is registered in the folder.
-	 * `retry`: an attempt failed and the file will be sent again after `delayMs`.
+	 * `retry`: an attempt failed and the file will be sent again after `delayMs`, or, with
+	 * `waitingForOnline`, once the browser is back online.
 	 * `error`: the file failed for good; the upload goes on with the other files.
 	 */
 	type: "start" | "sent" | "complete" | "retry" | "error";
@@ -75,8 +76,14 @@ export type FolderUploadEvent = {
 	cid?: string;
 	/** `retry` and `error`: why the attempt failed */
 	error?: Error;
-	/** `retry`: how long until the next attempt */
+	/** `retry`: how long until the next attempt (0 with `waitingForOnline`) */
 	delayMs?: number;
+	/**
+	 * `retry`: the browser is offline (navigator.onLine is false). The next attempt starts
+	 * when it is back online, however long that takes, and this one is not counted against
+	 * `retries`. Cancel with `signal` to give up sooner.
+	 */
+	waitingForOnline?: boolean;
 	/** Files registered so far */
 	completed: number;
 	/** Files that failed for good so far */
@@ -114,11 +121,15 @@ export type FolderUploadOptions = UploadOptions & {
 	 */
 	signal?: AbortSignal;
 	/**
-	 * Called when the server refuses the JWT (401 or 403) during the upload: returns a new
-	 * one, which the SDK then uses as with setNewJwt, and the refused requests are sent
-	 * again. Called once per refused JWT, however many files it failed. Without it, or
-	 * when it returns nothing, the refused files fail, and so do the files not sent yet
-	 * until another JWT is set. Not used with `keys`.
+	 * Called when the server refuses the JWT (401 or 403) during the upload, the final
+	 * folder sync included: returns a new one, which the SDK then uses as with setNewJwt,
+	 * and the refused requests are sent again, without counting against `retries`. Called
+	 * once per refused JWT, however many files it failed. A file may be refused a renewed
+	 * JWT twice in a row without progress before it fails; any byte the server accepts
+	 * starts that count over, so a file can outlive many JWTs. Without it, or when it
+	 * returns nothing, the refused files fail, and so do the files not sent yet until
+	 * another JWT is set. A cancel (`signal`) doesn't wait for it to settle. Not used with
+	 * `keys`.
 	 */
 	refreshJwt?: () => Promise<string | undefined> | string | undefined;
 };
