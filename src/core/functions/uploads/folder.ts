@@ -55,7 +55,24 @@ export const uploadFolder = async (
 	};
 	const endpoint = config.uploadUrl || "https://uploads.pinata.cloud/v3";
 
-	const folderId = uuidv7();
+	if (
+		options?.folderId !== undefined &&
+		!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+			options.folderId,
+		)
+	) {
+		throw new ValidationError(
+			`The folder id must be a UUID: got "${options.folderId}"`,
+		);
+	}
+	const folderId = options?.folderId ?? uuidv7();
+	const signal = options?.signal;
+	// What a file fails with once the upload is cancelled
+	const cancelled = () => {
+		const error = new PinataError("The upload was cancelled");
+		error.name = "AbortError";
+		return error;
+	};
 	const createUrl = new URL(`${endpoint}/files/${folderId}`);
 	if (options?.cid_version !== undefined) {
 		createUrl.searchParams.set(
@@ -118,22 +135,32 @@ export const uploadFolder = async (
 		underWay.run(() => uploadOne(entry));
 	const uploadOne = async (entry: ResolvedEntry): Promise<void> => {
 		const { path, file } = entry;
+		const fail = (error: Error, attempt: number) => {
+			failed.push({ path, size: file.size, error });
+			emit({ type: "error", path, size: file.size, attempt, error });
+		};
 		// files-api leaves "%" unescaped in the upload URL, so checking the upload hits
 		// another path (404) and the file would be reported failed while it lands in the
 		// folder. Not sent until the server escapes it.
 		if (path.includes("%")) {
-			const error = new ValidationError(
-				`File paths containing "%" cannot be uploaded yet: "${path}"`,
+			fail(
+				new ValidationError(
+					`File paths containing "%" cannot be uploaded yet: "${path}"`,
+				),
+				0,
 			);
-			failed.push({ path, size: file.size, error });
-			emit({ type: "error", path, size: file.size, attempt: 0, error });
 			return;
 		}
 		for (let attempt = 1; ; attempt++) {
+			if (signal?.aborted) {
+				fail(cancelled(), attempt - 1);
+				return;
+			}
 			try {
 				// Only sending the bytes takes a slot: waiting for registration doesn't.
 				const stored = await slots.run(async () => {
 					if (fatal) throw fatal;
+					if (signal?.aborted) throw cancelled();
 					emit({ type: "start", path, size: file.size, attempt });
 					try {
 						return await sendResumable(
@@ -142,6 +169,7 @@ export const uploadFolder = async (
 							file,
 							`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
 							true,
+							signal,
 						);
 					} catch (error) {
 						// Before the slot goes to the next file, which must not be sent then.
@@ -152,7 +180,12 @@ export const uploadFolder = async (
 				// The file is in the folder once registered. It may be reported as an earlier
 				// upload when, alone, it matches one (a one-file folder of the same name and
 				// content): its object is in this folder all the same, and its CID is its own.
-				const registered = await registerResumable(stored, headers, file.size);
+				const registered = await registerResumable(
+					stored,
+					headers,
+					file.size,
+					signal,
+				);
 				const result = { path, size: file.size, cid: registered.cid as string };
 				uploaded.push(result);
 				emit({
@@ -164,17 +197,20 @@ export const uploadFolder = async (
 				});
 				return;
 			} catch (caught) {
+				if (signal?.aborted) {
+					fail(cancelled(), attempt);
+					return;
+				}
 				const error =
 					caught instanceof Error ? caught : new Error(String(caught));
 				noteFatal(error);
 				if (error === fatal || !isTransient(error) || attempt > retries) {
-					failed.push({ path, size: file.size, error });
-					emit({ type: "error", path, size: file.size, attempt, error });
+					fail(error, attempt);
 					return;
 				}
 				const delayMs = backoff(attempt);
 				emit({ type: "retry", path, size: file.size, attempt, error, delayMs });
-				await sleep(delayMs);
+				await sleep(delayMs, signal);
 			}
 		}
 	};
@@ -200,7 +236,7 @@ export const uploadFolder = async (
 		}
 		const [first] = pending.splice(pick, 1);
 		await uploadEntry(first);
-		if (uploaded.length > 0) break;
+		if (uploaded.length > 0 || signal?.aborted) break;
 		const { error } = failed[failed.length - 1];
 		const status = error instanceof PinataError ? error.statusCode : undefined;
 		const reason = `${status} ${error.message}`;
@@ -227,7 +263,8 @@ export const uploadFolder = async (
 	}
 
 	const folder = await syncFolder(endpoint, folderId, headers(), retries);
-	if (folder.number_of_files !== total) {
+	// At least these files: a folder uploaded into (folderId) also holds the earlier ones
+	if (folder.number_of_files < total) {
 		throw new NetworkError(
 			`Folder ${folderId} holds ${folder.number_of_files} of the ${total} uploaded files`,
 			0,
@@ -415,8 +452,18 @@ const isTransient = (error: Error): boolean => {
 const backoff = (attempt: number): number =>
 	Math.min(1000 * 2 ** (attempt - 1), 10000) + Math.floor(Math.random() * 500);
 
-const sleep = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
+// Resolves after `ms`, or as soon as `signal` aborts
+const sleep = (ms: number, signal?: AbortSignal) =>
+	new Promise<void>((resolve) => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const done = () => {
+			if (timer !== undefined) clearTimeout(timer);
+			signal?.removeEventListener("abort", done);
+			resolve();
+		};
+		signal?.addEventListener("abort", done, { once: true });
+		timer = setTimeout(done, ms);
+	});
 
 // Runs at most `limit` tasks at a time, in the order they ask.
 class Semaphore {

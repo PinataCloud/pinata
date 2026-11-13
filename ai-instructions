@@ -569,6 +569,9 @@ Response: "Revoked"
     concurrency?: number;   // files sending bytes at once (default 4)
     retries?: number;       // retries per file after a transient failure (default 3)
     onProgress?: (event: FolderUploadEvent) => void;
+    folderId?: string;      // upload into this folder (UUID): resend a FolderUploadError's
+                            // failed files with its folderId to complete that folder
+    signal?: AbortSignal;   // cancel: files not uploaded yet fail with an "AbortError"
   }
   type FolderUploadEvent = {
     type: "start" | "complete" | "retry" | "error";

@@ -86,6 +86,18 @@ export type FolderUploadOptions = UploadOptions & {
 	retries?: number;
 	/** Called for every file event, in order for each file. What it throws is ignored. */
 	onProgress?: (event: FolderUploadEvent) => void;
+	/**
+	 * The folder to upload into (a UUID). Defaults to a new one. Pass the `folderId` of a
+	 * FolderUploadError with its failed files to send them again into the same folder; a
+	 * file with a path already in the folder replaces it.
+	 */
+	folderId?: string;
+	/**
+	 * Cancels the upload: requests under way are aborted and files not uploaded yet fail with
+	 * an error named "AbortError". The files already uploaded stay in the folder, and the
+	 * upload rejects with a FolderUploadError.
+	 */
+	signal?: AbortSignal;
 };
 
 /** A file of an uploaded folder */

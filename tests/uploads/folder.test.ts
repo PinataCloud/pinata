@@ -766,6 +766,117 @@ describe("uploadFolder", () => {
 		expect(result.files[0].cid).toBe("bafyfile");
 	});
 
+	it("uploads into a given folder, so failed files can be sent again into it", async () => {
+		const { created } = server();
+		const folderId = "01a1d1d0-c031-7430-8e84-34db001732c0";
+
+		await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/sub/b.txt", file: file("bb") },
+			],
+			"private",
+			{ folderId },
+		);
+
+		expect(created.map((c) => c.folderId)).toEqual([folderId, folderId]);
+	});
+
+	it("sends failed files again into their folder, which then holds every file", async () => {
+		const { created } = server((creation, n) =>
+			n === 1 ? refused(503, "Service Unavailable") : undefined,
+		);
+		const files = [
+			{ path: "d/a.txt", file: file("a") },
+			{ path: "d/b.txt", file: file("bb") },
+			{ path: "d/c.txt", file: file("ccc") },
+		];
+
+		const error = await uploadFolder(config, files, "private", {
+			retries: 0,
+			concurrency: 1,
+		}).catch((e) => e);
+		expect(error).toBeInstanceOf(FolderUploadError);
+		const retry = files.filter((f) =>
+			error.failed.some((x: { path: string }) => x.path === f.path),
+		);
+
+		const result = await uploadFolder(config, retry, "private", {
+			folderId: error.folderId,
+		});
+
+		expect(result).toMatchObject({ id: error.folderId, number_of_files: 3 });
+		expect(new Set(created.map((c) => c.folderId))).toEqual(
+			new Set([error.folderId]),
+		);
+	});
+
+	it("refuses a folder id that is not a UUID", async () => {
+		const { created } = server();
+		await expect(
+			uploadFolder(config, [{ path: "d/a.txt", file: file("a") }], "private", {
+				folderId: "../x",
+			}),
+		).rejects.toBeInstanceOf(ValidationError);
+		expect(created).toHaveLength(0);
+	});
+
+	it("stops sending files once cancelled, keeping the ones already uploaded", async () => {
+		const { created } = server();
+		const controller = new AbortController();
+		const events: string[] = [];
+
+		const error = await uploadFolder(
+			config,
+			Array.from({ length: 5 }, (_, i) => ({
+				path: `d/${i}.txt`,
+				file: file("x".repeat(i + 1)),
+			})),
+			"private",
+			{
+				concurrency: 1,
+				signal: controller.signal,
+				onProgress: (e) => {
+					events.push(`${e.type} ${e.path}`);
+					// Cancel once the first file is in
+					if (e.type === "complete" && e.completed === 1) controller.abort();
+				},
+			},
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.folderId).toBe(created[0].folderId);
+		expect(error.uploaded.map((f: { path: string }) => f.path)).toEqual([
+			"d/0.txt",
+		]);
+		expect(error.failed.map((f: { error: Error }) => f.error.name)).toEqual([
+			"AbortError",
+			"AbortError",
+			"AbortError",
+			"AbortError",
+		]);
+		expect(created).toHaveLength(1);
+		expect(events.filter((e) => e.startsWith("error"))).toHaveLength(4);
+	});
+
+	it("sends nothing when cancelled before it starts", async () => {
+		const { created } = server();
+		const controller = new AbortController();
+		controller.abort();
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"private",
+			{ signal: controller.signal },
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.failed[0].error.name).toBe("AbortError");
+		expect(created).toHaveLength(0);
+	});
+
 	it("refuses options a folder upload cannot honor", async () => {
 		server();
 		await expect(

@@ -26,12 +26,14 @@ export interface StoredUpload {
 // failed chunks from the offset the server reports. Returns once the server has all of it.
 // With `inline`, a file that fits in one request travels with the creation request
 // (TUS creation-with-upload), so a small file takes one request instead of two.
+// `signal` cancels it: the request under way is aborted and it rejects with the reason.
 export const sendResumable = async (
 	createUrl: string,
 	headers: RequestHeaders,
 	file: File,
 	metadata: string,
 	inline = false,
+	signal?: AbortSignal,
 ): Promise<StoredUpload> => {
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
 	const urlReq = await fetch(createUrl, {
@@ -48,6 +50,7 @@ export const sendResumable = async (
 			Prefer: "respond-async",
 		},
 		...(withBody ? { body: file } : {}),
+		signal,
 	});
 	const url = urlReq.headers.get("Location");
 	if (!url) {
@@ -103,6 +106,7 @@ export const sendResumable = async (
 						...resolveHeaders(headers),
 					},
 					body: chunk,
+					signal,
 				});
 
 				if (uploadReq.ok) {
@@ -135,6 +139,7 @@ export const sendResumable = async (
 					};
 				}
 			} catch (error) {
+				if (signal?.aborted) throw signal.reason;
 				failure = {
 					status: 0,
 					error: error instanceof Error ? error.message : String(error),
@@ -176,11 +181,12 @@ export const sendResumable = async (
 			}
 			const delay = Math.min(1000 * Math.pow(2, failures - 1), 10000); // Cap at 10 seconds
 			await new Promise((resolve) => setTimeout(resolve, delay));
+			if (signal?.aborted) throw signal.reason;
 
 			// The failed PATCH may have been stored, in full or in part, before its
 			// response was lost. Ask the server where the upload stands and continue
 			// from there, instead of resending at our own offset (TUS: HEAD after a failure).
-			const status = await getUploadStatus(url, headers, file.size);
+			const status = await getUploadStatus(url, headers, file.size, signal);
 			if (status) {
 				// The server stored more of the upload, so this retry made progress. Reset
 				// the retry budget and the backoff, as tus-js-client does.
