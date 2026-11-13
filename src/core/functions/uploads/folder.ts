@@ -210,6 +210,8 @@ export const uploadFolder = async (
 		// Kept across attempts: once every byte is stored, an attempt only waits for the
 		// file's registration again
 		let stored: StoredUpload | undefined;
+		// An upload an attempt left unfinished, which the next one continues
+		let unfinished: string | undefined;
 		// Failed attempts counted against `retries`: not those made while offline, nor those
 		// refused a JWT since replaced (at most MAX_RENEWALS of them)
 		let spent = 0;
@@ -238,6 +240,7 @@ export const uploadFolder = async (
 								`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
 								true,
 								signal,
+								unfinished,
 							);
 						} catch (error) {
 							// Before the slot goes to the next file, which must not be sent with a
@@ -293,6 +296,9 @@ export const uploadFolder = async (
 				}
 				const error =
 					caught instanceof Error ? caught : new Error(String(caught));
+				if (error instanceof PinataError) {
+					unfinished = error.details?.metadata?.uploadUrl ?? unfinished;
+				}
 				const renewed = await renewJwt(error, jwt);
 				// No answer while the browser is offline: the next attempt waits until it is
 				// back online, and this one is not counted

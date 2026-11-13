@@ -28,6 +28,8 @@ export interface StoredUpload {
 // With `inline`, a file that fits in one request travels with the creation request
 // (TUS creation-with-upload), so a small file takes one request instead of two.
 // `signal` cancels it: the request under way is aborted and it rejects with the reason.
+// `resumeUrl`, the uploadUrl of an error an earlier call threw, continues that upload from
+// where the server stands, if the server still has it; else a new upload is created.
 export const sendResumable = async (
 	createUrl: string,
 	headers: RequestHeaders,
@@ -35,7 +37,28 @@ export const sendResumable = async (
 	metadata: string,
 	inline = false,
 	signal?: AbortSignal,
+	resumeUrl?: string,
 ): Promise<StoredUpload> => {
+	if (resumeUrl) {
+		const status = await getUploadStatus(
+			resumeUrl,
+			headers,
+			file.size,
+			signal,
+		).catch(() => undefined);
+		if (signal?.aborted) throw signal.reason;
+		if (status) {
+			const upload: StoredUpload = {
+				url: resumeUrl,
+				cid: status.cid,
+				status: status.status,
+				metadata: status.metadata,
+			};
+			return status.offset === file.size
+				? upload
+				: sendChunks(upload, status.offset, headers, file, signal);
+		}
+	}
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
 	let urlReq: Response;
 	try {
@@ -91,7 +114,21 @@ export const sendResumable = async (
 		upload.metadata = urlReq.headers.get("upload-metadata");
 		return upload;
 	}
+	return sendChunks(upload, offset, headers, file, signal);
+};
 
+// Sends the bytes of `file` from `offset` on to the upload, resuming after failed chunks
+// from the offset the server reports. What it throws holds the upload's URL (uploadUrl) to
+// continue it later.
+const sendChunks = async (
+	upload: StoredUpload,
+	start: number,
+	headers: RequestHeaders,
+	file: File,
+	signal?: AbortSignal,
+): Promise<StoredUpload> => {
+	const { url } = upload;
+	let offset = start;
 	let failures = 0;
 	// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
 	const chunks = new FileChunks(file, CHUNK_SIZE);
@@ -187,6 +224,7 @@ export const sendResumable = async (
 							code: failure.status ? "HTTP_ERROR" : "NETWORK_ERROR",
 							metadata: {
 								requestUrl: failure.requestUrl,
+								uploadUrl: url,
 								...(permanent ? {} : { retriesAttempted: MAX_RETRIES }),
 								retryAfterMs: failure.retryAfterMs,
 							},

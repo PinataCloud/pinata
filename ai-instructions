@@ -605,7 +605,8 @@ Response: "Revoked"
   If the first file fails for a reason of its own (path, type, size), the next one
   creates the folder; any other failure of the first file stops the upload.
   A file whose bytes are stored but whose registration check fails is checked again on
-  retry, not sent again. A HEAD the server refuses for good (4xx) fails the file at once.
+  retry, not sent again; a file whose chunks failed is continued on retry from the offset
+  the server holds, not sent from the start. A HEAD the server refuses for good (4xx) fails the file at once.
   A one-file folder matching an earlier one is merged into it by the server (sync: 404):
   the upload resolves with that folder and is_duplicate.
 
