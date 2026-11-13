@@ -5,17 +5,8 @@ import {
 	AuthenticationError,
 	ValidationError,
 } from "../../../utils/custom-errors";
-import {
-	getUploadStatus,
-	parseUploadOffset,
-	waitForRegistration,
-} from "./tusStatus";
-import { FileChunks } from "./fileChunks";
-import {
-	encodeMetadataValue,
-	parseUploadMetadata,
-	serverReason,
-} from "./tusMetadata";
+import { registerResumable, registersLater, sendResumable } from "./resumable";
+import { encodeMetadataValue, parseUploadMetadata } from "./tusMetadata";
 
 export const uploadFile = async (
 	config: PinataConfig | undefined,
@@ -98,169 +89,18 @@ export const uploadFile = async (
 			);
 		}
 
-		const urlReq = await fetch(requestUrl.toString(), {
-			method: "POST",
-			headers: {
-				"Upload-Length": `${file.size}`,
-				"Upload-Metadata": metadata,
-				...headers,
-				// RFC 7240: this client accepts that the server registers the file after the
-				// last PATCH, and waits for `ready` (see waitForRegistration).
-				Prefer: "respond-async",
-			},
-		});
-		const url = urlReq.headers.get("Location");
-		if (!url) {
-			const errorData = await urlReq.text().catch(() => "");
-			const reason = serverReason(errorData);
-			throw new NetworkError(
-				urlReq.ok
-					? `Upload URL not provided: the server answered ${urlReq.status} without a Location header`
-					: `Could not start the upload (HTTP ${urlReq.status})${reason ? `: ${reason}` : ""}`,
-				urlReq.status,
-				{
-					error: errorData,
-					code: "HTTP_ERROR",
-					metadata: {
-						requestUrl: urlReq.url,
-						requestHeaders: urlReq.headers,
-					},
-				},
-			);
-		}
-
-		const chunkSize = 50 * 1024 * 1024 + 1; // 50MB in bytes
-		const maxRetries = 5;
-		let offset = 0;
-		let failures = 0;
-		let cid: string | null = null;
-		let uploadStatus: string | null = null;
-		// Upload-Metadata of the response that reported the upload done
-		let completion: string | null = null;
-
-		// Not file.slice() alone: Node's Blob breaks past 2^32 bytes (see FileChunks).
-		const chunks = new FileChunks(file, chunkSize);
-
-		try {
-			while (offset < file.size) {
-				// The rest of the chunk that holds `offset`: after a PATCH that stored only part
-				// of a chunk, the next one resends the remainder.
-				const chunk = await chunks.at(offset);
-				const chunkLength =
-					chunk instanceof Uint8Array ? chunk.byteLength : chunk.size;
-				let failure: { status: number; error: string; requestUrl: string };
-
-				try {
-					const uploadReq = await fetch(url, {
-						method: "PATCH",
-						headers: {
-							"Content-Type": "application/offset+octet-stream",
-							"Upload-Offset": offset.toString(),
-							...headers,
-						},
-						body: chunk,
-					});
-
-					if (uploadReq.ok) {
-						// The server's Upload-Offset wins over our own count: it can be lower than
-						// the end of this chunk (only part of the body was stored) or the full length
-						// (the server replayed an upload that had already finished).
-						const next =
-							parseUploadOffset(uploadReq.headers, file.size) ??
-							offset + chunkLength;
-						if (next > offset) {
-							offset = next;
-							failures = 0;
-							if (offset === file.size) {
-								cid = uploadReq.headers.get("upload-cid");
-								uploadStatus = uploadReq.headers.get("upload-status");
-								completion = uploadReq.headers.get("upload-metadata");
-							}
-							continue;
-						}
-						failure = {
-							status: uploadReq.status,
-							error: "the server did not accept any bytes of the chunk",
-							requestUrl: uploadReq.url || url,
-						};
-					} else {
-						failure = {
-							status: uploadReq.status,
-							error: await uploadReq.text().catch(() => "Unknown error"),
-							requestUrl: uploadReq.url || url,
-						};
-					}
-				} catch (error) {
-					failure = {
-						status: 0,
-						error: error instanceof Error ? error.message : String(error),
-						requestUrl: url,
-					};
-				}
-
-				failures++;
-				if (failures > maxRetries) {
-					throw new NetworkError(
-						`HTTP error during chunk upload after ${maxRetries} retries: ${failure.error}`,
-						failure.status,
-						{
-							error: failure.error,
-							code: "HTTP_ERROR",
-							metadata: {
-								requestUrl: failure.requestUrl,
-								retriesAttempted: maxRetries,
-							},
-						},
-					);
-				}
-				const delay = Math.min(1000 * Math.pow(2, failures - 1), 10000); // Cap at 10 seconds
-				await new Promise((resolve) => setTimeout(resolve, delay));
-
-				// The failed PATCH may have been stored, in full or in part, before its
-				// response was lost. Ask the server where the upload stands and continue
-				// from there, instead of resending at our own offset (TUS: HEAD after a failure).
-				const status = await getUploadStatus(url, headers, file.size);
-				if (status) {
-					// The server stored more of the upload, so this retry made progress. Reset
-					// the retry budget and the backoff, as tus-js-client does.
-					if (status.offset > offset) {
-						failures = 0;
-					}
-					offset = status.offset;
-					if (offset === file.size) {
-						cid = status.cid;
-						uploadStatus = status.status;
-						completion = status.metadata;
-					}
-				}
-			}
-		} finally {
-			await chunks.close();
-		}
-
-		// A server that sends Upload-Status registers the file after its last byte, and
-		// may already return the CID: only `ready` means the file can be looked up.
-		const registersLater = uploadStatus !== null && uploadStatus !== "ready";
-		const skipWait = registersLater && options?.waitForCid === false;
-		if (registersLater && !skipWait) {
-			const ready = await waitForRegistration(url, headers, file.size);
-			cid = ready.cid;
-			completion = ready.metadata;
-		}
-
-		if (!cid && !skipWait) {
-			throw new NetworkError(
-				"The server has every byte of the upload, but did not return its CID",
-				0,
-				{
-					error: "missing upload-cid",
-					code: "HTTP_ERROR",
-					metadata: {
-						requestUrl: url,
-					},
-				},
-			);
-		}
+		const stored = await sendResumable(
+			requestUrl.toString(),
+			headers,
+			file,
+			metadata,
+		);
+		const skipWait = registersLater(stored) && options?.waitForCid === false;
+		const registered = skipWait
+			? stored
+			: await registerResumable(stored, headers, file.size);
+		const cid = registered.cid;
+		const completion = registered.metadata;
 
 		// Without the registered file to look up (no JWT, or waitForCid: false), return
 		// what the upload itself reported. A server that registered the file can report its
@@ -268,11 +108,11 @@ export const uploadFile = async (
 		// so they are only taken from there, never from the request. Not the type: the server's
 		// Upload-Content-Type is detected from this upload, even when it returns an earlier file.
 		if (!config.pinataJwt || skipWait) {
-			const registered = parseUploadMetadata(completion);
-			const known = registered.file_id !== undefined;
+			const reported = parseUploadMetadata(completion);
+			const known = reported.file_id !== undefined;
 			const data: UploadResponse = {
-				id: known ? registered.file_id : "",
-				name: known ? (registered.filename ?? "") : "",
+				id: known ? reported.file_id : "",
+				name: known ? (reported.filename ?? "") : "",
 				cid: cid ?? "",
 				size: file.size,
 				created_at: "",
