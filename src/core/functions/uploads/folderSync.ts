@@ -1,4 +1,5 @@
-// The final sync of a folder upload, which computes the folder's CID.
+// The folder of a folder upload on the server: whether it exists, and the final sync, which
+// computes its CID.
 
 import type { PinataError } from "../../../utils/custom-errors";
 import { MAX_RENEWALS } from "./folderAuth";
@@ -33,6 +34,29 @@ export interface SyncedFolder {
 	/** The folder's content was already uploaded: this is that earlier folder */
 	is_duplicate?: boolean;
 }
+
+// Whether the folder `folderId` exists: its file record answers 200, or 404 when there is
+// none. Undefined when that can't be told: no answer, any other status, or a cancel.
+export const folderExists = async (
+	apiUrl: string,
+	network: "public" | "private",
+	folderId: string,
+	headers: Record<string, string>,
+	signal?: AbortSignal,
+): Promise<boolean | undefined> => {
+	try {
+		const res = await fetch(`${apiUrl}/files/${network}/${folderId}`, {
+			method: "GET",
+			headers,
+			signal,
+		});
+		await res.body?.cancel().catch(() => undefined);
+		if (res.status === 200) return true;
+		return res.status === 404 ? false : undefined;
+	} catch {
+		return undefined;
+	}
+};
 
 // Computes the folder's CID from every registered file and says how many files it holds.
 // `renew`, after a refusal: true if another JWT is now in use (see FolderCredentials).

@@ -1,10 +1,6 @@
-import {
-	NetworkError,
-	PinataError,
-	ValidationError,
-} from "../../../utils/custom-errors";
+import { NetworkError, PinataError } from "../../../utils/custom-errors";
 import type { CidVersion } from "../../types";
-import { FileChunks } from "./fileChunks";
+import { FileChunks, holdsMore } from "./fileChunks";
 import {
 	backoff,
 	isFinalRefusal,
@@ -125,12 +121,13 @@ export const sendResumable = async (
 		}
 	}
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
-	// The file is the body of the creation request, once its stream is found to hold exactly
-	// its size: fs.openAsBlob() reports a file past 4 GiB modulo 2^32, and a body of `size`
-	// bytes would complete a truncated upload. The SDK copies nothing: a file on disk is read
-	// as it is sent (Node's fetch still holds the body it sent until the request ends). A
-	// size of 0 completes the upload at once: the same check makes sure there are no bytes.
-	if (withBody || file.size === 0) await assertSize(file);
+	// The file is the body of the creation request, once found to hold no bytes past its size
+	// (holdsMore reads 2 bytes): fs.openAsBlob() reports a file past 4 GiB modulo 2^32, and a
+	// body of `size` bytes would complete a truncated upload. The file is not read ahead:
+	// fetch reads it as it sends it. A size of 0 completes the upload at once: its stream must
+	// end without a byte.
+	if (withBody && (await holdsMore(file))) throw largerThanSize(file.size);
+	if (file.size === 0) await assertEmpty(file);
 	let urlReq: Response;
 	try {
 		urlReq = await fetch(createUrl, {
@@ -395,25 +392,18 @@ const storedFromStatus = (url: string, status: UploadStatus): StoredUpload => ({
 	completedBy: "lookup",
 });
 
-// Throws unless the stream of `file` holds exactly `file.size` bytes. Reads it to the end
-// and drops each piece once counted: sendResumable only calls it for files of one chunk.
-const assertSize = async (file: Blob) => {
+// Throws if the stream of a file whose size is 0 holds a byte. Reads at most its first
+// piece that holds any.
+const assertEmpty = async (file: Blob) => {
 	const reader = file.stream().getReader();
-	let read = 0;
 	try {
 		for (;;) {
 			const { done, value } = await reader.read();
-			if (done) break;
-			read += value.byteLength;
-			if (read > file.size) throw largerThanSize(file.size);
+			if (done) return;
+			if (value.byteLength > 0) throw largerThanSize(0);
 		}
 	} finally {
 		await reader.cancel().catch(() => undefined);
-	}
-	if (read < file.size) {
-		throw new ValidationError(
-			`The file is smaller than its reported size: its stream ended after ${read} of ${file.size} bytes`,
-		);
 	}
 };
 

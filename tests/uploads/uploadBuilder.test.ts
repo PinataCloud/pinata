@@ -107,4 +107,20 @@ describe("UploadBuilder", () => {
 			metadata: { name: "from-options", keyvalues: { team: "docs" } },
 		});
 	});
+
+	it("sends no name with a CID pinned without one, and the name given otherwise", async () => {
+		const bodies: Record<string, unknown>[] = [];
+		global.fetch = jest.fn(async (_url: string, init: RequestInit) => {
+			bodies.push(JSON.parse(init.body as string));
+			return new Response(JSON.stringify({ data: { id: "1" } }), {
+				status: 200,
+			});
+		}) as unknown as typeof fetch;
+
+		await new PublicUpload(config).cid("bafyabc");
+		await new PublicUpload(config).cid("bafyabc").name("given");
+
+		expect(bodies[0]).not.toHaveProperty("name");
+		expect(bodies[1].name).toBe("given");
+	});
 });

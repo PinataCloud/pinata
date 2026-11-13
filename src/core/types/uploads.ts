@@ -55,7 +55,8 @@ export type FolderEntry = {
 /** What happened to one file of a folder upload. */
 export type FolderUploadEvent = {
 	/**
-	 * `start`: the file's bytes start to be sent (again on each attempt).
+	 * `start`: the file's bytes start to be sent (again on each attempt that sends bytes;
+	 * not on one that only checks the registration again).
 	 * `sent`: the server has every byte of the file and is registering it (it may take
 	 * seconds to minutes: the server is processing the file), then `complete`, `retry` or
 	 * `error`. Again on each attempt, also on one that only checks the registration.
@@ -103,7 +104,11 @@ export type FolderUploadEvent = {
 	total: number;
 };
 
-export type FolderUploadOptions = UploadOptions & {
+/** The upload options without those folder uploads refuse */
+export type FolderUploadOptions = Omit<
+	UploadOptions,
+	"url" | "vectorize" | "car" | "streamable" | "peerAddresses" | "waitForCid"
+> & {
 	/**
 	 * How many files send their bytes at the same time. Defaults to 4. Files whose bytes are
 	 * stored wait for the server to register them without holding one of these; at most
@@ -112,7 +117,7 @@ export type FolderUploadOptions = UploadOptions & {
 	concurrency?: number;
 	/**
 	 * How many times a file is sent again after a transient failure (no answer, 408, 409,
-	 * 425, 429 or 5xx), after a growing pause or the one the server asks for (Retry-After,
+	 * 423, 425, 429 or 5xx), after a growing pause or the one the server asks for (Retry-After,
 	 * up to 5 minutes). Attempts that fail while the browser is offline do not count: the
 	 * next one waits until it is back online. Defaults to 3. Also how many times the final
 	 * sync of the folder is sent again, except while the server is rate limited (429, or a
@@ -124,8 +129,10 @@ export type FolderUploadOptions = UploadOptions & {
 	/**
 	 * The folder to upload into (a UUID). Defaults to a new one. Pass the `folderId` of a
 	 * FolderUploadError with its failed files to send them again into the same folder; a
-	 * file with a path already in the folder replaces it. The folder exists, so every file is
-	 * sent at once (a new folder is created by one file first).
+	 * file with a path already in the folder replaces it. The SDK first asks whether the
+	 * folder exists (one request for its file record): if it does, every file is sent at
+	 * once. If it doesn't, or that can't be told, one file creates it first, as for a new
+	 * folder.
 	 */
 	folderId?: string;
 	/**

@@ -2,7 +2,11 @@
 // paths of its files.
 
 import { ValidationError } from "../../../utils/custom-errors";
-import type { FolderEntry, FolderUploadOptions } from "../../types";
+import type {
+	FolderEntry,
+	FolderUploadOptions,
+	UploadOptions,
+} from "../../types";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RETRIES = 3;
@@ -16,7 +20,7 @@ export interface ResolvedEntry {
 	file: File;
 }
 
-export const rejectUnsupported = (options?: FolderUploadOptions) => {
+export const rejectUnsupported = (options?: UploadOptions) => {
 	const unsupported = [
 		options?.vectorize && "vectorize",
 		options?.url && "url (signed upload URLs)",

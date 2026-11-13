@@ -9,6 +9,15 @@ import {
 } from "../../src/utils/custom-errors";
 import { registrationTimeout } from "../../src/core/functions/uploads/tusStatus";
 import { NodeLikeFile } from "./nodeLikeFile";
+import {
+	closeSync,
+	ftruncateSync,
+	openAsBlob,
+	openSync,
+	rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { decodeMetadata } from "./uploadMetadata";
 
 const config: PinataConfig = {
@@ -31,9 +40,20 @@ const encode = (value: string) => Buffer.from(value, "utf8").toString("base64");
 
 type Handler = (url: string, init: RequestInit) => Promise<Response>;
 
-// Answers every request with `handler`
+// Where a folder upload given a folderId looks up whether the folder exists
+const FOLDER_RECORDS = "https://api.pinata.cloud/v3/files/";
+const folderFound = async () =>
+	new Response(JSON.stringify({ data: {} }), { status: 200 });
+// How a lookup of a given folder answers: found, unless a test says otherwise
+let lookUpFolder: Handler = folderFound;
+
+// Answers every request with `handler`, but the lookups of a given folder with lookUpFolder
 const mockFetch = (handler: Handler) => {
-	const fetchMock = jest.fn(handler);
+	const fetchMock = jest.fn((url: string, init: RequestInit) =>
+		init.method === "GET" && url.startsWith(FOLDER_RECORDS)
+			? lookUpFolder(url, init)
+			: handler(url, init),
+	);
 	global.fetch = fetchMock as unknown as typeof fetch;
 	return fetchMock;
 };
@@ -165,6 +185,24 @@ const server = (
 	};
 };
 
+// Calls `use` with a sparse file of `size` bytes opened with fs.openAsBlob(), which reports
+// a size past 4 GiB modulo 2^32, then removes the file
+const withFileOnDisk = async <T>(
+	size: number,
+	use: (file: File) => Promise<T>,
+): Promise<T> => {
+	const path = join(tmpdir(), `folder-${process.pid}-${size}.bin`);
+	const fd = openSync(path, "w");
+	try {
+		ftruncateSync(fd, size);
+		closeSync(fd);
+		const blob = await openAsBlob(path);
+		return await use(new File([blob], "disk.bin"));
+	} finally {
+		rmSync(path, { force: true });
+	}
+};
+
 // The size of a resumable upload's chunk, and a file just over one chunk
 const CHUNK = 50 * 1024 * 1024 + 1;
 const big = () =>
@@ -194,6 +232,7 @@ describe("uploadFolder", () => {
 	let setTimeoutSpy: jest.SpyInstance;
 	beforeEach(() => {
 		delays = [];
+		lookUpFolder = folderFound;
 		setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
 			callback: () => void,
 			ms: number,
@@ -518,8 +557,10 @@ describe("uploadFolder", () => {
 			expect(created.map((c) => c.path)).toEqual(["d/a.txt", "d/a.txt"]);
 		});
 
-		it("sends every file into a given folder at once, without waiting for a first one", async () => {
+		it("sends every file into a given folder that exists at once, without waiting for a first one", async () => {
 			server();
+			const lookups = jest.fn(folderFound);
+			lookUpFolder = lookups;
 			const events: string[] = [];
 
 			await uploadFolder(
@@ -535,10 +576,162 @@ describe("uploadFolder", () => {
 				},
 			);
 
+			// One lookup of the folder's record, with the upload's JWT
+			expect(lookups).toHaveBeenCalledTimes(1);
+			const [url, init] = lookups.mock.calls[0] as unknown as [
+				string,
+				RequestInit,
+			];
+			expect(url).toBe(`${FOLDER_RECORDS}public/${givenFolderId}`);
+			expect(headersOf(init).Authorization).toBe("Bearer test-jwt");
 			// The second file starts while the first is under way, not once it is registered
 			expect(events.indexOf("start d/second.txt")).toBeLessThan(
 				events.indexOf("complete d/first.txt"),
 			);
+		});
+
+		// The events of uploading d/first.txt and d/second.txt into the given folder
+		const eventsOfTwoFiles = async () => {
+			server();
+			const events: string[] = [];
+			await uploadFolder(
+				config,
+				[
+					{ path: "d/first.txt", file: file("a") },
+					{ path: "d/second.txt", file: file("bb") },
+				],
+				"public",
+				{
+					folderId: givenFolderId,
+					onProgress: (e) => events.push(`${e.type} ${e.path}`),
+				},
+			);
+			return events;
+		};
+
+		it("creates a given folder the server doesn't have with a first file, as a new one", async () => {
+			lookUpFolder = async () => refused(404, "Not found");
+
+			const events = await eventsOfTwoFiles();
+
+			expect(events.indexOf("start d/second.txt")).toBeGreaterThan(
+				events.indexOf("complete d/first.txt"),
+			);
+		});
+
+		it.each([
+			["answers 500", async () => refused(500, "Internal error")],
+			["is refused the JWT", async () => refused(401, "Not Authorized")],
+			[
+				"gets no answer",
+				async (): Promise<Response> => {
+					throw new TypeError("fetch failed");
+				},
+			],
+		])(
+			"creates a given folder with a first file when looking it up %s",
+			async (_, lookup) => {
+				lookUpFolder = lookup;
+
+				const events = await eventsOfTwoFiles();
+
+				expect(events.indexOf("start d/second.txt")).toBeGreaterThan(
+					events.indexOf("complete d/first.txt"),
+				);
+			},
+		);
+
+		it("fails every file of a given folder the server doesn't have when its first file fails", async () => {
+			lookUpFolder = async () => refused(404, "Not found");
+			const { created } = server(() => refused(503, "Service Unavailable"));
+			const events: FolderUploadEvent[] = [];
+
+			const error = await uploadFolder(
+				config,
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/b.txt", file: file("bb") },
+					{ path: "d/c.txt", file: file("ccc") },
+				],
+				"public",
+				{
+					folderId: givenFolderId,
+					retries: 0,
+					onProgress: (e) => events.push(e),
+				},
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.folderId).toBe(givenFolderId);
+			expect(error.folderName).toBe("d");
+			expect(error.failed).toHaveLength(3);
+			for (const failed of error.failed) {
+				expect(failed.error.statusCode).toBe(503);
+			}
+			// The first file alone was sent; the others fail unsent
+			expect(created.map((c) => c.path)).toEqual(["d/a.txt"]);
+			for (const path of ["d/b.txt", "d/c.txt"]) {
+				expect(
+					events
+						.filter((e) => e.path === path)
+						.map((e) => `${e.type} ${e.attempt}`),
+				).toEqual(["error 0"]);
+			}
+		});
+
+		it("doesn't stop a given folder the server didn't have when files in a row fail alike", async () => {
+			lookUpFolder = async () => refused(404, "Not found");
+			server((creation) =>
+				["d/b.txt", "d/c.txt", "d/d.txt"].includes(creation.path)
+					? refused(422, "Unsupported file")
+					: undefined,
+			);
+
+			const error = await uploadFolder(
+				config,
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/b.txt", file: file("bb") },
+					{ path: "d/c.txt", file: file("bb") },
+					{ path: "d/d.txt", file: file("bb") },
+					{ path: "d/e.txt", file: file("ccc") },
+				],
+				"public",
+				{ folderId: givenFolderId, concurrency: 1 },
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(
+				error.uploaded.map((f: { path: string }) => f.path).sort(),
+			).toEqual(["d/a.txt", "d/e.txt"]);
+		});
+
+		it("keeps sending the files of a given folder after files in a row refused for their size", async () => {
+			server((creation) =>
+				creation.path.startsWith("d/big")
+					? refused(413, "Upload exceeds authorized size limit")
+					: undefined,
+			);
+
+			const error = await uploadFolder(
+				config,
+				["big1", "big2", "big3", "s1", "s2", "s3"].map((name) => ({
+					path: `d/${name}.bin`,
+					file: file("x"),
+				})),
+				"public",
+				{ folderId: givenFolderId, concurrency: 1 },
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.failed.map((f: { path: string }) => f.path)).toEqual([
+				"d/big1.bin",
+				"d/big2.bin",
+				"d/big3.bin",
+			]);
+			expect(
+				error.uploaded.map((f: { path: string }) => f.path).sort(),
+			).toEqual(["d/s1.bin", "d/s2.bin", "d/s3.bin"]);
 		});
 
 		it("reports the failed files of a given folder like any partial failure, after trying every file", async () => {
@@ -793,6 +986,7 @@ describe("uploadFolder", () => {
 			server();
 			await expect(
 				uploadFolder(config, [{ path: "d/a.txt", file: file("a") }], "public", {
+					// @ts-expect-error: refused at compile time, and at run time for JavaScript
 					vectorize: true,
 					waitForCid: false,
 				}),
@@ -911,18 +1105,14 @@ describe("uploadFolder", () => {
 				return registeredAt(url, init);
 			});
 
-			// A file on disk read in pieces: 2 MiB of bytes, 1 MiB reported (fs.openAsBlob past
-			// 4 GiB reports its size modulo 2^32)
-			const liar = NodeLikeFile.of({
-				length: 2 * 1024 * 1024,
-				reported: 1024 * 1024,
-				disk: true,
-			});
-			const error = await uploadFolder(
-				config,
-				[{ path: "d/big.bin", file: liar }],
-				"public",
-			).catch((e) => e);
+			// A file on disk of 4 GiB and 1 MiB: fs.openAsBlob reports its size modulo 2^32
+			const error = await withFileOnDisk(2 ** 32 + 1024 * 1024, (liar) =>
+				uploadFolder(
+					config,
+					[{ path: "d/big.bin", file: liar }],
+					"public",
+				).catch((e) => e),
+			);
 
 			expect(error).toBeInstanceOf(ValidationError);
 			expect(error.message).toContain("larger than its reported size");
@@ -975,15 +1165,18 @@ describe("uploadFolder", () => {
 
 			// A Buffer, then a file on disk of 4 GiB (fs.openAsBlob reports 0 bytes): every
 			// slice() of the File ends with the Buffer
-			const mixed = NodeLikeFile.of(
-				{ length: 1024 * 1024 },
-				{ length: 2 ** 32, reported: 0, disk: true },
+			const error = await withFileOnDisk(2 ** 32, (disk) =>
+				uploadFolder(
+					config,
+					[
+						{
+							path: "d/mixed.bin",
+							file: new File([new Uint8Array(1024 * 1024), disk], "mixed.bin"),
+						},
+					],
+					"public",
+				).catch((e) => e),
 			);
-			const error = await uploadFolder(
-				config,
-				[{ path: "d/mixed.bin", file: mixed }],
-				"public",
-			).catch((e) => e);
 
 			expect(error).toBeInstanceOf(ValidationError);
 			expect(error.message).toContain("larger than its reported size");
@@ -1742,6 +1935,40 @@ describe("uploadFolder", () => {
 			});
 		});
 
+		it("reports the failed files without waiting when the sync of the partly uploaded folder is rate limited", async () => {
+			const { fetchMock, respond } = server((creation) =>
+				creation.path === "d/bad.txt"
+					? refused(400, "invalid name")
+					: undefined,
+			);
+			let syncs = 0;
+			fetchMock.mockImplementation(async (url, init) => {
+				if (init.method !== "PUT") return respond(url, init);
+				syncs++;
+				return new Response("Too many requests", {
+					status: 429,
+					headers: { "Retry-After": "300" },
+				});
+			});
+
+			const error = await uploadFolder(
+				config,
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/bad.txt", file: file("bad") },
+				],
+				"public",
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(FolderUploadError);
+			expect(error.failed.map((f: { path: string }) => f.path)).toEqual([
+				"d/bad.txt",
+			]);
+			expect(error.folder).toBeUndefined();
+			expect(syncs).toBe(1);
+			expect(delays).toEqual([]);
+		});
+
 		it("keeps why files failed when the partly uploaded folder cannot be synced", async () => {
 			const { fetchMock, respond } = server((creation) =>
 				creation.path === "d/bad.txt"
@@ -2484,14 +2711,26 @@ describe("uploadFolder", () => {
 					return registration("ready");
 				});
 
+				const events: string[] = [];
 				const result = await uploadFolder(
 					live(),
 					[{ path: "d/a.txt", file: file("a") }],
 					"public",
-					{ refreshJwt: () => "new-jwt" },
+					{
+						refreshJwt: () => "new-jwt",
+						onProgress: (e) => events.push(`${e.type} ${e.attempt}`),
+					},
 				);
 
 				expect(result.files[0].cid).toBe("bafyfile");
+				// No `start` for the attempt that only checks the registration
+				expect(events).toEqual([
+					"start 1",
+					"sent 1",
+					"retry 1",
+					"sent 2",
+					"complete 2",
+				]);
 				expect(calls).toEqual([
 					"POST Bearer old-jwt",
 					"HEAD Bearer old-jwt",

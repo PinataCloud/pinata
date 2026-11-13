@@ -43,7 +43,7 @@ async function inMemoryBefore(file: Blob, end: number): Promise<boolean> {
 // when it holds more. Two markers: a byte of the file can't equal both. Reads 2 bytes.
 // False when it can't tell (a Blob that doesn't hold the file's bytes as its own), and
 // outside Node: only Node misreports sizes, and Bun copies a Blob held in memory to join it.
-async function holdsMore(file: Blob): Promise<boolean> {
+export async function holdsMore(file: Blob): Promise<boolean> {
 	const versions = (
 		globalThis as { process?: { versions?: Record<string, string> } }
 	).process?.versions;

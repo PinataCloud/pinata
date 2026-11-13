@@ -25,7 +25,7 @@ import {
 	resolveFolderId,
 	unsendablePath,
 } from "./folderInput";
-import { type SyncedFolder, syncFolder } from "./folderSync";
+import { folderExists, type SyncedFolder, syncFolder } from "./folderSync";
 import {
 	creationUrl,
 	registerResumable,
@@ -50,6 +50,7 @@ import { registrationTimeout } from "./tusStatus";
 import { cancelled } from "./uploadErrors";
 
 const DEFAULT_UPLOAD_URL = "https://uploads.pinata.cloud/v3";
+const DEFAULT_API_URL = "https://api.pinata.cloud/v3";
 // A file's bytes are stored seconds to minutes before the server registers it. Files waiting
 // for that don't hold a send slot, but at most this many per slot are under way at once, so
 // that a large folder doesn't poll the registration of thousands of files. When registration
@@ -63,6 +64,9 @@ const GATE_POLL_MS = 1000;
 const OWN_REFUSALS = [400, 413, 414, 415, 422, 431];
 // How many files in a row failing alike show that every file would
 const SHARED_FAILURE_REPEATS = 3;
+// Refusals of a file for its size, or the length of its path or metadata: however many
+// files in a row get one, a smaller file may not
+const SIZE_REFUSALS = [413, 414, 431];
 
 type FileAbout = Pick<FolderFileResult, "index" | "path" | "size">;
 type FailedFile = FolderUploadError["failed"][number];
@@ -80,7 +84,8 @@ interface FolderPlan {
 //
 // A new folder's first file is uploaded alone, so that the folder exists before the others
 // join it. If it fails for a reason of its own, the next one tries. The files of a folder
-// given (folderId) all go at once: it exists already.
+// given (folderId) that exists all go at once; a folder given that doesn't exist yet, or
+// may not, is created by a first file as a new one is.
 export const uploadFolder = async (
 	config: PinataConfig | undefined,
 	files: File[] | FolderEntry[],
@@ -110,6 +115,7 @@ class FolderUpload {
 	// Sending bytes takes a slot; waiting for registration doesn't
 	private readonly slots: Semaphore;
 	private readonly endpoint: string;
+	private readonly apiUrl: string;
 	private readonly createUrl: string;
 	// The same folder options on every file
 	private readonly sharedMetadata: string;
@@ -118,8 +124,12 @@ class FolderUpload {
 	private duplicateOf: { id: string; name: string; cid: string } | undefined;
 	// The reason the last files failed for good, and how many in a row failed for it
 	private lastFailure: { reason: string; repeats: number } | undefined;
-	// In a folder given (folderId): the failure SHARED_FAILURE_REPEATS files in a row met,
-	// which every file would. Files not sent yet fail with it instead of being sent.
+	// Whether files failing alike stop the others (see noteFailure): in a folder given
+	// (folderId) not known to be new
+	private stopsOnSharedFailure = false;
+	// The failure every file would meet, in a folder given: the one SHARED_FAILURE_REPEATS
+	// files in a row met (see noteFailure), or the one that stopped its first file (see
+	// createFolder). Files not sent yet fail with it instead of being sent.
 	private sharedFailure: Error | undefined;
 
 	constructor(
@@ -129,6 +139,7 @@ class FolderUpload {
 		private readonly plan: FolderPlan,
 	) {
 		this.credentials = new FolderCredentials(config, options);
+		this.apiUrl = config.endpointUrl || DEFAULT_API_URL;
 		this.slots = new Semaphore(plan.concurrency);
 		this.endpoint = config.uploadUrl || DEFAULT_UPLOAD_URL;
 		this.createUrl = creationUrl(
@@ -140,9 +151,21 @@ class FolderUpload {
 
 	async run(): Promise<FolderUploadResponse> {
 		const { folderId, entries } = this.plan;
-		// A folder given exists already: no file has to create it first
-		const pending =
-			this.options.folderId === undefined ? await this.createFolder() : entries;
+		// A folder given that exists needs no first file to create it. One the server doesn't
+		// have (404), or can't say it has, is created by a first file, as a new one is.
+		const exists =
+			this.options.folderId === undefined
+				? false
+				: await folderExists(
+						this.apiUrl,
+						this.network,
+						folderId,
+						this.credentials.headers(),
+						this.options.signal,
+					);
+		this.stopsOnSharedFailure =
+			this.options.folderId !== undefined && exists !== false;
+		const pending = exists ? entries : await this.createFolder();
 		await this.uploadAll(pending);
 		if (this.failed.length > 0) {
 			throw await this.partialFailure();
@@ -174,7 +197,9 @@ class FolderUpload {
 	// others wait for it. If it fails for a reason of its own (its path, type or size), the
 	// next one tries. A failure every file would share stops the upload: any other error, or
 	// the same reason SHARED_FAILURE_REPEATS times in a row (see noteFailure; a missing
-	// group answers 400 to every file). Returns the files left to upload.
+	// group answers 400 to every file). Then a new folder's upload rejects with that error;
+	// in a folder given, the files left fail with it, unsent, as in any partial failure.
+	// Returns the files left to upload.
 	private async createFolder(): Promise<ResolvedEntry[]> {
 		const pending = this.plan.entries.slice();
 		for (;;) {
@@ -194,6 +219,10 @@ class FolderUpload {
 				(this.lastFailure?.repeats ?? 0) >= SHARED_FAILURE_REPEATS ||
 				pending.length === 0
 			) {
+				if (this.options.folderId !== undefined) {
+					this.sharedFailure = error;
+					return pending;
+				}
 				throw error instanceof PinataError
 					? error
 					: new PinataError(`Error uploading folder: ${error.message}`);
@@ -273,7 +302,8 @@ class FolderUpload {
 			const wasStarted = unfinished !== undefined;
 			try {
 				if (stored) {
-					this.emit({ type: "start", ...about, attempt: ++started });
+					// Only the registration is checked again: no byte is sent, so no `start`
+					started++;
 				} else {
 					// Only sending the bytes takes a slot: waiting for registration doesn't.
 					stored = await this.slots.run(async () => {
@@ -424,9 +454,10 @@ class FolderUpload {
 
 	// Notes a file that failed for good. Files failing in a row for the same reason (the same
 	// status and message) SHARED_FAILURE_REPEATS times show that every file would: in a folder
-	// given, the files not sent yet then fail with it (a new folder's first files stop the
-	// upload instead, see createFolder). Not a cancel, nor the failures that are already
-	// shared (a refused JWT, sharedFailure itself).
+	// given that is not known to be new, the files not sent yet then fail with it (a new
+	// folder's first files stop the upload instead, see createFolder). Not when the reason is
+	// the file's own size, path or content (SIZE_REFUSALS, a ValidationError), nor a cancel,
+	// nor the failures that are already shared (a refused JWT, sharedFailure itself).
 	private noteFailure(error: Error): void {
 		if (
 			this.options.signal?.aborted ||
@@ -440,7 +471,13 @@ class FolderUpload {
 		const repeats =
 			this.lastFailure?.reason === reason ? this.lastFailure.repeats + 1 : 1;
 		this.lastFailure = { reason, repeats };
-		if (repeats >= SHARED_FAILURE_REPEATS && this.options.folderId) {
+		const ownRefusal =
+			error instanceof ValidationError || SIZE_REFUSALS.includes(status ?? 0);
+		if (
+			repeats >= SHARED_FAILURE_REPEATS &&
+			this.stopsOnSharedFailure &&
+			!ownRefusal
+		) {
 			this.sharedFailure ??= error;
 		}
 	}
@@ -487,9 +524,9 @@ class FolderUpload {
 		return registered.cid;
 	}
 
-	// Syncs the folder. While the server is rate limited, waits up to `rateLimitBudgetMs`
-	// (see syncFolder).
-	private async finish(rateLimitBudgetMs?: number): Promise<SyncedFolder> {
+	// Syncs the folder (see syncFolder). `once`: a single attempt, sent again only after a
+	// refused JWT is replaced, without waiting for anything.
+	private async finish(once = false): Promise<SyncedFolder> {
 		const { folderId, retries } = this.plan;
 		try {
 			const auth = this.credentials.tracked();
@@ -497,10 +534,10 @@ class FolderUpload {
 				this.endpoint,
 				folderId,
 				auth.headers,
-				retries,
+				once ? 0 : retries,
 				this.options.signal,
 				(error) => this.credentials.renew(error, auth.jwt()),
-				rateLimitBudgetMs,
+				once ? 0 : undefined,
 			);
 		} catch (error) {
 			// Only a one-file folder is merged into an earlier one
@@ -546,15 +583,14 @@ class FolderUpload {
 
 	// The server completes the folder without the failed files: its CID, or the earlier
 	// folder it turned out to duplicate, is worth knowing. Best effort: a failed sync leaves
-	// it unknown and must not hide why the files failed, so it doesn't wait while the server
-	// is rate limited.
+	// it unknown and must not hide why the files failed, or keep them waiting: one attempt.
 	private async partialFailure(): Promise<FolderUploadError> {
 		const { folderId, folderName, entries } = this.plan;
 		const folder =
 			this.uploaded.length > 0 &&
 			!this.options.signal?.aborted &&
 			!this.credentials.refused()
-				? await this.finish(0).then(
+				? await this.finish(true).then(
 						(synced) => ({
 							id: synced.id,
 							name: synced.name,
