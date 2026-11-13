@@ -85,7 +85,11 @@ export type FolderUploadEvent = {
 };
 
 export type FolderUploadOptions = UploadOptions & {
-	/** How many files send their bytes at the same time. Defaults to 4. */
+	/**
+	 * How many files send their bytes at the same time. Defaults to 4. Files whose bytes are
+	 * stored wait for the server to register them without holding one of these; at most
+	 * 8 times as many files (32 by default) are under way at once, sending or waiting.
+	 */
 	concurrency?: number;
 	/**
 	 * How many times a file is sent again after a transient failure (no answer, 408, 409,

@@ -138,15 +138,17 @@ export const getUploadStatus = async (
 // file can only be looked up once HEAD reports `ready`; until then registration can
 // still fail. Polls HEAD until then and returns that `ready` status (its CID is null if
 // `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
+// The pause between two checks starts at 1 s and doubles up to `pollMaxMs`.
 export const waitForRegistration = async (
 	url: string,
 	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
+	pollMaxMs = REGISTRATION_POLL_MAX_MS,
 ): Promise<UploadStatus> => {
 	const timeout = registrationTimeout(size);
 	const deadline = Date.now() + timeout;
-	let delay = 1000;
+	let delay = Math.min(1000, pollMaxMs);
 	while (Date.now() + delay <= deadline) {
 		await new Promise<void>((resolve, reject) => {
 			if (signal?.aborted) return reject(signal.reason);
@@ -160,7 +162,7 @@ export const waitForRegistration = async (
 			}, delay);
 			signal?.addEventListener("abort", onAbort, { once: true });
 		});
-		delay = Math.min(delay * 2, REGISTRATION_POLL_MAX_MS);
+		delay = Math.min(delay * 2, pollMaxMs);
 		const status = await getUploadStatus(url, headers, size, signal);
 		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.

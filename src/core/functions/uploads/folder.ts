@@ -30,10 +30,15 @@ const DEFAULT_RETRIES = 3;
 const DEFAULT_FOLDER_NAME = "folder_from_sdk";
 // How many times a file is sent again because the JWT it was refused was replaced
 const MAX_RENEWALS = 2;
-// A file's bytes are stored seconds before the server registers it. Files waiting for that
-// don't hold a send slot, but at most this many per slot are under way at once, so that a
-// large folder doesn't poll the registration of thousands of files.
-const UNDER_WAY_PER_SLOT = 4;
+// A file's bytes are stored seconds to minutes before the server registers it. Files waiting
+// for that don't hold a send slot, but at most this many per slot are under way at once, so
+// that a large folder doesn't poll the registration of thousands of files. Registration
+// taking about a minute on prod, a lower cap left the slots idle (16: 20 files of a 60-file
+// folder in 120-140 s; 64: 80 s); 8 per slot weighs that against the HEAD polling load.
+const UNDER_WAY_PER_SLOT = 8;
+// How often the file every other one waits for (the first, which creates the folder) checks
+// its registration: the others start as soon as it is registered.
+const GATE_POLL_MS = 1000;
 
 // Uploads a folder file by file: each file is its own resumable upload into the folder,
 // several at a time, each retried on its own. A final sync gives the folder's CID.
@@ -187,9 +192,10 @@ export const uploadFolder = async (
 		}
 	};
 
-	const uploadEntry = (entry: ResolvedEntry) =>
-		underWay.run(() => uploadOne(entry));
-	const uploadOne = async (entry: ResolvedEntry): Promise<void> => {
+	// `gate`: the other files wait for this one's registration
+	const uploadEntry = (entry: ResolvedEntry, gate = false) =>
+		underWay.run(() => uploadOne(entry, gate));
+	const uploadOne = async (entry: ResolvedEntry, gate: boolean) => {
 		const { index, path, file } = entry;
 		const fail = (error: Error, attempt: number) => {
 			failed.push({ index, path, size: file.size, error });
@@ -259,6 +265,7 @@ export const uploadFolder = async (
 					headers,
 					file.size,
 					signal,
+					gate ? GATE_POLL_MS : undefined,
 				);
 				const reported = parseUploadMetadata(registered.metadata);
 				if (
@@ -351,7 +358,7 @@ export const uploadFolder = async (
 			}
 		}
 		const [first] = pending.splice(pick, 1);
-		await uploadEntry(first);
+		await uploadEntry(first, true);
 		if (uploaded.length > 0 || signal?.aborted) break;
 		const { error } = failed[failed.length - 1];
 		const status = error instanceof PinataError ? error.statusCode : undefined;

@@ -1723,4 +1723,121 @@ describe("uploadFolder, a file sent again", () => {
 			"complete 0 1",
 		]);
 	});
+
+	it("has at most 8 files per slot under way, sending or waiting for registration", async () => {
+		// Each file is registered after many checks, so the others pile up behind the cap
+		const polls = new Map<string, number>();
+		let waiting = 0;
+		let peak = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: {
+							id: "f",
+							name: "d",
+							cid: "bafyfolder",
+							number_of_files: 40,
+						},
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				const headers = init.headers as Record<string, string>;
+				const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+				waiting++;
+				peak = Math.max(peak, waiting);
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/${encodeURIComponent(path)}`,
+						"Upload-Offset": "1",
+						"Upload-Cid": `bafy-${path}`,
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			const n = (polls.get(url) ?? 0) + 1;
+			polls.set(url, n);
+			const ready = n >= 20;
+			if (ready) waiting--;
+			return new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": "1",
+					"Upload-Status": ready ? "ready" : "processing",
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			config,
+			Array.from({ length: 40 }, (_, i) => ({
+				path: `d/${i}.txt`,
+				file: file("x"),
+			})),
+			"public",
+			{ concurrency: 2 },
+		);
+
+		expect(peak).toBe(16);
+	});
+
+	it("checks the first file's registration every second, the others less often", async () => {
+		const delays: number[] = [];
+		setTimeoutSpy.mockImplementation(((callback: () => void, ms: number) => {
+			delays.push(ms);
+			callback();
+			return 0;
+		}) as unknown as typeof setTimeout);
+		const polls = new Map<string, number>();
+		const marks: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 2 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				const headers = init.headers as Record<string, string>;
+				const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+				marks.push(`${delays.length} POST ${path}`);
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/${encodeURIComponent(path)}`,
+						"Upload-Offset": "1",
+						"Upload-Cid": `bafy-${path}`,
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			const n = (polls.get(url) ?? 0) + 1;
+			polls.set(url, n);
+			return new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": "1",
+					"Upload-Status": n >= 6 ? "ready" : "processing",
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			config,
+			[
+				{ path: "d/first.txt", file: file("a") },
+				{ path: "d/second.txt", file: file("b") },
+			],
+			"public",
+		);
+
+		expect(marks).toEqual(["0 POST d/first.txt", "6 POST d/second.txt"]);
+		expect(delays.slice(0, 6)).toEqual(Array(6).fill(1000));
+		expect(delays.slice(6)).toEqual([1000, 2000, 4000, 8000, 10000, 10000]);
+	});
 });

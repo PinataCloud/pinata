@@ -295,16 +295,23 @@ export const registersLater = (upload: StoredUpload): boolean =>
 // Waits until a stored upload is registered (see waitForRegistration) and returns it with
 // its own CID (the one computed from its bytes, else the registered file's) and the
 // registered file's Upload-Metadata, which may be an earlier upload's. Throws if it has no
-// CID.
+// CID. `pollMaxMs` caps the pause between two checks (see waitForRegistration).
 export const registerResumable = async (
 	upload: StoredUpload,
 	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
+	pollMaxMs?: number,
 ): Promise<StoredUpload> => {
 	let registered = upload;
 	if (registersLater(upload)) {
-		const ready = await waitForRegistration(upload.url, headers, size, signal);
+		const ready = await waitForRegistration(
+			upload.url,
+			headers,
+			size,
+			signal,
+			pollMaxMs,
+		);
 		registered = {
 			url: upload.url,
 			// The CID the server computed from these bytes, sent with the last of them, wins:
