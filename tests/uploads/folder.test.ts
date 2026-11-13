@@ -240,16 +240,19 @@ describe("uploadFolder", () => {
 		});
 		expect(result.files).toEqual([
 			{
+				index: 0,
 				path: "d/large.txt",
 				size: 13,
 				cid: `bafy-${encodeURIComponent("d/large.txt")}`,
 			},
 			{
+				index: 1,
 				path: "d/s.txt",
 				size: 1,
 				cid: `bafy-${encodeURIComponent("d/s.txt")}`,
 			},
 			{
+				index: 2,
 				path: "d/m.txt",
 				size: 2,
 				cid: `bafy-${encodeURIComponent("d/m.txt")}`,
@@ -308,6 +311,7 @@ describe("uploadFolder", () => {
 			"start 2",
 			"retry 2",
 			"start 3",
+			"sent 3",
 			"complete 3",
 		]);
 		expect(forB[1].error?.message).toBe(
@@ -341,12 +345,138 @@ describe("uploadFolder", () => {
 		expect(error.failed[0].error.message).toBe(
 			"Could not start the upload (HTTP 400): invalid name",
 		);
-		// Not retried, and the incomplete folder is not synced
+		expect(error.failed[0].index).toBe(1);
+		// Not retried; the folder is synced once, without the failed file
 		expect(
 			fetchMock.mock.calls.filter(
 				(call) => (call[1] as RequestInit).method === "PUT",
 			),
-		).toHaveLength(0);
+		).toHaveLength(1);
+		expect(error.folder).toEqual({
+			id: error.folderId,
+			name: "d",
+			cid: "bafyfolder",
+		});
+	});
+
+	it("reports the earlier folder a partly uploaded folder turned out to duplicate", async () => {
+		const { fetchMock } = server((creation) =>
+			creation.path === "d/bad.txt" ? refused(400, "invalid name") : undefined,
+		);
+		const respond = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			init.method === "PUT"
+				? new Response(
+						JSON.stringify({
+							data: {
+								id: "earlier-folder",
+								name: "first",
+								cid: "bafyearlier",
+								size: 1,
+								number_of_files: 1,
+								is_duplicate: true,
+							},
+						}),
+						{ status: 200 },
+					)
+				: respond(url, init),
+		);
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/bad.txt", file: file("bad") },
+			],
+			"public",
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.folder).toEqual({
+			id: "earlier-folder",
+			name: "first",
+			cid: "bafyearlier",
+			is_duplicate: true,
+		});
+	});
+
+	it("keeps why files failed when the partly uploaded folder cannot be synced", async () => {
+		const { fetchMock } = server((creation) =>
+			creation.path === "d/bad.txt" ? refused(400, "invalid name") : undefined,
+		);
+		const respond = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+			init.method === "PUT"
+				? new Response("down", { status: 503 })
+				: respond(url, init),
+		);
+
+		const error = await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/bad.txt", file: file("bad") },
+			],
+			"public",
+			{ retries: 1 },
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.message).toContain("d/bad.txt: Could not start the upload");
+		expect(error.folder).toBeUndefined();
+	});
+
+	it("tells files apart by their position, whatever their path", async () => {
+		const { created } = server((creation) =>
+			creation.path === "d/back\\slash.txt"
+				? refused(400, "invalid file path")
+				: undefined,
+		);
+		const events: FolderUploadEvent[] = [];
+
+		const error = await uploadFolder(
+			config,
+			[
+				file("a", "a.txt", "d/a.txt"),
+				// A File's path never uses "\\" as separator: it is part of the name
+				file("b", "back\\slash.txt", "d/back\\slash.txt"),
+			],
+			"public",
+			{ onProgress: (event) => events.push(event) },
+		).catch((e) => e);
+
+		expect(created.map((c) => c.path)).toEqual([
+			"d/a.txt",
+			"d/back\\slash.txt",
+		]);
+		expect(events.map((e) => `${e.type} ${e.index}`)).toEqual([
+			"start 0",
+			"sent 0",
+			"complete 0",
+			"start 1",
+			"error 1",
+		]);
+		expect(error.uploaded.map((f: { index: number }) => f.index)).toEqual([0]);
+		expect(error.failed.map((f: { index: number }) => f.index)).toEqual([1]);
+	});
+
+	it("reads '\\' in an entry's path as a separator (a Windows path)", async () => {
+		const { created } = server();
+
+		const result = await uploadFolder(
+			config,
+			[{ path: "d\\sub\\a.txt", file: file("a") }],
+			"public",
+		);
+
+		expect(created.map((c) => c.path)).toEqual(["d/sub/a.txt"]);
+		expect(result.files[0]).toMatchObject({ index: 0, path: "d/sub/a.txt" });
 	});
 
 	it("ignores what onProgress throws", async () => {
@@ -860,6 +990,33 @@ describe("uploadFolder", () => {
 		expect(events.filter((e) => e.startsWith("error"))).toHaveLength(4);
 	});
 
+	it("stops finishing the folder once cancelled", async () => {
+		const { fetchMock } = server();
+		const respond = fetchMock.getMockImplementation() as (
+			url: string,
+			init: RequestInit,
+		) => Promise<Response>;
+		const controller = new AbortController();
+		let syncs = 0;
+		fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+			if (init.method !== "PUT") return respond(url, init);
+			syncs++;
+			controller.abort();
+			throw new DOMException("This operation was aborted", "AbortError");
+		});
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+			{ signal: controller.signal },
+		).catch((e) => e);
+
+		expect(error.name).toBe("AbortError");
+		expect(error.message).toBe("The upload was cancelled");
+		expect(syncs).toBe(1);
+	});
+
 	it("sends nothing when cancelled before it starts", async () => {
 		const { created } = server();
 		const controller = new AbortController();
@@ -887,5 +1044,1072 @@ describe("uploadFolder", () => {
 		).rejects.toThrow(
 			"Folder uploads do not support: vectorize, waitForCid(false)",
 		);
+	});
+});
+
+describe("uploadFolder, faults", () => {
+	const originalFetch = global.fetch;
+	let delays: number[];
+	let setTimeoutSpy: jest.SpyInstance;
+	beforeEach(() => {
+		delays = [];
+		setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
+			callback: () => void,
+			ms: number,
+		) => {
+			delays.push(ms);
+			callback();
+			return 0;
+		}) as unknown as typeof setTimeout);
+	});
+	afterEach(() => {
+		global.fetch = originalFetch;
+		setTimeoutSpy.mockRestore();
+	});
+
+	const big = () =>
+		new File([new Uint8Array(50 * 1024 * 1024 + 2)], "big.bin", {
+			type: "application/octet-stream",
+		});
+	// A creation that registers the file at once
+	const registeredAt = (url: string, init: RequestInit) => {
+		const headers = init.headers as Record<string, string>;
+		const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+		return new Response(null, {
+			status: 201,
+			headers: {
+				Location: `${url}/${encodeURIComponent(path)}`,
+				"Upload-Offset": headers["Upload-Length"],
+				"Upload-Cid": `bafy-${path}`,
+			},
+		});
+	};
+	const synced = (url: string, files: number) =>
+		new Response(
+			JSON.stringify({
+				data: {
+					id: url.split("/buckets/")[1].split("/")[0],
+					name: "d",
+					cid: "bafyfolder",
+					size: 1,
+					number_of_files: files,
+				},
+			}),
+			{ status: 200 },
+		);
+
+	it("waits as long as a 429 asks before sending a file again", async () => {
+		let creations = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") return synced(url, 2);
+			creations++;
+			if (creations === 2) {
+				return new Response(
+					JSON.stringify({ error: { message: "slow down" } }),
+					{
+						status: 429,
+						headers: { "Retry-After": "20" },
+					},
+				);
+			}
+			return registeredAt(url, init);
+		}) as unknown as typeof fetch;
+		const events: FolderUploadEvent[] = [];
+
+		await uploadFolder(
+			config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/b.txt", file: file("bb") },
+			],
+			"public",
+			{ onProgress: (e) => events.push(e) },
+		);
+
+		const retry = events.find((e) => e.type === "retry");
+		expect(retry?.delayMs).toBe(20000);
+		expect(retry?.error?.message).toBe(
+			"Could not start the upload (HTTP 429): slow down",
+		);
+		expect(delays).toContain(20000);
+	});
+
+	it("waits as long as a refused chunk asks, and says why it failed without raw JSON", async () => {
+		let patches = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "PATCH") {
+				patches++;
+				return new Response(
+					JSON.stringify({ error: { message: "write capacity" } }),
+					{ status: 503, headers: { "Retry-After": "30" } },
+				);
+			}
+			return new Response(null, {
+				status: 200,
+				headers: { "Upload-Offset": "0" },
+			});
+		}) as unknown as typeof fetch;
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/big.bin", file: big() }],
+			"public",
+			{ retries: 0 },
+		).catch((e) => e);
+
+		expect(patches).toBe(6);
+		expect(delays.filter((ms) => ms === 30000)).toHaveLength(5);
+		expect(error.message).toBe(
+			"Could not send the file (HTTP 503) after 5 retries: write capacity",
+		);
+	});
+
+	it("says the upload server could not be reached when a request gets no answer", async () => {
+		global.fetch = jest.fn(async () => {
+			throw new TypeError("Failed to fetch");
+		}) as unknown as typeof fetch;
+
+		await expect(
+			uploadFolder(config, [{ path: "d/a.txt", file: file("a") }], "public", {
+				retries: 0,
+			}),
+		).rejects.toThrow("Could not reach the upload server: Failed to fetch");
+	});
+
+	it("fails a file at once when the server refuses to look it up", async () => {
+		let heads = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/upload`,
+						"Upload-Offset": "1",
+						"Upload-Cid": "bafyfile",
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			heads++;
+			return new Response(null, { status: 400 });
+		}) as unknown as typeof fetch;
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+		).catch((e) => e);
+
+		expect(error.message).toBe(
+			"The server refused to look up the upload (HTTP 400)",
+		);
+		expect(error.statusCode).toBe(400);
+		expect(heads).toBe(1);
+	});
+
+	describe("in a browser that goes offline", () => {
+		const online = new EventTarget();
+		const scope = globalThis as unknown as Record<string, unknown>;
+		const navigatorDescriptor = Object.getOwnPropertyDescriptor(
+			globalThis,
+			"navigator",
+		);
+		let onLine = true;
+		beforeEach(() => {
+			onLine = true;
+			Object.defineProperty(globalThis, "navigator", {
+				value: {
+					get onLine() {
+						return onLine;
+					},
+				},
+				configurable: true,
+			});
+			scope.addEventListener = online.addEventListener.bind(online);
+			scope.removeEventListener = online.removeEventListener.bind(online);
+		});
+		afterEach(() => {
+			if (navigatorDescriptor) {
+				Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+			} else {
+				delete scope.navigator;
+			}
+			delete scope.addEventListener;
+			delete scope.removeEventListener;
+		});
+
+		it("waits until it is back online, without spending the file's retries", async () => {
+			let creations = 0;
+			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				if (init.method === "PUT") return synced(url, 1);
+				creations++;
+				if (creations <= 3) {
+					onLine = false;
+					// Back online once the upload waits for it
+					setImmediate(() => {
+						onLine = true;
+						online.dispatchEvent(new Event("online"));
+					});
+					throw new TypeError("Failed to fetch");
+				}
+				return registeredAt(url, init);
+			}) as unknown as typeof fetch;
+
+			const events: FolderUploadEvent[] = [];
+			const result = await uploadFolder(
+				config,
+				[{ path: "d/a.txt", file: file("a") }],
+				"public",
+				{ retries: 0, onProgress: (e) => events.push(e) },
+			);
+
+			expect(result.cid).toBe("bafyfolder");
+			expect(creations).toBe(4);
+			// Each retry says it waits for the browser to be back online, not for delayMs
+			const retries = events.filter((e) => e.type === "retry");
+			expect(retries).toHaveLength(3);
+			for (const retry of retries) {
+				expect(retry).toMatchObject({ delayMs: 0, waitingForOnline: true });
+			}
+		});
+
+		it("resumes a chunk once back online, without spending its retries", async () => {
+			const patches: string[] = [];
+			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				const headers = init.headers as Record<string, string>;
+				if (init.method === "PUT") return synced(url, 1);
+				if (init.method === "POST") {
+					return new Response(null, {
+						status: 201,
+						headers: { Location: `${url}/upload` },
+					});
+				}
+				if (init.method === "HEAD") {
+					return new Response(null, {
+						status: 200,
+						headers: { "Upload-Offset": "0" },
+					});
+				}
+				patches.push(headers["Upload-Offset"]);
+				if (patches.length <= 7) {
+					onLine = false;
+					setImmediate(() => {
+						onLine = true;
+						online.dispatchEvent(new Event("online"));
+					});
+					throw new TypeError("Failed to fetch");
+				}
+				return new Response(null, {
+					status: 204,
+					headers: {
+						"Upload-Offset":
+							headers["Upload-Offset"] === "0" ? "52428801" : "52428802",
+						"Upload-Cid": "bafybig",
+					},
+				});
+			}) as unknown as typeof fetch;
+
+			const result = await uploadFolder(
+				config,
+				[{ path: "d/big.bin", file: big() }],
+				"public",
+				{ retries: 0 },
+			);
+
+			expect(result.files[0].cid).toBe("bafybig");
+			// More failures than the 5 chunk retries, none of them counted
+			expect(patches).toHaveLength(9);
+		});
+	});
+
+	describe("when the server refuses the JWT", () => {
+		const live = () => ({ ...config, pinataJwt: "old-jwt" });
+		// 401 for every request with the old JWT
+		const authServer = () => {
+			const auths: string[] = [];
+			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				const headers = init.headers as Record<string, string>;
+				auths.push(`${init.method} ${headers.Authorization}`);
+				if (headers.Authorization === "Bearer old-jwt") {
+					return refused(401, "Invalid/expired token");
+				}
+				if (init.method === "PUT") return synced(url, 3);
+				return registeredAt(url, init);
+			}) as unknown as typeof fetch;
+			return auths;
+		};
+
+		it("asks refreshJwt once for a new one and sends the refused files again", async () => {
+			const auths = authServer();
+			const refreshJwt = jest.fn(async () => "new-jwt");
+			const entries = Array.from({ length: 3 }, (_, i) => ({
+				path: `d/${i}.txt`,
+				file: file(`${i}`),
+			}));
+
+			const result = await uploadFolder(live(), entries, "public", {
+				refreshJwt,
+				concurrency: 3,
+			});
+
+			expect(refreshJwt).toHaveBeenCalledTimes(1);
+			expect(result.files.map((f) => f.cid)).toEqual([
+				"bafy-d/0.txt",
+				"bafy-d/1.txt",
+				"bafy-d/2.txt",
+			]);
+			expect(auths.at(-1)).toBe("PUT Bearer new-jwt");
+		});
+
+		it("sends a refused file again when the JWT was replaced meanwhile", async () => {
+			authServer();
+			const settings = live();
+			const fetchMock = global.fetch as jest.Mock;
+			const respond = fetchMock.getMockImplementation() as (
+				url: string,
+				init: RequestInit,
+			) => Promise<Response>;
+			// setNewJwt lands while the refused request is under way
+			fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+				const response = await respond(url, init);
+				if (response.status === 401) settings.pinataJwt = "new-jwt";
+				return response;
+			});
+
+			const result = await uploadFolder(
+				settings,
+				[{ path: "d/a.txt", file: file("a") }],
+				"public",
+				{ retries: 0 },
+			);
+
+			expect(result.files[0].cid).toBe("bafy-d/a.txt");
+		});
+
+		it("fails the files when no new JWT comes", async () => {
+			authServer();
+
+			const error = await uploadFolder(
+				live(),
+				[
+					{ path: "d/a.txt", file: file("a") },
+					{ path: "d/b.txt", file: file("bb") },
+				],
+				"public",
+				{ refreshJwt: async () => undefined },
+			).catch((e) => e);
+
+			expect(error.statusCode).toBe(401);
+			expect(error.message).toBe(
+				"Could not start the upload (HTTP 401): Invalid/expired token",
+			);
+		});
+
+		it("checks a stored file's registration again with the new JWT, without sending it again", async () => {
+			const calls: string[] = [];
+			global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+				const headers = init.headers as Record<string, string>;
+				calls.push(`${init.method} ${headers.Authorization}`);
+				if (init.method === "PUT") return synced(url, 1);
+				if (init.method === "POST") {
+					return new Response(null, {
+						status: 201,
+						headers: {
+							Location: `${url}/upload`,
+							"Upload-Offset": "1",
+							"Upload-Cid": "bafyfile",
+							"Upload-Status": "processing",
+						},
+					});
+				}
+				if (headers.Authorization === "Bearer old-jwt") {
+					return new Response(null, { status: 401 });
+				}
+				return new Response(null, {
+					status: 200,
+					headers: { "Upload-Offset": "1", "Upload-Status": "ready" },
+				});
+			}) as unknown as typeof fetch;
+
+			const result = await uploadFolder(
+				live(),
+				[{ path: "d/a.txt", file: file("a") }],
+				"public",
+				{ refreshJwt: () => "new-jwt" },
+			);
+
+			expect(result.files[0].cid).toBe("bafyfile");
+			expect(calls).toEqual([
+				"POST Bearer old-jwt",
+				"HEAD Bearer old-jwt",
+				"HEAD Bearer new-jwt",
+				"PUT Bearer new-jwt",
+			]);
+		});
+	});
+
+	it("answers with the earlier folder when syncing finds this one merged into it", async () => {
+		const encodeValue = (v: string) => Buffer.from(v).toString("base64");
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({ error: { message: "bucket not found" } }),
+					{ status: 404 },
+				);
+			}
+			// The one file is registered as the earlier one-file folder of the same content
+			return new Response(null, {
+				status: 201,
+				headers: {
+					Location: `${url}/d/only.txt`,
+					"Upload-Offset": "1",
+					"Upload-Cid": "bafkonly",
+					"Upload-Metadata": `filename ${encodeValue("d")},file_id ${encodeValue("earlier-folder")},cid ${encodeValue("bafyearlier")}`,
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			config,
+			[{ path: "d/only.txt", file: file("a") }],
+			"public",
+		);
+
+		expect(result).toMatchObject({
+			id: "earlier-folder",
+			name: "d",
+			cid: "bafyearlier",
+			is_duplicate: true,
+			number_of_files: 1,
+		});
+		expect(result.files).toEqual([
+			{ index: 0, path: "d/only.txt", size: 1, cid: "bafkonly" },
+		]);
+	});
+
+	it("stops waiting to send a chunk again once cancelled", async () => {
+		// Pauses never end on their own: only the abort ends them
+		setTimeoutSpy.mockImplementation(((_: () => void, ms: number) => {
+			delays.push(ms);
+			return 0;
+		}) as unknown as typeof setTimeout);
+		const controller = new AbortController();
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			setImmediate(() => controller.abort());
+			return new Response("busy", { status: 503 });
+		}) as unknown as typeof fetch;
+
+		const error = await uploadFolder(
+			config,
+			[{ path: "d/big.bin", file: big() }],
+			"public",
+			{ signal: controller.signal },
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.failed[0].error.name).toBe("AbortError");
+		expect(delays).toEqual([1000]);
+	});
+});
+
+describe("uploadFolder, a file sent again", () => {
+	const originalFetch = global.fetch;
+	let setTimeoutSpy: jest.SpyInstance;
+	beforeEach(() => {
+		setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
+			callback: () => void,
+		) => {
+			callback();
+			return 0;
+		}) as unknown as typeof setTimeout);
+	});
+	afterEach(() => {
+		global.fetch = originalFetch;
+		setTimeoutSpy.mockRestore();
+	});
+
+	it("continues the upload its last attempt left unfinished", async () => {
+		const chunk = 50 * 1024 * 1024 + 1;
+		const size = chunk + 10;
+		let stored = 0;
+		let lost = 0;
+		const calls: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			const offset = headers["Upload-Offset"];
+			calls.push(`${init.method}${offset ? ` ${offset}` : ""}`);
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 1 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "HEAD") {
+				return new Response(null, {
+					status: 200,
+					headers: { "Upload-Offset": `${stored}` },
+				});
+			}
+			// The second chunk is lost more times than the chunk retries allow
+			if (offset === `${chunk}` && lost < 6) {
+				lost++;
+				throw new TypeError("fetch failed");
+			}
+			stored = offset === "0" ? chunk : size;
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Upload-Offset": `${stored}`,
+					...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
+				},
+			});
+		}) as unknown as typeof fetch;
+		const events: string[] = [];
+
+		const result = await uploadFolder(
+			config,
+			[
+				{
+					path: "d/big.bin",
+					file: new File([new Uint8Array(size)], "big.bin"),
+				},
+			],
+			"public",
+			{ onProgress: (e) => events.push(`${e.type} ${e.attempt}`) },
+		);
+
+		expect(result.files[0].cid).toBe("bafybig");
+		expect(events).toEqual([
+			"start 1",
+			"retry 1",
+			"start 2",
+			"sent 2",
+			"complete 2",
+		]);
+		// One upload, continued from the stored chunk
+		expect(calls.filter((c) => c === "POST")).toHaveLength(1);
+		expect(calls.filter((c) => c === "PATCH 0")).toHaveLength(1);
+		expect(calls.slice(-3)).toEqual(["HEAD", `PATCH ${chunk}`, "PUT"]);
+	});
+
+	it("keeps the unfinished upload when the server cannot say where it stands", async () => {
+		const chunk = 50 * 1024 * 1024 + 1;
+		const size = chunk + 10;
+		let stored = 0;
+		let lost = 0;
+		let heads = 0;
+		const calls: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			const offset = headers["Upload-Offset"];
+			calls.push(`${init.method}${offset ? ` ${offset}` : ""}`);
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 1 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "HEAD") {
+				heads++;
+				// No answer to the chunk retries' HEADs nor to the first one of the next attempt
+				if (heads <= 6) throw new TypeError("fetch failed");
+				return new Response(null, {
+					status: 200,
+					headers: { "Upload-Offset": `${stored}` },
+				});
+			}
+			if (offset === `${chunk}` && lost < 6) {
+				lost++;
+				throw new TypeError("fetch failed");
+			}
+			stored = offset === "0" ? chunk : size;
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Upload-Offset": `${stored}`,
+					...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			config,
+			[
+				{
+					path: "d/big.bin",
+					file: new File([new Uint8Array(size)], "big.bin"),
+				},
+			],
+			"public",
+		);
+
+		expect(result.files[0].cid).toBe("bafybig");
+		expect(calls.filter((c) => c === "POST")).toHaveLength(1);
+		expect(calls.slice(-4)).toEqual(["HEAD", "HEAD", `PATCH ${chunk}`, "PUT"]);
+	});
+
+	it("reports a file sent once its bytes are stored, before its registration ends", async () => {
+		let heads = 0;
+		const timeline: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 1 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				timeline.push("POST");
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/upload`,
+						"Upload-Offset": "1",
+						"Upload-Cid": "bafyfile",
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			heads++;
+			timeline.push(`HEAD ${heads}`);
+			return new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": "1",
+					"Upload-Status": heads < 3 ? "processing" : "ready",
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+			{
+				onProgress: (e) => timeline.push(`${e.type} ${e.index} ${e.attempt}`),
+			},
+		);
+
+		expect(timeline).toEqual([
+			"start 0 1",
+			"POST",
+			"sent 0 1",
+			"HEAD 1",
+			"HEAD 2",
+			"HEAD 3",
+			"complete 0 1",
+		]);
+	});
+
+	it("has at most 8 files per slot under way, sending or waiting for registration", async () => {
+		// Each file is registered after many checks, so the others pile up behind the cap
+		const polls = new Map<string, number>();
+		let waiting = 0;
+		let peak = 0;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: {
+							id: "f",
+							name: "d",
+							cid: "bafyfolder",
+							number_of_files: 40,
+						},
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				const headers = init.headers as Record<string, string>;
+				const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+				waiting++;
+				peak = Math.max(peak, waiting);
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/${encodeURIComponent(path)}`,
+						"Upload-Offset": "1",
+						"Upload-Cid": `bafy-${path}`,
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			const n = (polls.get(url) ?? 0) + 1;
+			polls.set(url, n);
+			const ready = n >= 20;
+			if (ready) waiting--;
+			return new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": "1",
+					"Upload-Status": ready ? "ready" : "processing",
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			config,
+			Array.from({ length: 40 }, (_, i) => ({
+				path: `d/${i}.txt`,
+				file: file("x"),
+			})),
+			"public",
+			{ concurrency: 2 },
+		);
+
+		expect(peak).toBe(16);
+	});
+
+	it("checks the first file's registration every second, the others less often", async () => {
+		const delays: number[] = [];
+		setTimeoutSpy.mockImplementation(((callback: () => void, ms: number) => {
+			delays.push(ms);
+			callback();
+			return 0;
+		}) as unknown as typeof setTimeout);
+		const polls = new Map<string, number>();
+		const marks: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			if (init.method === "PUT") {
+				return new Response(
+					JSON.stringify({
+						data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: 2 },
+					}),
+					{ status: 200 },
+				);
+			}
+			if (init.method === "POST") {
+				const headers = init.headers as Record<string, string>;
+				const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+				marks.push(`${delays.length} POST ${path}`);
+				return new Response(null, {
+					status: 201,
+					headers: {
+						Location: `${url}/${encodeURIComponent(path)}`,
+						"Upload-Offset": "1",
+						"Upload-Cid": `bafy-${path}`,
+						"Upload-Status": "processing",
+					},
+				});
+			}
+			const n = (polls.get(url) ?? 0) + 1;
+			polls.set(url, n);
+			return new Response(null, {
+				status: 200,
+				headers: {
+					"Upload-Offset": "1",
+					"Upload-Status": n >= 6 ? "ready" : "processing",
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			config,
+			[
+				{ path: "d/first.txt", file: file("a") },
+				{ path: "d/second.txt", file: file("b") },
+			],
+			"public",
+		);
+
+		expect(marks).toEqual(["0 POST d/first.txt", "6 POST d/second.txt"]);
+		expect(delays.slice(0, 6)).toEqual(Array(6).fill(1000));
+		expect(delays.slice(6)).toEqual([1000, 2000, 4000, 8000, 10000, 10000]);
+	});
+});
+
+describe("uploadFolder, refreshed JWTs (review of #107)", () => {
+	const originalFetch = global.fetch;
+	let setTimeoutSpy: jest.SpyInstance;
+	beforeEach(() => {
+		setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
+			callback: () => void,
+		) => {
+			callback();
+			return 0;
+		}) as unknown as typeof setTimeout);
+	});
+	afterEach(() => {
+		global.fetch = originalFetch;
+		setTimeoutSpy.mockRestore();
+	});
+
+	const chunk = 50 * 1024 * 1024 + 1;
+	const synced = (files: number) =>
+		new Response(
+			JSON.stringify({
+				data: { id: "f", name: "d", cid: "bafyfolder", number_of_files: files },
+			}),
+			{ status: 200 },
+		);
+	const registeredAt = (url: string, init: RequestInit) => {
+		const headers = init.headers as Record<string, string>;
+		const path = decodeMetadata(headers["Upload-Metadata"]).filename;
+		return new Response(null, {
+			status: 201,
+			headers: {
+				Location: `${url}/${encodeURIComponent(path)}`,
+				"Upload-Offset": headers["Upload-Length"],
+				"Upload-Cid": `bafy-${path}`,
+			},
+		});
+	};
+	// Each JWT is accepted `uses` times, then refused (401); refreshJwt hands out the next one
+	const expiring = (uses: number) => {
+		const used = new Map<string, number>();
+		let issued = 1;
+		return {
+			config: { ...config, pinataJwt: "t1" },
+			refreshJwt: jest.fn(async () => `t${++issued}`),
+			accepts: (headers: Record<string, string>) => {
+				const jwt = headers.Authorization.replace("Bearer ", "");
+				const n = (used.get(jwt) ?? 0) + 1;
+				used.set(jwt, n);
+				return n <= uses;
+			},
+		};
+	};
+
+	it("renews a JWT the final sync is refused, without spending its retries", async () => {
+		const auth = expiring(1);
+		const calls: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			calls.push(`${init.method} ${headers.Authorization}`);
+			if (!auth.accepts(headers)) return refused(401, "Invalid/expired token");
+			return init.method === "PUT" ? synced(1) : registeredAt(url, init);
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			auth.config,
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+			{ refreshJwt: auth.refreshJwt, retries: 0 },
+		);
+
+		expect(result.cid).toBe("bafyfolder");
+		expect(calls).toEqual(["POST Bearer t1", "PUT Bearer t1", "PUT Bearer t2"]);
+		expect(auth.refreshJwt).toHaveBeenCalledTimes(1);
+	});
+
+	it("renews a JWT the sync of a partly uploaded folder is refused", async () => {
+		const auth = expiring(1);
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			const path =
+				init.method === "POST"
+					? decodeMetadata(headers["Upload-Metadata"]).filename
+					: "";
+			if (path === "d/bad.txt") return refused(400, "invalid name");
+			if (!auth.accepts(headers)) return refused(401, "Invalid/expired token");
+			return init.method === "PUT" ? synced(1) : registeredAt(url, init);
+		}) as unknown as typeof fetch;
+
+		const error = await uploadFolder(
+			auth.config,
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/bad.txt", file: file("bb") },
+			],
+			"public",
+			{ refreshJwt: auth.refreshJwt },
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.folder?.cid).toBe("bafyfolder");
+	});
+
+	it("stops at once when cancelled while a new JWT is being asked for", async () => {
+		const controller = new AbortController();
+		global.fetch = jest.fn(async () =>
+			refused(401, "Invalid/expired token"),
+		) as unknown as typeof fetch;
+
+		const error = await uploadFolder(
+			{ ...config, pinataJwt: "t1" },
+			[{ path: "d/a.txt", file: file("a") }],
+			"public",
+			{
+				signal: controller.signal,
+				// Never settles: the user would have to sign in again
+				refreshJwt: () => {
+					setImmediate(() => controller.abort());
+					return new Promise<string>(() => {});
+				},
+			},
+		).catch((e) => e);
+
+		expect(error).toBeInstanceOf(FolderUploadError);
+		expect(error.failed[0].error.name).toBe("AbortError");
+	});
+
+	it("keeps renewing the JWT of a file that outlives several of them, as long as it progresses", async () => {
+		// Four chunks; each JWT is accepted for two requests
+		const auth = expiring(2);
+		let stored = 0;
+		const size = 3 * chunk + 10;
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			if (!auth.accepts(headers)) return refused(401, "Invalid/expired token");
+			if (init.method === "PUT") return synced(1);
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "HEAD") {
+				return new Response(null, {
+					status: 200,
+					headers: { "Upload-Offset": `${stored}` },
+				});
+			}
+			stored = Math.min(size, Number(headers["Upload-Offset"]) + chunk);
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Upload-Offset": `${stored}`,
+					...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			auth.config,
+			[
+				{
+					path: "d/big.bin",
+					file: new File([new Uint8Array(size)], "big.bin"),
+				},
+			],
+			"public",
+			{ refreshJwt: auth.refreshJwt },
+		);
+
+		expect(result.files[0].cid).toBe("bafybig");
+		expect(auth.refreshJwt.mock.calls.length).toBeGreaterThan(2);
+	});
+
+	it("asks for a new JWT when the one a file was sent with is refused, even if it changed while the file waited", async () => {
+		// t1 is refused after one use, t2 at once, t3 never
+		const used = new Map<string, number>();
+		const limits: Record<string, number> = { t1: 1, t2: 0 };
+		const posts: string[] = [];
+		let issued = 1;
+		const refreshJwt = jest.fn(async () => `t${++issued}`);
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			const jwt = headers.Authorization.replace("Bearer ", "");
+			const n = (used.get(jwt) ?? 0) + 1;
+			used.set(jwt, n);
+			if (init.method === "POST") posts.push(jwt);
+			if (n > (limits[jwt] ?? Number.POSITIVE_INFINITY)) {
+				return refused(401, "Invalid/expired token");
+			}
+			return init.method === "PUT" ? synced(3) : registeredAt(url, init);
+		}) as unknown as typeof fetch;
+
+		await uploadFolder(
+			{ ...config, pinataJwt: "t1" },
+			[
+				{ path: "d/a.txt", file: file("a") },
+				{ path: "d/b.txt", file: file("bb") },
+				{ path: "d/c.txt", file: file("cc") },
+			],
+			"public",
+			{ refreshJwt, concurrency: 1 },
+		);
+
+		// t2, refused, is used once and replaced at once
+		expect(posts.filter((jwt) => jwt === "t2")).toHaveLength(1);
+		expect(refreshJwt).toHaveBeenCalledTimes(2);
+	});
+
+	it("continues the upload when checking it after a failed chunk is refused the JWT", async () => {
+		const size = 2 * chunk + 10;
+		let stored = 0;
+		let failedOnce = false;
+		const calls: string[] = [];
+		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+			const headers = init.headers as Record<string, string>;
+			const old = headers.Authorization === "Bearer t1";
+			calls.push(
+				`${init.method}${headers["Upload-Offset"] ? ` ${headers["Upload-Offset"]}` : ""}`,
+			);
+			if (init.method === "PUT") return synced(1);
+			if (init.method === "POST") {
+				return new Response(null, {
+					status: 201,
+					headers: { Location: `${url}/upload` },
+				});
+			}
+			if (init.method === "HEAD") {
+				// The JWT expired while the chunk failed
+				if (old) return new Response(null, { status: 401 });
+				return new Response(null, {
+					status: 200,
+					headers: { "Upload-Offset": `${stored}` },
+				});
+			}
+			if (headers["Upload-Offset"] === `${chunk}` && !failedOnce) {
+				failedOnce = true;
+				return new Response("busy", { status: 503 });
+			}
+			stored = Math.min(size, Number(headers["Upload-Offset"]) + chunk);
+			return new Response(null, {
+				status: 204,
+				headers: {
+					"Upload-Offset": `${stored}`,
+					...(stored === size ? { "Upload-Cid": "bafybig" } : {}),
+				},
+			});
+		}) as unknown as typeof fetch;
+
+		const result = await uploadFolder(
+			{ ...config, pinataJwt: "t1" },
+			[
+				{
+					path: "d/big.bin",
+					file: new File([new Uint8Array(size)], "big.bin"),
+				},
+			],
+			"public",
+			{ refreshJwt: () => "t2" },
+		);
+
+		expect(result.files[0].cid).toBe("bafybig");
+		expect(calls.filter((c) => c === "POST")).toHaveLength(1);
+		expect(calls.filter((c) => c === "PATCH 0")).toHaveLength(1);
 	});
 });

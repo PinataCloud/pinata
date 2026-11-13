@@ -56,8 +56,8 @@ export const resolveHeaders = (
 
 // Asks the server how much of a resumable upload it has stored (TUS HEAD).
 // Returns undefined when the server cannot tell right now, so the caller retries
-// at its own offset. Throws when the upload no longer exists, because no retry
-// can succeed then.
+// at its own offset. Throws when no retry can succeed: the upload no longer exists,
+// or the server refuses to look it up for good.
 export const getUploadStatus = async (
 	url: string,
 	headers: RequestHeaders,
@@ -100,6 +100,23 @@ export const getUploadStatus = async (
 			},
 		);
 	}
+	// Asking again cannot change a refusal other than a timeout, a conflict or a rate
+	// limit (a name the server cannot address answers 400 to every HEAD)
+	if (
+		res.status >= 400 &&
+		res.status < 500 &&
+		![408, 409, 423, 425, 429].includes(res.status)
+	) {
+		throw new NetworkError(
+			`The server refused to look up the upload (HTTP ${res.status})`,
+			res.status,
+			{
+				error: `HEAD returned ${res.status}`,
+				code: "HTTP_ERROR",
+				metadata: { requestUrl: res.url || url },
+			},
+		);
+	}
 	if (!res.ok) {
 		return undefined;
 	}
@@ -121,15 +138,17 @@ export const getUploadStatus = async (
 // file can only be looked up once HEAD reports `ready`; until then registration can
 // still fail. Polls HEAD until then and returns that `ready` status (its CID is null if
 // `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
+// The pause between two checks starts at 1 s and doubles up to `pollMaxMs`.
 export const waitForRegistration = async (
 	url: string,
 	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
+	pollMaxMs = REGISTRATION_POLL_MAX_MS,
 ): Promise<UploadStatus> => {
 	const timeout = registrationTimeout(size);
 	const deadline = Date.now() + timeout;
-	let delay = 1000;
+	let delay = Math.min(1000, pollMaxMs);
 	while (Date.now() + delay <= deadline) {
 		await new Promise<void>((resolve, reject) => {
 			if (signal?.aborted) return reject(signal.reason);
@@ -143,7 +162,7 @@ export const waitForRegistration = async (
 			}, delay);
 			signal?.addEventListener("abort", onAbort, { once: true });
 		});
-		delay = Math.min(delay * 2, REGISTRATION_POLL_MAX_MS);
+		delay = Math.min(delay * 2, pollMaxMs);
 		const status = await getUploadStatus(url, headers, size, signal);
 		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.

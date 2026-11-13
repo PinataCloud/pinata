@@ -56,11 +56,17 @@ export type FolderEntry = {
 export type FolderUploadEvent = {
 	/**
 	 * `start`: the file's bytes start to be sent (again on each attempt).
+	 * `sent`: the server has every byte of the file and is registering it (it may take
+	 * seconds to minutes: the server is processing the file), then `complete`, `retry` or
+	 * `error`. Again on each attempt, also on one that only checks the registration.
 	 * `complete`: the file is registered in the folder.
-	 * `retry`: an attempt failed and the file will be sent again after `delayMs`.
+	 * `retry`: an attempt failed and the file will be sent again after `delayMs`, or, with
+	 * `waitingForOnline`, once the browser is back online.
 	 * `error`: the file failed for good; the upload goes on with the other files.
 	 */
-	type: "start" | "complete" | "retry" | "error";
+	type: "start" | "sent" | "complete" | "retry" | "error";
+	/** The file's position in the files given: tells files apart whatever their path */
+	index: number;
 	/** The file's path in the folder, folder name included */
 	path: string;
 	size: number;
@@ -70,8 +76,14 @@ export type FolderUploadEvent = {
 	cid?: string;
 	/** `retry` and `error`: why the attempt failed */
 	error?: Error;
-	/** `retry`: how long until the next attempt */
+	/** `retry`: how long until the next attempt (0 with `waitingForOnline`) */
 	delayMs?: number;
+	/**
+	 * `retry`: the browser is offline (navigator.onLine is false). The next attempt starts
+	 * when it is back online, however long that takes, and this one is not counted against
+	 * `retries`. Cancel with `signal` to give up sooner.
+	 */
+	waitingForOnline?: boolean;
 	/** Files registered so far */
 	completed: number;
 	/** Files that failed for good so far */
@@ -80,9 +92,18 @@ export type FolderUploadEvent = {
 };
 
 export type FolderUploadOptions = UploadOptions & {
-	/** How many files send their bytes at the same time. Defaults to 4. */
+	/**
+	 * How many files send their bytes at the same time. Defaults to 4. Files whose bytes are
+	 * stored wait for the server to register them without holding one of these; at most
+	 * 8 times as many files (32 by default) are under way at once, sending or waiting.
+	 */
 	concurrency?: number;
-	/** How many times a file is sent again after a transient failure. Defaults to 3. */
+	/**
+	 * How many times a file is sent again after a transient failure (no answer, 408, 409,
+	 * 425, 429 or 5xx), after a growing pause or the one the server asks for (Retry-After,
+	 * up to 5 minutes). Attempts that fail while the browser is offline do not count: the
+	 * next one waits until it is back online. Defaults to 3.
+	 */
 	retries?: number;
 	/** Called for every file event, in order for each file. What it throws is ignored. */
 	onProgress?: (event: FolderUploadEvent) => void;
@@ -95,13 +116,28 @@ export type FolderUploadOptions = UploadOptions & {
 	/**
 	 * Cancels the upload: requests under way are aborted and files not uploaded yet fail with
 	 * an error named "AbortError". The files already uploaded stay in the folder, and the
-	 * upload rejects with a FolderUploadError.
+	 * upload rejects with a FolderUploadError (with a PinataError named "AbortError" once
+	 * every file is uploaded and the folder is being finished).
 	 */
 	signal?: AbortSignal;
+	/**
+	 * Called when the server refuses the JWT (401 or 403) during the upload, the final
+	 * folder sync included: returns a new one, which the SDK then uses as with setNewJwt,
+	 * and the refused requests are sent again, without counting against `retries`. Called
+	 * once per refused JWT, however many files it failed. A file may be refused a renewed
+	 * JWT twice in a row without progress before it fails; any byte the server accepts
+	 * starts that count over, so a file can outlive many JWTs. Without it, or when it
+	 * returns nothing, the refused files fail, and so do the files not sent yet until
+	 * another JWT is set. A cancel (`signal`) doesn't wait for it to settle. Not used with
+	 * `keys`.
+	 */
+	refreshJwt?: () => Promise<string | undefined> | string | undefined;
 };
 
 /** A file of an uploaded folder */
 export type FolderFileResult = {
+	/** The file's position in the files given */
+	index: number;
 	path: string;
 	size: number;
 	cid: string;
