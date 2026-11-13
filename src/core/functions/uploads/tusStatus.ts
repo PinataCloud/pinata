@@ -1,4 +1,8 @@
-import { NetworkError } from "../../../utils/custom-errors";
+import {
+	AuthenticationError,
+	NetworkError,
+} from "../../../utils/custom-errors";
+import { isFinalRefusal, parseRetryAfter, sleep } from "./retry";
 
 const GIB = 1024 * 1024 * 1024;
 // How long to wait for a finished upload to be registered. Processing a large file
@@ -40,19 +44,47 @@ export const parseUploadOffset = (
 	return Number.isSafeInteger(offset) && offset <= size ? offset : undefined;
 };
 
+// Request headers, or a function that builds them for each request: a token replaced
+// meanwhile (setNewJwt) is then used from the next request on.
+export type RequestHeaders =
+	| Record<string, string>
+	| (() => Record<string, string>);
+
+export const resolveHeaders = (
+	headers: RequestHeaders,
+): Record<string, string> =>
+	typeof headers === "function" ? headers() : headers;
+
+// Why a lookup could not tell where an upload stands
+export interface StatusHint {
+	// The HTTP status of the answer (none without an answer)
+	status?: number;
+	// How long the server asked to wait (Retry-After), if it did
+	retryAfterMs?: number;
+}
+
 // Asks the server how much of a resumable upload it has stored (TUS HEAD).
 // Returns undefined when the server cannot tell right now, so the caller retries
-// at its own offset. Throws when the upload no longer exists, because no retry
-// can succeed then.
+// at its own offset; `hint` then says why. Throws when no retry can succeed: the
+// upload no longer exists, or the server refuses to look it up for good.
 export const getUploadStatus = async (
 	url: string,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
+	hint?: StatusHint,
 ): Promise<UploadStatus | undefined> => {
+	if (hint) {
+		hint.status = undefined;
+		hint.retryAfterMs = undefined;
+	}
 	let res: Response;
 	try {
-		res = await fetch(url, { method: "HEAD", headers, signal });
+		res = await fetch(url, {
+			method: "HEAD",
+			headers: resolveHeaders(headers),
+			signal,
+		});
 	} catch {
 		return undefined;
 	}
@@ -69,7 +101,37 @@ export const getUploadStatus = async (
 			},
 		);
 	}
+	// No later request can succeed with these credentials: say so now, rather than
+	// polling until the registration wait runs out
+	if (res.status === 401 || res.status === 403) {
+		throw new AuthenticationError(
+			`Authentication failed while checking the upload (HTTP ${res.status})`,
+			res.status,
+			{
+				error: `HEAD returned ${res.status}`,
+				code: "AUTH_ERROR",
+				metadata: { requestUrl: res.url || url },
+			},
+		);
+	}
+	// Asking again cannot change a refusal other than a timeout, a conflict or a rate
+	// limit (a name the server cannot address answers 400 to every HEAD)
+	if (isFinalRefusal(res.status)) {
+		throw new NetworkError(
+			`The server refused to look up the upload (HTTP ${res.status})`,
+			res.status,
+			{
+				error: `HEAD returned ${res.status}`,
+				code: "HTTP_ERROR",
+				metadata: { requestUrl: res.url || url },
+			},
+		);
+	}
 	if (!res.ok) {
+		if (hint) {
+			hint.status = res.status;
+			hint.retryAfterMs = parseRetryAfter(res.headers);
+		}
 		return undefined;
 	}
 	const offset = parseUploadOffset(res.headers, size);
@@ -90,30 +152,23 @@ export const getUploadStatus = async (
 // file can only be looked up once HEAD reports `ready`; until then registration can
 // still fail. Polls HEAD until then and returns that `ready` status (its CID is null if
 // `ready` came without one). `signal` stops the wait: it rejects with the abort reason.
+// The pause between two checks starts at 1 s and doubles up to `pollMaxMs`, or is as long
+// as the server asks (Retry-After), and the last check is at the end of the wait.
 export const waitForRegistration = async (
 	url: string,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	size: number,
 	signal?: AbortSignal,
+	pollMaxMs = REGISTRATION_POLL_MAX_MS,
 ): Promise<UploadStatus> => {
 	const timeout = registrationTimeout(size);
 	const deadline = Date.now() + timeout;
-	let delay = 1000;
-	while (Date.now() + delay <= deadline) {
-		await new Promise<void>((resolve, reject) => {
-			if (signal?.aborted) return reject(signal.reason);
-			const onAbort = () => {
-				clearTimeout(timer);
-				reject(signal?.reason);
-			};
-			const timer = setTimeout(() => {
-				signal?.removeEventListener("abort", onAbort);
-				resolve();
-			}, delay);
-			signal?.addEventListener("abort", onAbort, { once: true });
-		});
-		delay = Math.min(delay * 2, REGISTRATION_POLL_MAX_MS);
-		const status = await getUploadStatus(url, headers, size, signal);
+	let delay = Math.min(1000, pollMaxMs);
+	const hint: StatusHint = {};
+	for (;;) {
+		await sleep(delay, signal);
+		if (signal?.aborted) throw signal.reason;
+		const status = await getUploadStatus(url, headers, size, signal, hint);
 		if (signal?.aborted) throw signal.reason;
 		// `ready` is final: without a CID the caller reports the missing CID.
 		if (status?.status === "ready") {
@@ -133,6 +188,12 @@ export const waitForRegistration = async (
 				},
 			);
 		}
+		const left = deadline - Date.now();
+		if (left <= 0) break;
+		delay = Math.min(
+			Math.max(Math.min(delay * 2, pollMaxMs), hint.retryAfterMs ?? 0),
+			left,
+		);
 	}
 	// Not a failure of the upload: the server has every byte and may still register it.
 	throw new NetworkError(

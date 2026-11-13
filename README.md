@@ -70,6 +70,47 @@ This will return an object like the following:
 }
 ```
 
+### Upload a Folder
+
+`folder()` uploads every file as its own resumable upload into one folder, several at a time, each retried on its own, and resolves with the folder's CID and every file's CID:
+
+```typescript
+import { FolderUploadError } from "pinata";
+
+// Files from <input type="file" webkitdirectory>, or { path, file } entries
+const files = Array.from(input.files!);
+
+try {
+  const folder = await pinata.upload.public
+    .folder(files, {
+      concurrency: 4, // files sending bytes at once
+      onProgress: (event) => console.log(event.type, event.index, event.path),
+    })
+    .name("photos");
+  console.log(folder.cid, folder.files);
+} catch (error) {
+  if (error instanceof FolderUploadError) {
+    if (error.folder?.is_duplicate) {
+      // The files that made it matched an earlier folder, which replaced this one:
+      // send every file again, into a new folder
+      await pinata.upload.public.folder(files).name("photos");
+    } else if (error.failed.length === 0) {
+      // Every file is uploaded, but the folder is still being finished: get it by
+      // error.folderId later for its CID
+    } else {
+      // The other files are in the folder: send the failed ones again into it (within
+      // 30 minutes when error.folder is undefined; see FolderUploadError)
+      await pinata.upload.public.folder(
+        error.failed.map((f) => ({ path: f.path, file: files[f.index] })),
+        { folderId: error.folderId },
+      );
+    }
+  }
+}
+```
+
+Events (`start`, `sent`, `complete`, `retry`, `error`) carry the file's `index` in the files given. A `signal` cancels the upload, `refreshJwt` renews a JWT the server refuses during a long upload, and an upload whose content was already uploaded resolves with `is_duplicate: true`. See the `FolderUploadOptions` and `FolderUploadEvent` types for the rest.
+
 ### 3. Retrieve a File
 
 Use the `cid` or from the upload to fetch a file
