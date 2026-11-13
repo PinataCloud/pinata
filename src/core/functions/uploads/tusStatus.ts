@@ -56,8 +56,8 @@ export const resolveHeaders = (
 
 // Asks the server how much of a resumable upload it has stored (TUS HEAD).
 // Returns undefined when the server cannot tell right now, so the caller retries
-// at its own offset. Throws when the upload no longer exists, because no retry
-// can succeed then.
+// at its own offset. Throws when no retry can succeed: the upload no longer exists,
+// or the server refuses to look it up for good.
 export const getUploadStatus = async (
 	url: string,
 	headers: RequestHeaders,
@@ -96,6 +96,23 @@ export const getUploadStatus = async (
 			{
 				error: `HEAD returned ${res.status}`,
 				code: "AUTH_ERROR",
+				metadata: { requestUrl: res.url || url },
+			},
+		);
+	}
+	// Asking again cannot change a refusal other than a timeout, a conflict or a rate
+	// limit (a name the server cannot address answers 400 to every HEAD)
+	if (
+		res.status >= 400 &&
+		res.status < 500 &&
+		![408, 409, 423, 425, 429].includes(res.status)
+	) {
+		throw new NetworkError(
+			`The server refused to look up the upload (HTTP ${res.status})`,
+			res.status,
+			{
+				error: `HEAD returned ${res.status}`,
+				code: "HTTP_ERROR",
 				metadata: { requestUrl: res.url || url },
 			},
 		);

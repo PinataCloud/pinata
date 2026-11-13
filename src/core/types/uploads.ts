@@ -84,7 +84,12 @@ export type FolderUploadEvent = {
 export type FolderUploadOptions = UploadOptions & {
 	/** How many files send their bytes at the same time. Defaults to 4. */
 	concurrency?: number;
-	/** How many times a file is sent again after a transient failure. Defaults to 3. */
+	/**
+	 * How many times a file is sent again after a transient failure (no answer, 408, 409,
+	 * 425, 429 or 5xx), after a growing pause or the one the server asks for (Retry-After,
+	 * up to 5 minutes). Attempts that fail while the browser is offline do not count: the
+	 * next one waits until it is back online. Defaults to 3.
+	 */
 	retries?: number;
 	/** Called for every file event, in order for each file. What it throws is ignored. */
 	onProgress?: (event: FolderUploadEvent) => void;
@@ -97,9 +102,18 @@ export type FolderUploadOptions = UploadOptions & {
 	/**
 	 * Cancels the upload: requests under way are aborted and files not uploaded yet fail with
 	 * an error named "AbortError". The files already uploaded stay in the folder, and the
-	 * upload rejects with a FolderUploadError.
+	 * upload rejects with a FolderUploadError (with a PinataError named "AbortError" once
+	 * every file is uploaded and the folder is being finished).
 	 */
 	signal?: AbortSignal;
+	/**
+	 * Called when the server refuses the JWT (401 or 403) during the upload: returns a new
+	 * one, which the SDK then uses as with setNewJwt, and the refused requests are sent
+	 * again. Called once per refused JWT, however many files it failed. Without it, or
+	 * when it returns nothing, the refused files fail, and so do the files not sent yet
+	 * until another JWT is set. Not used with `keys`.
+	 */
+	refreshJwt?: () => Promise<string | undefined> | string | undefined;
 };
 
 /** A file of an uploaded folder */

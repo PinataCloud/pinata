@@ -569,11 +569,18 @@ Response: "Revoked"
 
   type FolderUploadOptions = {
     concurrency?: number;   // files sending bytes at once (default 4)
-    retries?: number;       // retries per file after a transient failure (default 3)
+    retries?: number;       // retries per file after a transient failure (default 3):
+                            // no answer, 408/409/425/429, 5xx; waits as long as Retry-After
+                            // asks (up to 5 min); attempts while the browser is offline
+                            // (navigator.onLine false) don't count, the next waits for "online"
     onProgress?: (event: FolderUploadEvent) => void;
     folderId?: string;      // upload into this folder (UUID): resend a FolderUploadError's
                             // failed files with its folderId to complete that folder
     signal?: AbortSignal;   // cancel: files not uploaded yet fail with an "AbortError"
+    refreshJwt?: () => Promise<string | undefined> | string | undefined;
+                            // on a 401/403: a new JWT (used as with setNewJwt), asked once per
+                            // refused JWT; the refused files are sent again. Without it, a
+                            // refused JWT fails the files until another is set (setNewJwt)
   }
   type FolderUploadEvent = {
     type: "start" | "complete" | "retry" | "error";
@@ -597,6 +604,10 @@ Response: "Revoked"
   Cancelled while the folder is being finished: rejects with an error named "AbortError".
   If the first file fails for a reason of its own (path, type, size), the next one
   creates the folder; any other failure of the first file stops the upload.
+  A file whose bytes are stored but whose registration check fails is checked again on
+  retry, not sent again. A HEAD the server refuses for good (4xx) fails the file at once.
+  A one-file folder matching an earlier one is merged into it by the server (sync: 404):
+  the upload resolves with that folder and is_duplicate.
 
   // JSON content
   pinata.upload.public.json(JsonObject)

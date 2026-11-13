@@ -12,12 +12,24 @@ import {
 	PinataError,
 	ValidationError,
 } from "../../../utils/custom-errors";
-import { registerResumable, sendResumable } from "./resumable";
-import { encodeMetadataValue, serverReason } from "./tusMetadata";
+import {
+	registerResumable,
+	sendResumable,
+	type StoredUpload,
+} from "./resumable";
+import {
+	encodeMetadataValue,
+	parseUploadMetadata,
+	serverReason,
+} from "./tusMetadata";
+import { type RequestHeaders, resolveHeaders } from "./tusStatus";
+import { isOffline, parseRetryAfter, sleep, untilOnline } from "./wait";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_RETRIES = 3;
 const DEFAULT_FOLDER_NAME = "folder_from_sdk";
+// How many times a file is sent again because the JWT it was refused was replaced
+const MAX_RENEWALS = 2;
 // A file's bytes are stored seconds before the server registers it. Files waiting for that
 // don't hold a send slot, but at most this many per slot are under way at once, so that a
 // large folder doesn't poll the registration of thousands of files.
@@ -112,17 +124,66 @@ export const uploadFolder = async (
 
 	const slots = new Semaphore(concurrency);
 	const underWay = new Semaphore(concurrency * UNDER_WAY_PER_SLOT);
-	// Set by a failure no other file can avoid (authentication): files not started yet fail
-	// with it instead of being sent.
-	let fatal: Error | undefined;
-	// No file can succeed after an authentication failure.
-	const noteFatal = (error: unknown) => {
+
+	const currentJwt = () => options?.keys || config.pinataJwt || "";
+	// An authentication failure no other file can avoid, and the JWT it was for: files not
+	// started yet fail with it instead of being sent, until another JWT is in use.
+	let fatal: { error: Error; jwt: string } | undefined;
+	const fatalNow = () =>
+		fatal && fatal.jwt === currentJwt() ? fatal.error : undefined;
+	// After `error`, true if it is a 401 or 403 for `refused` and another JWT is now in use:
+	// one set meanwhile (setNewJwt), else one from refreshJwt, asked once per refused JWT.
+	// A refusal that no other JWT follows is fatal.
+	let renewal: { jwt: string; done: Promise<void> } | undefined;
+	const renewJwt = async (error: unknown, refused: string) => {
 		if (
-			!fatal &&
-			error instanceof PinataError &&
-			(error.statusCode === 401 || error.statusCode === 403)
+			!(error instanceof PinataError) ||
+			(error.statusCode !== 401 && error.statusCode !== 403)
 		) {
-			fatal = error;
+			return false;
+		}
+		const refresh = options?.refreshJwt;
+		if (currentJwt() === refused && refresh && !options?.keys) {
+			if (renewal?.jwt !== refused) {
+				renewal = {
+					jwt: refused,
+					done: (async () => {
+						try {
+							const jwt = await refresh();
+							// What setNewJwt does: the SDK uses it from then on
+							if (jwt) config.pinataJwt = jwt;
+						} catch {
+							// No new JWT: the refusal stands
+						}
+					})(),
+				};
+			}
+			await renewal.done;
+		}
+		if (currentJwt() !== refused) return true;
+		if (!fatalNow()) fatal = { error, jwt: refused };
+		return false;
+	};
+	// A file the server registered as an earlier folder (a one-file folder matching one):
+	// the server then removes this folder, and syncing it answers 404
+	let duplicateOf: { id: string; name: string; cid: string } | undefined;
+	const finishFolder = async (): Promise<SyncedFolder> => {
+		try {
+			return await syncFolder(endpoint, folderId, headers, retries, signal);
+		} catch (error) {
+			if (
+				!duplicateOf ||
+				!(error instanceof PinataError) ||
+				error.statusCode !== 404
+			) {
+				throw error;
+			}
+			return {
+				...duplicateOf,
+				size: uploaded.reduce((sum, f) => sum + f.size, 0),
+				number_of_files: uploaded.length,
+				is_duplicate: true,
+			};
 		}
 	};
 
@@ -146,32 +207,46 @@ export const uploadFolder = async (
 			);
 			return;
 		}
+		// Kept across attempts: once every byte is stored, an attempt only waits for the
+		// file's registration again
+		let stored: StoredUpload | undefined;
+		// Failed attempts counted against `retries`: not those made while offline, nor those
+		// refused a JWT since replaced (at most MAX_RENEWALS of them)
+		let spent = 0;
+		let renewals = 0;
 		for (let attempt = 1; ; attempt++) {
 			if (signal?.aborted) {
 				fail(cancelled(), attempt - 1);
 				return;
 			}
+			const jwt = currentJwt();
 			try {
-				// Only sending the bytes takes a slot: waiting for registration doesn't.
-				const stored = await slots.run(async () => {
-					if (fatal) throw fatal;
-					if (signal?.aborted) throw cancelled();
+				if (stored) {
 					emit({ type: "start", index, path, size: file.size, attempt });
-					try {
-						return await sendResumable(
-							createUrl.toString(),
-							headers,
-							file,
-							`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
-							true,
-							signal,
-						);
-					} catch (error) {
-						// Before the slot goes to the next file, which must not be sent then.
-						noteFatal(error);
-						throw error;
-					}
-				});
+				} else {
+					// Only sending the bytes takes a slot: waiting for registration doesn't.
+					stored = await slots.run(async () => {
+						const refused = fatalNow();
+						if (refused) throw refused;
+						if (signal?.aborted) throw cancelled();
+						emit({ type: "start", index, path, size: file.size, attempt });
+						try {
+							return await sendResumable(
+								createUrl.toString(),
+								headers,
+								file,
+								`filename ${encodeMetadataValue(path)},filetype ${encodeMetadataValue(file.type)},${sharedMetadata}`,
+								true,
+								signal,
+							);
+						} catch (error) {
+							// Before the slot goes to the next file, which must not be sent with a
+							// JWT refused for good
+							await renewJwt(error, jwt);
+							throw error;
+						}
+					});
+				}
 				// The file is in the folder once registered. It may be reported as an earlier
 				// upload when, alone, it matches one (a one-file folder of the same name and
 				// content): its object is in this folder all the same, and its CID is its own.
@@ -181,6 +256,20 @@ export const uploadFolder = async (
 					file.size,
 					signal,
 				);
+				const reported = parseUploadMetadata(registered.metadata);
+				if (
+					reported.file_id &&
+					reported.file_id !== folderId &&
+					reported.filename &&
+					!reported.filename.includes("/") &&
+					reported.cid
+				) {
+					duplicateOf = {
+						id: reported.file_id,
+						name: reported.filename,
+						cid: reported.cid,
+					};
+				}
 				const result = {
 					index,
 					path,
@@ -204,12 +293,22 @@ export const uploadFolder = async (
 				}
 				const error =
 					caught instanceof Error ? caught : new Error(String(caught));
-				noteFatal(error);
-				if (error === fatal || !isTransient(error) || attempt > retries) {
+				const renewed = await renewJwt(error, jwt);
+				// No answer while the browser is offline: the next attempt waits until it is
+				// back online, and this one is not counted
+				const offline =
+					(!(error instanceof PinataError) || error.statusCode === 0) &&
+					isOffline();
+				if (
+					renewed
+						? ++renewals > MAX_RENEWALS
+						: !isTransient(error) || (!offline && ++spent > retries)
+				) {
 					fail(error, attempt);
 					return;
 				}
-				const delayMs = backoff(attempt);
+				const delayMs =
+					renewed || offline ? 0 : Math.max(backoff(spent), retryAfter(error));
 				emit({
 					type: "retry",
 					index,
@@ -219,7 +318,8 @@ export const uploadFolder = async (
 					error,
 					delayMs,
 				});
-				await sleep(delayMs, signal);
+				if (offline) await untilOnline(signal);
+				else await sleep(delayMs, signal);
 			}
 		}
 	};
@@ -253,8 +353,13 @@ export const uploadFolder = async (
 		previousReason = reason;
 		const ownReason =
 			error instanceof ValidationError ||
-			[400, 413, 415, 422].includes(status ?? 0);
-		if (error === fatal || !ownReason || repeats >= 3 || pending.length === 0) {
+			[400, 413, 414, 415, 422, 431].includes(status ?? 0);
+		if (
+			error === fatalNow() ||
+			!ownReason ||
+			repeats >= 3 ||
+			pending.length === 0
+		) {
 			throw error instanceof PinataError
 				? error
 				: new PinataError(`Error uploading folder: ${error.message}`);
@@ -267,8 +372,8 @@ export const uploadFolder = async (
 		// folder it turned out to duplicate, is worth knowing. Best effort: a failed sync
 		// leaves it unknown and must not hide why the files failed.
 		const folder =
-			uploaded.length > 0 && !signal?.aborted && !fatal
-				? await syncFolder(endpoint, folderId, headers(), retries, signal).then(
+			uploaded.length > 0 && !signal?.aborted && !fatalNow()
+				? await finishFolder().then(
 						(synced) => ({
 							id: synced.id,
 							name: synced.name,
@@ -287,13 +392,7 @@ export const uploadFolder = async (
 		);
 	}
 
-	const folder = await syncFolder(
-		endpoint,
-		folderId,
-		headers(),
-		retries,
-		signal,
-	);
+	const folder = await finishFolder();
 	// At least these files: a folder uploaded into (folderId) also holds the earlier ones
 	if (folder.number_of_files < total) {
 		throw new NetworkError(
@@ -362,16 +461,17 @@ const cancelled = () => {
 const syncFolder = async (
 	endpoint: string,
 	folderId: string,
-	headers: Record<string, string>,
+	headers: RequestHeaders,
 	retries: number,
 	signal?: AbortSignal,
 ): Promise<SyncedFolder> => {
-	for (let attempt = 1; ; attempt++) {
+	const requestUrl = `${endpoint}/buckets/${folderId}/sync`;
+	for (let attempt = 1, spent = 0; ; attempt++) {
 		let error: NetworkError;
 		try {
-			const res = await fetch(`${endpoint}/buckets/${folderId}/sync`, {
+			const res = await fetch(requestUrl, {
 				method: "PUT",
-				headers,
+				headers: resolveHeaders(headers),
 				signal,
 			});
 			if (res.ok) {
@@ -381,26 +481,40 @@ const syncFolder = async (
 			const text = await res.text().catch(() => "");
 			const reason = serverReason(text);
 			error = new NetworkError(
-				`Could not finish folder ${folderId} (HTTP ${res.status})${reason ? `: ${reason}` : ""}`,
+				`Could not finish the folder (HTTP ${res.status})${reason ? `: ${reason}` : ""}`,
 				res.status,
-				{ error: text, code: "HTTP_ERROR", metadata: { requestUrl: res.url } },
+				{
+					error: text,
+					code: "HTTP_ERROR",
+					metadata: {
+						requestUrl,
+						folderId,
+						retryAfterMs: parseRetryAfter(res.headers),
+					},
+				},
 			);
 		} catch (caught) {
 			if (signal?.aborted) throw cancelled();
 			const message = caught instanceof Error ? caught.message : String(caught);
 			error = new NetworkError(
-				`Could not finish folder ${folderId}: ${message}`,
+				`Could not finish the folder: could not reach the upload server: ${message}`,
 				0,
 				{
 					error: message,
 					code: "NETWORK_ERROR",
+					metadata: { requestUrl, folderId },
 				},
 			);
 		}
-		if (!isTransient(error) || attempt > retries) {
+		// Offline in a browser: wait until back online, without counting the attempt
+		if (error.statusCode === 0 && (await untilOnline(signal))) {
+			if (signal?.aborted) throw cancelled();
+			continue;
+		}
+		if (!isTransient(error) || ++spent > retries) {
 			throw error;
 		}
-		await sleep(backoff(attempt), signal);
+		await sleep(Math.max(backoff(spent), retryAfter(error)), signal);
 		if (signal?.aborted) throw cancelled();
 	}
 };
@@ -490,21 +604,17 @@ const isTransient = (error: Error): boolean => {
 	);
 };
 
+// How long the server asked to wait before the next attempt (Retry-After), if it did
+const retryAfter = (error: Error): number => {
+	const ms =
+		error instanceof PinataError
+			? error.details?.metadata?.retryAfterMs
+			: undefined;
+	return typeof ms === "number" ? ms : 0;
+};
+
 const backoff = (attempt: number): number =>
 	Math.min(1000 * 2 ** (attempt - 1), 10000) + Math.floor(Math.random() * 500);
-
-// Resolves after `ms`, or as soon as `signal` aborts
-const sleep = (ms: number, signal?: AbortSignal) =>
-	new Promise<void>((resolve) => {
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const done = () => {
-			if (timer !== undefined) clearTimeout(timer);
-			signal?.removeEventListener("abort", done);
-			resolve();
-		};
-		signal?.addEventListener("abort", done, { once: true });
-		timer = setTimeout(done, ms);
-	});
 
 // Runs at most `limit` tasks at a time, in the order they ask.
 class Semaphore {

@@ -1,6 +1,7 @@
 import { NetworkError } from "../../../utils/custom-errors";
 import { FileChunks } from "./fileChunks";
 import { serverReason } from "./tusMetadata";
+import { parseRetryAfter, sleep, untilOnline } from "./wait";
 import {
 	getUploadStatus,
 	parseUploadOffset,
@@ -36,22 +37,28 @@ export const sendResumable = async (
 	signal?: AbortSignal,
 ): Promise<StoredUpload> => {
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
-	const urlReq = await fetch(createUrl, {
-		method: "POST",
-		headers: {
-			"Upload-Length": `${file.size}`,
-			"Upload-Metadata": metadata,
-			...(withBody
-				? { "Content-Type": "application/offset+octet-stream" }
-				: {}),
-			...resolveHeaders(headers),
-			// RFC 7240: this client accepts that the server registers the file after the
-			// last PATCH, and waits for `ready` (see waitForRegistration).
-			Prefer: "respond-async",
-		},
-		...(withBody ? { body: file } : {}),
-		signal,
-	});
+	let urlReq: Response;
+	try {
+		urlReq = await fetch(createUrl, {
+			method: "POST",
+			headers: {
+				"Upload-Length": `${file.size}`,
+				"Upload-Metadata": metadata,
+				...(withBody
+					? { "Content-Type": "application/offset+octet-stream" }
+					: {}),
+				...resolveHeaders(headers),
+				// RFC 7240: this client accepts that the server registers the file after the
+				// last PATCH, and waits for `ready` (see waitForRegistration).
+				Prefer: "respond-async",
+			},
+			...(withBody ? { body: file } : {}),
+			signal,
+		});
+	} catch (error) {
+		if (signal?.aborted) throw signal.reason;
+		throw unreachable(error, createUrl);
+	}
 	const url = urlReq.headers.get("Location");
 	if (!url) {
 		const errorData = await urlReq.text().catch(() => "");
@@ -67,6 +74,7 @@ export const sendResumable = async (
 				metadata: {
 					requestUrl: urlReq.url,
 					requestHeaders: urlReq.headers,
+					retryAfterMs: parseRetryAfter(urlReq.headers),
 				},
 			},
 		);
@@ -95,7 +103,12 @@ export const sendResumable = async (
 			const chunk = await chunks.at(offset);
 			const chunkLength =
 				chunk instanceof Uint8Array ? chunk.byteLength : chunk.size;
-			let failure: { status: number; error: string; requestUrl: string };
+			let failure: {
+				status: number;
+				error: string;
+				requestUrl: string;
+				retryAfterMs?: number;
+			};
 
 			try {
 				const uploadReq = await fetch(url, {
@@ -136,6 +149,7 @@ export const sendResumable = async (
 						status: uploadReq.status,
 						error: await uploadReq.text().catch(() => "Unknown error"),
 						requestUrl: uploadReq.url || url,
+						retryAfterMs: parseRetryAfter(uploadReq.headers),
 					};
 				}
 			} catch (error) {
@@ -147,41 +161,46 @@ export const sendResumable = async (
 				};
 			}
 
-			failures++;
-			// A refusal that sending again cannot change (a 4xx other than a timeout, a
-			// conflict or a rate limit) fails at once
-			const permanent =
-				failure.status >= 400 &&
-				failure.status < 500 &&
-				![408, 409, 423, 425, 429].includes(failure.status);
-			if (permanent) {
-				throw new NetworkError(
-					`HTTP error during chunk upload: ${failure.error}`,
-					failure.status,
-					{
-						error: failure.error,
-						code: "HTTP_ERROR",
-						metadata: { requestUrl: failure.requestUrl },
-					},
-				);
-			}
-			if (failures > MAX_RETRIES) {
-				throw new NetworkError(
-					`HTTP error during chunk upload after ${MAX_RETRIES} retries: ${failure.error}`,
-					failure.status,
-					{
-						error: failure.error,
-						code: "HTTP_ERROR",
-						metadata: {
-							requestUrl: failure.requestUrl,
-							retriesAttempted: MAX_RETRIES,
-						},
-					},
-				);
-			}
-			const delay = Math.min(1000 * Math.pow(2, failures - 1), 10000); // Cap at 10 seconds
-			await new Promise((resolve) => setTimeout(resolve, delay));
+			// Offline in a browser: the attempt is not counted, and the next one waits until
+			// the browser is back online
+			const waited = failure.status === 0 && (await untilOnline(signal));
 			if (signal?.aborted) throw signal.reason;
+			if (!waited) {
+				failures++;
+				const reason =
+					failure.status === 0 ? failure.error : serverReason(failure.error);
+				const sent = failure.status
+					? `Could not send the file (HTTP ${failure.status})`
+					: "Could not reach the upload server while sending the file";
+				// A refusal that sending again cannot change (a 4xx other than a timeout, a
+				// conflict or a rate limit) fails at once
+				const permanent =
+					failure.status >= 400 &&
+					failure.status < 500 &&
+					![408, 409, 423, 425, 429].includes(failure.status);
+				if (permanent || failures > MAX_RETRIES) {
+					throw new NetworkError(
+						`${sent}${permanent ? "" : ` after ${MAX_RETRIES} retries`}${reason ? `: ${reason}` : ""}`,
+						failure.status,
+						{
+							error: failure.error,
+							code: failure.status ? "HTTP_ERROR" : "NETWORK_ERROR",
+							metadata: {
+								requestUrl: failure.requestUrl,
+								...(permanent ? {} : { retriesAttempted: MAX_RETRIES }),
+								retryAfterMs: failure.retryAfterMs,
+							},
+						},
+					);
+				}
+				// Cap at 10 seconds, unless the server asks for longer (Retry-After)
+				const delay = Math.max(
+					Math.min(1000 * Math.pow(2, failures - 1), 10000),
+					failure.retryAfterMs ?? 0,
+				);
+				await sleep(delay, signal);
+				if (signal?.aborted) throw signal.reason;
+			}
 
 			// The failed PATCH may have been stored, in full or in part, before its
 			// response was lost. Ask the server where the upload stands and continue
@@ -205,6 +224,16 @@ export const sendResumable = async (
 		await chunks.close();
 	}
 	return upload;
+};
+
+// What a request that got no answer (offline, DNS, connection reset) fails with
+const unreachable = (error: unknown, requestUrl: string) => {
+	const message = error instanceof Error ? error.message : String(error);
+	return new NetworkError(`Could not reach the upload server: ${message}`, 0, {
+		error: message,
+		code: "NETWORK_ERROR",
+		metadata: { requestUrl },
+	});
 };
 
 // A server that sends Upload-Status registers the file after its last byte, and may
