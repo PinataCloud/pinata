@@ -1,4 +1,8 @@
-import { NetworkError, PinataError } from "../../../utils/custom-errors";
+import {
+	NetworkError,
+	PinataError,
+	ValidationError,
+} from "../../../utils/custom-errors";
 import { FileChunks } from "./fileChunks";
 import { serverReason } from "./tusMetadata";
 import { parseRetryAfter, sleep, untilOnline } from "./wait";
@@ -31,6 +35,9 @@ export interface StoredUpload {
 // `signal` cancels it: the request under way is aborted and it rejects with the reason.
 // `resumeUrl`, the uploadUrl of an error an earlier call threw, continues that upload from
 // where the server stands, if the server still has it; else a new upload is created.
+// With `waitOnline` (folder uploads, which can be cancelled), a chunk that gets no answer
+// while the browser is offline waits until it is back online, without counting as a
+// retry; otherwise it counts, so the upload fails after its retries.
 export const sendResumable = async (
 	createUrl: string,
 	headers: RequestHeaders,
@@ -39,6 +46,7 @@ export const sendResumable = async (
 	inline = false,
 	signal?: AbortSignal,
 	resumeUrl?: string,
+	waitOnline = false,
 ): Promise<StoredUpload> => {
 	if (resumeUrl) {
 		// null: the server no longer has the upload, or refuses to say: a new one is created
@@ -70,10 +78,25 @@ export const sendResumable = async (
 			};
 			return status.offset === file.size
 				? upload
-				: sendChunks(upload, status.offset, headers, file, signal);
+				: sendChunks(upload, status.offset, headers, file, signal, waitOnline);
 		}
 	}
 	const withBody = inline && file.size > 0 && file.size <= CHUNK_SIZE;
+	// The body of the creation request as FileChunks cuts it, which refuses a file whose
+	// bytes don't match its size (fs.openAsBlob reports a file past 4 GiB modulo 2^32):
+	// the file itself as body would send `size` bytes and complete a truncated upload.
+	let body: Blob | Uint8Array<ArrayBuffer> | undefined;
+	if (withBody) {
+		const chunks = new FileChunks(file, CHUNK_SIZE);
+		try {
+			body = await chunks.at(0);
+		} finally {
+			await chunks.close();
+		}
+	} else if (file.size === 0) {
+		// A size of 0 completes the upload at once: make sure there really are no bytes
+		await assertEmpty(file);
+	}
 	let urlReq: Response;
 	try {
 		urlReq = await fetch(createUrl, {
@@ -89,7 +112,7 @@ export const sendResumable = async (
 				// last PATCH, and waits for `ready` (see waitForRegistration).
 				Prefer: "respond-async",
 			},
-			...(withBody ? { body: file } : {}),
+			...(body ? { body } : {}),
 			signal,
 		});
 	} catch (error) {
@@ -128,7 +151,7 @@ export const sendResumable = async (
 		upload.metadata = urlReq.headers.get("upload-metadata");
 		return upload;
 	}
-	return sendChunks(upload, offset, headers, file, signal);
+	return sendChunks(upload, offset, headers, file, signal, waitOnline);
 };
 
 // Sends the bytes of `file` from `offset` on to the upload, resuming after failed chunks
@@ -140,6 +163,7 @@ const sendChunks = async (
 	headers: RequestHeaders,
 	file: File,
 	signal?: AbortSignal,
+	waitOnline = false,
 ): Promise<StoredUpload> => {
 	const { url } = upload;
 	let offset = start;
@@ -214,7 +238,8 @@ const sendChunks = async (
 
 			// Offline in a browser: the attempt is not counted, and the next one waits until
 			// the browser is back online
-			const waited = failure.status === 0 && (await untilOnline(signal));
+			const waited =
+				waitOnline && failure.status === 0 && (await untilOnline(signal));
 			if (signal?.aborted) throw signal.reason;
 			if (!waited) {
 				failures++;
@@ -297,6 +322,24 @@ const sendChunks = async (
 		await chunks.close();
 	}
 	return upload;
+};
+
+// Throws unless `file`, which reports a size of 0, holds no bytes
+const assertEmpty = async (file: Blob) => {
+	const reader = file.stream().getReader();
+	try {
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) return;
+			if (value.byteLength > 0) {
+				throw new ValidationError(
+					"The file is larger than its reported size: it reports 0 bytes but holds more",
+				);
+			}
+		}
+	} finally {
+		await reader.cancel().catch(() => undefined);
+	}
 };
 
 // What a request that got no answer (offline, DNS, connection reset) fails with

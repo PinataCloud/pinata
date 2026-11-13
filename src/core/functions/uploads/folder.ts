@@ -282,6 +282,7 @@ export const uploadFolder = async (
 								true,
 								signal,
 								unfinished,
+								true,
 							);
 						} catch (error) {
 							// Before the slot goes to the next file, which must not be sent with a

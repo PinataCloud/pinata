@@ -1767,7 +1767,7 @@ describe("uploadFolder, a file sent again", () => {
 			}
 			const n = (polls.get(url) ?? 0) + 1;
 			polls.set(url, n);
-			const ready = n >= 20;
+			const ready = n >= 200;
 			if (ready) waiting--;
 			return new Response(null, {
 				status: 200,
