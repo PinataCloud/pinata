@@ -1496,9 +1496,11 @@ describe("uploadFolder", () => {
 				let creations = 0;
 				mockFetch(async (url, init) => {
 					if (init.method === "PUT") return synced(1);
+					// The bytes, once the server took the upload
+					if (init.method === "PATCH") return chunkStored(1, 1);
 					creations++;
 					if (creations <= 2) return finalizing({ "Retry-After": "20" });
-					return registeredAt(url, init);
+					return createdAt(`${url}/a`);
 				});
 				const events: FolderUploadEvent[] = [];
 
@@ -1513,7 +1515,7 @@ describe("uploadFolder", () => {
 					},
 				);
 
-				expect(result.files[0].cid).toBe("bafy-d/a.txt");
+				expect(result.files[0].cid).toBe("bafybig");
 				const retries = events.filter((e) => e.type === "retry");
 				expect(
 					retries.map((e) => [e.delayMs, e.waitingForPreviousUpload]),
@@ -1525,6 +1527,76 @@ describe("uploadFolder", () => {
 					"Could not start the upload (HTTP 409): Upload is finalizing; poll HEAD on its Location for the outcome",
 				);
 				expect(delays.filter((ms) => ms === 20000)).toHaveLength(2);
+			});
+
+			it("sends the file's bytes once more after the wait, not with each refused attempt, and starts no refused attempt", async () => {
+				const size = 1000;
+				const requests: {
+					method?: string;
+					bytes: number;
+					headers: Record<string, string>;
+				}[] = [];
+				let creations = 0;
+				mockFetch(async (url, init) => {
+					if (init.method === "PUT") return synced(1);
+					const { body } = init;
+					requests.push({
+						method: init.method,
+						bytes:
+							body instanceof Blob
+								? body.size
+								: body instanceof Uint8Array
+									? body.byteLength
+									: 0,
+						headers: headersOf(init),
+					});
+					if (init.method === "PATCH") return chunkStored(size, size);
+					creations++;
+					if (creations <= 4) return finalizing({ "Retry-After": "20" });
+					return createdAt(`${url}/a`);
+				});
+				const events: FolderUploadEvent[] = [];
+
+				const result = await uploadFolder(
+					config,
+					[{ path: "d/a.txt", file: file("x".repeat(size)) }],
+					"public",
+					{ folderId: givenFolderId, onProgress: (e) => events.push(e) },
+				);
+
+				expect(result.files[0].cid).toBe("bafybig");
+				// The first attempt sends the file with its creation, before the server refuses
+				// it. While the file waits, each creation is sent without a byte; the bytes go
+				// once the server takes the upload.
+				expect(requests.map((r) => [r.method, r.bytes])).toEqual([
+					["POST", size],
+					["POST", 0],
+					["POST", 0],
+					["POST", 0],
+					["POST", 0],
+					["PATCH", size],
+				]);
+				for (const { headers } of requests.slice(1, 5)) {
+					expect(headers["Upload-Length"]).toBe(`${size}`);
+					expect(headers["Content-Type"]).toBeUndefined();
+				}
+				expect(
+					events.map((e) => [
+						e.type,
+						e.attempt,
+						e.delayMs,
+						e.waitingForPreviousUpload,
+					]),
+				).toEqual([
+					["start", 1, undefined, undefined],
+					["retry", 1, 20000, true],
+					["retry", 2, 20000, true],
+					["retry", 3, 20000, true],
+					["retry", 4, 20000, true],
+					["start", 5, undefined, undefined],
+					["sent", 5, undefined, undefined],
+					["complete", 5, undefined, undefined],
+				]);
 			});
 
 			it("counts the refusals against the retries once it took longer than a registration may", async () => {
@@ -3015,6 +3087,20 @@ describe("uploadFolder", () => {
 			const finishing = new Set<string>();
 			const refusals = new Map<string, number>();
 			const registered = new Set<string>();
+			// Bytes sent per path
+			const bytes = new Map<string, number>();
+			const count = (path: string, init: RequestInit) => {
+				const { body } = init;
+				const n = body instanceof Blob ? body.size : 0;
+				bytes.set(path, (bytes.get(path) ?? 0) + n);
+				return n;
+			};
+			// Its bytes are stored: registration is under way
+			const stored = (path: string) => ({
+				"Upload-Offset": `${MiB}`,
+				"Upload-Cid": `bafy-${path}`,
+				"Upload-Status": "processing",
+			});
 			mockFetch(async (url, init) => {
 				if (init.method === "PUT") return synced(registered.size);
 				if (init.method === "HEAD") {
@@ -3030,19 +3116,24 @@ describe("uploadFolder", () => {
 						},
 					});
 				}
+				if (init.method === "PATCH") {
+					const path = decodeURIComponent(url.slice(url.lastIndexOf("/") + 1));
+					count(path, init);
+					finishing.add(path);
+					return new Response(null, { status: 204, headers: stored(path) });
+				}
 				const path = pathOf(init);
+				const sent = count(path, init);
 				if (finishing.has(path)) {
 					const n = (refusals.get(path) ?? 0) + 1;
 					refusals.set(path, n);
 					if (n <= 5) return finalizing();
 					finishing.delete(path);
 				}
+				const location = `${url}/${encodeURIComponent(path)}`;
+				if (!sent) return createdAt(location, { "Upload-Offset": "0" });
 				finishing.add(path);
-				return createdAt(`${url}/${encodeURIComponent(path)}`, {
-					"Upload-Offset": `${MiB}`,
-					"Upload-Cid": `bafy-${path}`,
-					"Upload-Status": "processing",
-				});
+				return createdAt(location, stored(path));
 			});
 			const controller = new AbortController();
 
@@ -3062,6 +3153,7 @@ describe("uploadFolder", () => {
 				.map((f) => f.path);
 			expect(unfinished.length).toBeGreaterThan(0);
 
+			bytes.clear();
 			const events: FolderUploadEvent[] = [];
 			const result = await uploadFolder(
 				config,
@@ -3078,6 +3170,12 @@ describe("uploadFolder", () => {
 			expect(result.files).toHaveLength(failed.length);
 			for (const path of unfinished) {
 				expect(refusals.get(path)).toBe(6);
+				// The first attempt sends the file with its creation, refused; the others ask
+				// without its bytes, which go once the server takes the upload
+				expect(bytes.get(path)).toBe(2 * MiB);
+				expect(
+					events.filter((e) => e.path === path && e.type === "start"),
+				).toHaveLength(2);
 				// More waits than the 3 retries, none of them counted
 				const retries = events.filter(
 					(e) => e.path === path && e.type === "retry",

@@ -289,6 +289,10 @@ class FolderUpload {
 		// not counted until `waitUntil` (see FolderUploadEvent.waitingForPreviousUpload)
 		let waits = 0;
 		let waitUntil: number | undefined;
+		// Refused while the server finishes an earlier upload of the path: until the server takes
+		// a new upload of the file, an attempt creates it without the file's bytes and sends
+		// them once it is taken, so that a refusal costs no bytes (the server refuses it alike)
+		let waiting = false;
 		for (;;) {
 			if (signal?.aborted) return fail(cancelled(), started);
 			// The attempt failed with another file's refusal of the JWT, before sending anything
@@ -318,7 +322,12 @@ class FolderUpload {
 							throw this.sharedFailure;
 						}
 						if (signal?.aborted) throw cancelled();
-						this.emit({ type: "start", ...about, attempt: ++started });
+						const attempt = ++started;
+						const start = () => this.emit({ type: "start", ...about, attempt });
+						// While waiting, `start` comes once the server takes the upload: no byte is
+						// sent before
+						const asks = waiting;
+						if (!asks) start();
 						try {
 							return await sendResumable(
 								this.createUrl,
@@ -326,10 +335,16 @@ class FolderUpload {
 								file,
 								metadata,
 								{
-									inline: true,
+									inline: !asks,
 									signal,
 									resumeUrl: unfinished,
 									waitOnline: true,
+									onAccepted: asks
+										? () => {
+												waiting = false;
+												start();
+											}
+										: undefined,
 								},
 							);
 						} catch (error) {
@@ -422,6 +437,7 @@ class FolderUpload {
 				// as the server may take to register a file of this size
 				let previous = false;
 				if (isFinalizing(error)) {
+					waiting = true;
 					waitUntil ??= Date.now() + registrationTimeout(file.size);
 					previous = Date.now() < waitUntil;
 				}

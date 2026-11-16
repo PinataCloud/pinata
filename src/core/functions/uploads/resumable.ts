@@ -54,6 +54,10 @@ export interface ResumableOptions {
 	// online, without counting as a retry. For uploads that can be cancelled (folder
 	// uploads): otherwise it counts, so the upload fails after its retries.
 	waitOnline?: boolean;
+	// Called once the server has taken the upload: it answered the creation request with
+	// the upload's Location, or still has the upload to continue (resumeUrl). Without
+	// `inline`, no byte of the file has been sent by then.
+	onAccepted?: () => void;
 }
 
 // Where a resumable upload is created: `base`, asking for `cidVersion` if given
@@ -77,6 +81,7 @@ export const sendResumable = async (
 		signal,
 		resumeUrl,
 		waitOnline = false,
+		onAccepted,
 	}: ResumableOptions = {},
 ): Promise<StoredUpload> => {
 	if (resumeUrl) {
@@ -108,6 +113,7 @@ export const sendResumable = async (
 				: unreachable(message, metadata);
 		}
 		if (status) {
+			onAccepted?.();
 			return status.offset === file.size
 				? storedFromStatus(resumeUrl, status)
 				: sendChunks(
@@ -172,6 +178,7 @@ export const sendResumable = async (
 			{ error: errorData, code: "HTTP_ERROR", metadata: errorMetadata },
 		);
 	}
+	onAccepted?.();
 
 	// The creation request stored the body, or the whole of an empty file.
 	const offset = withBody

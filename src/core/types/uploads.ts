@@ -55,8 +55,12 @@ export type FolderEntry = {
 /** What happened to one file of a folder upload. */
 export type FolderUploadEvent = {
 	/**
-	 * `start`: the file's bytes start to be sent (again on each attempt that sends bytes;
-	 * not on one that only checks the registration again).
+	 * `start`: an attempt is about to send the file's bytes, or to continue its upload; at
+	 * most once per attempt. None on an attempt that only checks the registration again,
+	 * nor on one made while waiting for an earlier upload of the path
+	 * (`waitingForPreviousUpload`) that the server refuses: such an attempt asks for the
+	 * upload without the file's bytes, and its `start` comes once the server takes it,
+	 * before the bytes are sent. So a file's `start` events may skip attempt numbers.
 	 * `sent`: the server has every byte of the file and is registering it (it may take
 	 * seconds to minutes: the server is processing the file), then `complete`, `retry` or
 	 * `error`. Again on each attempt, also on one that only checks the registration.
@@ -91,10 +95,13 @@ export type FolderUploadEvent = {
 	/**
 	 * `retry`: the server is still finishing an earlier upload of the same path (one cancelled
 	 * after its last byte was sent, say) and refuses a new one until then (HTTP 409). The
-	 * next attempt starts after `delayMs`, and this one is not counted against `retries`,
-	 * for as long as the server may take to register a file of this size (10 minutes plus 5
-	 * per GiB); after that, the refusal counts as any other. Cancel with `signal` to give up
-	 * sooner.
+	 * next attempt starts after `delayMs` (the server's `Retry-After`, if longer than the
+	 * backoff), and this one is not counted against `retries`, for as long as the server may
+	 * take to register a file of this size (10 minutes plus 5 per GiB); after that, the
+	 * refusal counts as any other. From the first such refusal until the server takes the
+	 * upload, each attempt asks for it without the file's bytes (no `start`, see `type`) and
+	 * sends them once taken, so the bytes are sent once more however long the wait. Cancel
+	 * with `signal` to give up sooner.
 	 */
 	waitingForPreviousUpload?: boolean;
 	/** Files registered so far */

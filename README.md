@@ -109,7 +109,7 @@ try {
 }
 ```
 
-Events (`start`, `sent`, `complete`, `retry`, `error`) carry the file's `index` in the files given. A `signal` cancels the upload, `refreshJwt` renews a JWT the server refuses during a long upload, and an upload whose content was already uploaded resolves with `is_duplicate: true`. See the `FolderUploadOptions` and `FolderUploadEvent` types for the rest.
+Events (`start`, `sent`, `complete`, `retry`, `error`) carry the file's `index` in the files given. `start` fires when an attempt is about to send a file's bytes (or continue its upload), at most once per attempt: not on an attempt that only checks a stored file's registration again, nor on one refused while the file waits for an earlier upload of its path (`retry` with `waitingForPreviousUpload`), which sends no bytes. A `signal` cancels the upload, `refreshJwt` renews a JWT the server refuses during a long upload, and an upload whose content was already uploaded resolves with `is_duplicate: true`. See the `FolderUploadOptions` and `FolderUploadEvent` types for the rest.
 
 ### 3. Retrieve a File
 

@@ -593,8 +593,11 @@ Response: "Revoked"
   }
   type FolderUploadEvent = {
     type: "start" | "sent" | "complete" | "retry" | "error";
-                            // start: bytes start to be sent (not on an attempt that only
-                            // checks the registration again)
+                            // start: an attempt is about to send the file's bytes or continue
+                            // its upload (at most once per attempt). None on an attempt that
+                            // only checks the registration again, nor on a refused attempt
+                            // while waitingForPreviousUpload (it sends no bytes; its start
+                            // comes once the server takes the upload)
                             // sent: every byte is stored, the server is registering the file
                             // (processing, seconds to minutes) until complete/retry/error
     index: number;          // the file's position in `files`: match events by it, not path
@@ -605,7 +608,9 @@ Response: "Revoked"
     waitingForOnline?: boolean; // retry while offline: delayMs is 0, the next attempt waits
                             // for the "online" event, with no time limit (cancel via signal)
     waitingForPreviousUpload?: boolean; // retry after a 409: the server still finishes an
-                            // earlier upload of this path; next attempt after delayMs, not counted
+                            // earlier upload of this path; next attempt after delayMs (at least
+                            // Retry-After), not counted. Until the server takes the upload,
+                            // attempts send no bytes (Upload-Length only), then send them once
     completed: number; failed: number; total: number;
   }
 
