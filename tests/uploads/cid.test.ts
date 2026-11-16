@@ -75,7 +75,7 @@ describe("uploadCid function", () => {
 				},
 				body: JSON.stringify({
 					cid: mockCid,
-					name: mockCid,
+					name: undefined,
 					keyvalues: undefined,
 					group_id: undefined,
 					host_nodes: undefined,

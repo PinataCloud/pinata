@@ -1,5 +1,7 @@
 // Helpers for the headers of a resumable (TUS) upload.
 
+import type { UploadOptions } from "../../types";
+
 // A TUS Upload-Metadata value: the base64 of the value's UTF-8 bytes. btoa() alone throws
 // for characters above U+00FF (CJK, emoji, the combining accents of macOS file names).
 export const encodeMetadataValue = (value: string): string => {
@@ -8,6 +10,38 @@ export const encodeMetadataValue = (value: string): string => {
 		binary += String.fromCharCode(byte);
 	}
 	return btoa(binary);
+};
+
+// The Upload-Metadata entries that name and type one file
+export const fileMetadata = (name: string, type: string): string =>
+	`filename ${encodeMetadataValue(name)},filetype ${encodeMetadataValue(type)}`;
+
+// The Upload-Metadata entries of the network and the upload options a resumable upload
+// passes on to the server
+export const optionsMetadata = (
+	network: "public" | "private",
+	options?: UploadOptions,
+): string => {
+	let metadata = `network ${encodeMetadataValue(network)}`;
+	if (options?.groupId) {
+		metadata += `,group_id ${encodeMetadataValue(options.groupId)}`;
+	}
+	if (options?.metadata?.keyvalues) {
+		metadata += `,keyvalues ${encodeMetadataValue(JSON.stringify(options.metadata.keyvalues))}`;
+	}
+	if (options?.streamable) {
+		metadata += `,streamable ${encodeMetadataValue("true")}`;
+	}
+	if (options?.car) {
+		metadata += `,car ${encodeMetadataValue("true")}`;
+	}
+	if (options?.cid_version !== undefined) {
+		metadata += `,cid_version ${encodeMetadataValue(options.cid_version)}`;
+	}
+	if (options?.expires_at !== undefined) {
+		metadata += `,expires_at ${encodeMetadataValue(options.expires_at.toString())}`;
+	}
+	return metadata;
 };
 
 // The values of a TUS Upload-Metadata header, decoded as UTF-8. Skips entries that are not

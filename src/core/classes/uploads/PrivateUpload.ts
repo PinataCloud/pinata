@@ -4,11 +4,15 @@ import {
 	uploadBase64,
 	uploadFile,
 	uploadFileArray,
+	uploadFolder,
 	uploadJson,
 	uploadUrl,
 } from "../../functions";
 import {
 	FileObject,
+	FolderEntry,
+	FolderUploadOptions,
+	FolderUploadResponse,
 	PinataConfig,
 	SignedUploadUrlOptions,
 	UploadOptions,
@@ -49,6 +53,25 @@ export class PrivateUpload {
 	// 		options,
 	// 	);
 	// }
+
+	/**
+	 * Uploads a folder file by file, several files at a time, each retried on its own.
+	 * `files` are File objects (their `webkitRelativePath` from an <input webkitdirectory>
+	 * selection, else their name, is the path) or `{ path, file }` entries. See
+	 * FolderUploadOptions for concurrency, retries and progress events.
+	 */
+	folder(
+		files: File[] | FolderEntry[],
+		options?: FolderUploadOptions,
+	): UploadBuilder<FolderUploadResponse> {
+		return new UploadBuilder(
+			this.config,
+			(config, files, options) =>
+				uploadFolder(config, files, "private", options),
+			files,
+			options,
+		);
+	}
 
 	base64(
 		base64String: string,

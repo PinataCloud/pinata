@@ -109,9 +109,13 @@ export class UploadBuilder<T> {
 			| null
 			| undefined,
 	): Promise<TResult1 | TResult2> {
-		const options: UploadOptions = this.args[this.args.length - 1] || {};
-		if (this.metadata) {
-			options.metadata = this.metadata;
+		// The options given to the upload method, with what the builder's methods set on top:
+		// a builder method wins only for the field it sets. A copy, so that the caller's
+		// options object is left as it was.
+		const given: UploadOptions = this.args[this.args.length - 1] || {};
+		const options: UploadOptions = { ...given };
+		if (this.metadata && Object.keys(this.metadata).length > 0) {
+			options.metadata = { ...given.metadata, ...this.metadata };
 		}
 		if (this.keys) {
 			options.keys = this.keys;

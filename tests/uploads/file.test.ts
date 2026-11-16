@@ -840,6 +840,44 @@ describe("uploadFile function", () => {
 			expect(calls.filter((c) => c.method === "HEAD")).toHaveLength(5);
 		});
 
+		it("gives up after 5 retries while the browser is offline, as nothing could cancel it", async () => {
+			const scope = globalThis as unknown as Record<string, unknown>;
+			const navigatorDescriptor = Object.getOwnPropertyDescriptor(
+				globalThis,
+				"navigator",
+			);
+			const online = new EventTarget();
+			Object.defineProperty(globalThis, "navigator", {
+				value: { onLine: false },
+				configurable: true,
+			});
+			scope.addEventListener = online.addEventListener.bind(online);
+			scope.removeEventListener = online.removeEventListener.bind(online);
+			const steps: Array<Response | Error> = [created()];
+			for (let i = 0; i < 5; i++) {
+				steps.push(
+					new TypeError("Failed to fetch"),
+					new TypeError("Failed to fetch"),
+				);
+			}
+			steps.push(new TypeError("Failed to fetch"));
+			const calls = script(...steps);
+			try {
+				await expect(
+					uploadFile(mockConfig, largeFile, "public"),
+				).rejects.toThrow("after 5 retries");
+				expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(6);
+			} finally {
+				if (navigatorDescriptor) {
+					Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+				} else {
+					delete scope.navigator;
+				}
+				delete scope.addEventListener;
+				delete scope.removeEventListener;
+			}
+		});
+
 		it("resets the retry budget when HEAD shows the server stored more", async () => {
 			// Every PATCH response is lost, but the server stores 1000 more bytes each time
 			const steps: Response[] = [created()];

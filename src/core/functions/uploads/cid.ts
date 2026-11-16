@@ -40,7 +40,7 @@ export const uploadCid = async (
 
 	const requestBody: Record<string, any> = {
 		cid: cid,
-		name: options?.metadata ? options?.metadata?.name : cid,
+		name: options?.metadata?.name,
 		keyvalues: options?.metadata?.keyvalues,
 		group_id: options?.groupId,
 		host_nodes: options?.peerAddresses,
