@@ -126,52 +126,41 @@ export const uploadFileArray = async (
 		data.append("file", file, path);
 	}
 
-	// Reserved for later release
-	// data.append("name", folder);
+	data.append("network", network);
+	data.append("name", folder);
 
-	// data.append("network", network);
+	if (options?.groupId) {
+		data.append("group_id", options.groupId);
+	}
 
-	// if (options?.groupId) {
-	//   data.append("group_id", options.groupId);
-	// }
+	if (options?.metadata?.keyvalues) {
+		data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
+	}
 
-	// if (options?.metadata?.keyvalues) {
-	//   data.append("keyvalues", JSON.stringify(options.metadata.keyvalues));
-	// }
+	if (options?.streamable) {
+		data.append("streamable", "true");
+	}
 
-	// Legacy
-	data.append(
-		"pinataMetadata",
-		JSON.stringify({
-			name: folder,
-			keyvalues: options?.metadata?.keyvalues,
-		}),
-	);
+	if (options?.car) {
+		data.append("car", "true");
+	}
 
-	data.append(
-		"pinataOptions",
-		JSON.stringify({
-			groupId: options?.groupId,
-			cidVersion: 1,
-		}),
-	);
+	if (options?.cid_version !== undefined) {
+		data.append("cid_version", options.cid_version.toString());
+	}
 
-	// Reserved for later release
-	//let endpoint: string = "https://uploads.pinata.cloud/v3";
-	let endpoint: string = "https://api.pinata.cloud/pinning/pinFileToIPFS";
+	if (options?.expires_at !== undefined) {
+		data.append("expires_at", options.expires_at.toString());
+	}
 
-	if (config.legacyUploadUrl) {
-		endpoint = config.legacyUploadUrl;
+	let endpoint: string = "https://uploads.pinata.cloud/v3";
+
+	if (config.uploadUrl) {
+		endpoint = config.uploadUrl;
 	}
 
 	try {
-		// Reserved for later release
-		// const request = await fetch(`${endpoint}/files`, {
-		// 	method: "POST",
-		// 	headers: headers,
-		// 	body: data,
-		// });
-		const request = await fetch(`${endpoint}`, {
+		const request = await fetch(`${endpoint}/files`, {
 			method: "POST",
 			headers: headers,
 			body: data,
@@ -202,20 +191,7 @@ export const uploadFileArray = async (
 		}
 
 		const res = await request.json();
-
-		const resData: UploadResponse = {
-			id: res.ID,
-			name: res.Name,
-			cid: res.IpfsHash,
-			size: res.PinSize,
-			created_at: res.Timestamp,
-			number_of_files: res.NumberOfFiles,
-			mime_type: res.MimeType,
-			group_id: res.GroupId,
-			keyvalues: res.Keyvalues,
-			vectorized: false,
-			network: "public",
-		};
+		const resData: UploadResponse = res.data;
 
 		// if (options?.vectorize) {
 		//   const vectorReq = await fetch(
