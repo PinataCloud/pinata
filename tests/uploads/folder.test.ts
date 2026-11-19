@@ -47,12 +47,24 @@ const folderFound = async () =>
 // How a lookup of a given folder answers: found, unless a test says otherwise
 let lookUpFolder: Handler = folderFound;
 
+// Where a folder upload asks for the account's upload limits
+const UPLOAD_LIMITS = "https://uploads.test/v3/files/limits";
+const limitedTo = (folderMaxFiles: number) => async () =>
+	new Response(JSON.stringify({ data: { folder_max_files: folderMaxFiles } }), {
+		status: 200,
+	});
+// How the upload limits answer: the server's default, unless a test says otherwise
+let lookUpLimits: Handler = limitedTo(30_000);
+
 // Answers every request with `handler`, but the lookups of a given folder with lookUpFolder
+// and those of the upload limits with lookUpLimits
 const mockFetch = (handler: Handler) => {
 	const fetchMock = jest.fn((url: string, init: RequestInit) =>
 		init.method === "GET" && url.startsWith(FOLDER_RECORDS)
 			? lookUpFolder(url, init)
-			: handler(url, init),
+			: init.method === "GET" && url === UPLOAD_LIMITS
+				? lookUpLimits(url, init)
+				: handler(url, init),
 	);
 	global.fetch = fetchMock as unknown as typeof fetch;
 	return fetchMock;
@@ -233,6 +245,7 @@ describe("uploadFolder", () => {
 	beforeEach(() => {
 		delays = [];
 		lookUpFolder = folderFound;
+		lookUpLimits = limitedTo(30_000);
 		setTimeoutSpy = jest.spyOn(global, "setTimeout").mockImplementation(((
 			callback: () => void,
 			ms: number,
@@ -978,6 +991,74 @@ describe("uploadFolder", () => {
 			]);
 			expect(events).toContain("complete d/b.txt 2");
 			expect(events.filter((e) => e.startsWith("start"))).toHaveLength(3);
+		});
+	});
+
+	describe("folder limit", () => {
+		const threeFiles = [
+			{ path: "d/a.txt", file: file("a") },
+			{ path: "d/b.txt", file: file("bb") },
+			{ path: "d/c.txt", file: file("ccc") },
+		];
+
+		it("refuses a new folder of more files than the account's folder_max_files before sending any", async () => {
+			lookUpLimits = limitedTo(2);
+			const { created } = server();
+
+			const error = await uploadFolder(config, threeFiles, "public").catch(
+				(e) => e,
+			);
+
+			expect(error).toBeInstanceOf(ValidationError);
+			expect(error.message).toBe(
+				"A folder holds at most 2 files, and this upload has 3: upload them as several folders",
+			);
+			expect(error.details.code).toBe("FOLDER_MAX_FILES");
+			expect(created).toEqual([]);
+		});
+
+		it("uploads a new folder of as many files as folder_max_files", async () => {
+			lookUpLimits = limitedTo(3);
+			const { registered } = server();
+
+			await uploadFolder(config, threeFiles, "public");
+
+			expect(registered).toHaveLength(3);
+		});
+
+		it.each([
+			["is refused the JWT", async () => refused(401, "Not Authorized")],
+			["is not found", async () => refused(404, "Not found")],
+			[
+				"gets no answer",
+				async (): Promise<Response> => {
+					throw new TypeError("fetch failed");
+				},
+			],
+		])(
+			"uploads a new folder when asking for the limit %s, leaving the limit to the server",
+			async (_, lookup) => {
+				lookUpLimits = lookup;
+				const { registered } = server();
+
+				await uploadFolder(config, threeFiles, "public");
+
+				expect(registered).toHaveLength(3);
+			},
+		);
+
+		it("sends every file into a given folder that exists, whose files may be replaced", async () => {
+			lookUpLimits = limitedTo(2);
+			const { registered, fetchMock } = server();
+
+			await uploadFolder(config, threeFiles, "public", {
+				folderId: givenFolderId,
+			});
+
+			expect(registered).toHaveLength(3);
+			expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(
+				UPLOAD_LIMITS,
+			);
 		});
 	});
 

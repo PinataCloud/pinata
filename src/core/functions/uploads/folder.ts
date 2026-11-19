@@ -32,6 +32,7 @@ import {
 	sendResumable,
 	type StoredUpload,
 } from "./resumable";
+import { fetchUploadLimits } from "./limits";
 import {
 	isFinalizing,
 	isOffline,
@@ -165,6 +166,7 @@ class FolderUpload {
 					);
 		this.stopsOnSharedFailure =
 			this.options.folderId !== undefined && exists !== false;
+		if (exists === false) await this.assertFolderHoldsAll();
 		const pending = exists ? entries : await this.createFolder();
 		await this.uploadAll(pending);
 		if (this.failed.length > 0) {
@@ -191,6 +193,25 @@ class FolderUpload {
 			);
 		}
 		return this.response(folder);
+	}
+
+	// A new folder holds at most the account's folder_max_files files: more are refused before
+	// any is sent, rather than every file past the limit failing on its own with 413. When the
+	// limit can't be had (no answer, a key that can't read files), the server's refusals stand.
+	private async assertFolderHoldsAll(): Promise<void> {
+		const files = this.plan.entries.length;
+		const limits = await fetchUploadLimits(
+			this.endpoint,
+			this.credentials.headers(),
+			this.options.signal,
+		).catch(() => undefined);
+		const max = limits?.folder_max_files;
+		if (max !== undefined && files > max) {
+			throw new ValidationError(
+				`A folder holds at most ${max} files, and this upload has ${files}: upload them as several folders`,
+				{ code: "FOLDER_MAX_FILES", metadata: { folderMaxFiles: max, files } },
+			);
+		}
 	}
 
 	// Uploads the smallest of the shallowest files first: it creates the folder, and the
