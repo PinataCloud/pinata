@@ -1,5 +1,8 @@
 import { PinataSDK } from "../../src";
-import { AuthenticationError } from "../../src/utils/custom-errors";
+import {
+	AuthenticationError,
+	NetworkError,
+} from "../../src/utils/custom-errors";
 
 describe("upload.limits()", () => {
 	const originalFetch = global.fetch;
@@ -37,5 +40,35 @@ describe("upload.limits()", () => {
 
 		expect(error).toBeInstanceOf(AuthenticationError);
 		expect(error.statusCode).toBe(401);
+	});
+
+	it("asks the configured upload server, with the custom headers in place of the SDK's", async () => {
+		const fetchMock = answer(200, { data: { folder_max_files: 3 } });
+		const pinata = new PinataSDK({
+			pinataJwt: "test-jwt",
+			uploadUrl: "https://uploads.test/v3",
+			customHeaders: { "x-source": "app" },
+		});
+
+		await pinata.upload.limits();
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://uploads.test/v3/files/limits",
+			expect.objectContaining({
+				headers: { Authorization: "Bearer test-jwt", "x-source": "app" },
+			}),
+		);
+	});
+
+	it("rejects an answer without a folder limit", async () => {
+		answer(200, { data: {} });
+		const pinata = new PinataSDK({ pinataJwt: "test-jwt" });
+
+		const error = await pinata.upload.limits().catch((e) => e);
+
+		expect(error).toBeInstanceOf(NetworkError);
+		expect(error.message).toBe(
+			"Could not get the upload limits: unexpected answer",
+		);
 	});
 });

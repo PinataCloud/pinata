@@ -649,6 +649,18 @@ Response: "Revoked"
   except a 401/403, which goes through the JWT refresh (refreshJwt) first.
   A one-file folder matching an earlier one is merged into it by the server (sync: 404):
   the upload resolves with that folder and is_duplicate.
+  Folder file limit: a folder holds at most folder_max_files files (30,000 unless the
+  account has its own limit). A new folder (no folderId, or one the lookup answers 404 for)
+  first asks for the limit (GET {uploadUrl}/files/limits; an expired JWT is renewed with
+  refreshJwt first): more files reject with a ValidationError, details.code
+  "FOLDER_MAX_FILES", details.metadata { folderMaxFiles, files }, before any file is sent.
+  Upload them as several folders. When the limit can't be had, the upload goes ahead. A
+  folder that exists is not checked: a new path into a full one fails on its own with 413
+  "This folder has reached the maximum of N files"; a path it already has can be replaced.
+
+  // Upload limits of the account of the JWT (needs a key that can read files)
+  pinata.upload.limits()
+    // Returns: { folder_max_files: number }
 
   // JSON content
   pinata.upload.public.json(JsonObject)

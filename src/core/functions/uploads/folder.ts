@@ -5,6 +5,7 @@ import type {
 	FolderUploadOptions,
 	FolderUploadResponse,
 	PinataConfig,
+	UploadLimits,
 } from "../../types";
 import {
 	FolderUploadError,
@@ -196,15 +197,31 @@ class FolderUpload {
 	}
 
 	// A new folder holds at most the account's folder_max_files files: more are refused before
-	// any is sent, rather than every file past the limit failing on its own with 413. When the
-	// limit can't be had (no answer, a key that can't read files), the server's refusals stand.
+	// any is sent, rather than every file past the limit failing on its own with 413. A JWT
+	// refused as expired (401) is renewed with refreshJwt, as for a file. When the limit can't
+	// be had otherwise (no answer, a key that can't read files), the server's refusals stand.
 	private async assertFolderHoldsAll(): Promise<void> {
 		const files = this.plan.entries.length;
-		const limits = await fetchUploadLimits(
-			this.endpoint,
-			this.credentials.headers(),
-			this.options.signal,
-		).catch(() => undefined);
+		const { refreshJwt, keys, signal } = this.options;
+		let limits: UploadLimits | undefined;
+		for (let renewals = 0; ; renewals++) {
+			const auth = this.credentials.tracked();
+			try {
+				limits = await fetchUploadLimits(this.endpoint, auth.headers(), signal);
+			} catch (error) {
+				if (
+					refreshJwt &&
+					!keys &&
+					renewals < MAX_RENEWALS &&
+					error instanceof PinataError &&
+					error.statusCode === 401 &&
+					(await this.credentials.renew(error, auth.jwt()))
+				) {
+					continue;
+				}
+			}
+			break;
+		}
 		const max = limits?.folder_max_files;
 		if (max !== undefined && files > max) {
 			throw new ValidationError(

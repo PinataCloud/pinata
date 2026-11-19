@@ -2,12 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [unreleased]
 
 ### 🚀 Features
 
 - `upload.limits()`: the upload limits of the account of the JWT (`GET /v3/files/limits` on the upload server): `folder_max_files`, the most files one folder can hold (30,000 unless the account has its own limit).
-- `folder()` of a new folder asks for the account's `folder_max_files` first, and rejects with a `ValidationError` (`details.code` `"FOLDER_MAX_FILES"`) before sending any file when the folder has more files, instead of every file past the limit failing with 413. When the limit can't be had (no answer, a key that can't read files), the upload goes ahead and the server's refusals stand. A folder given (`folderId`) that exists is not checked: its files may replace files already in it.
+- `folder()` of a new folder asks for the account's `folder_max_files` first, and rejects with a `ValidationError` (`details.code` `"FOLDER_MAX_FILES"`) before sending any file when the folder has more files, instead of every file past the limit failing with 413. A JWT refused as expired (401) is renewed with `refreshJwt` first. When the limit can't be had otherwise (no answer, a key that can't read files), the upload goes ahead and the server's refusals stand. A folder given (`folderId`) that exists is not checked: its files may replace files already in it.
 
 ## [2.6.0] - 2026-11-16
 

@@ -1035,6 +1035,11 @@ describe("uploadFolder", () => {
 					throw new TypeError("fetch failed");
 				},
 			],
+			[
+				"gets no limit in the answer",
+				async () => new Response(JSON.stringify({ data: {} }), { status: 200 }),
+			],
+			["gets a limit of 0", limitedTo(0)],
 		])(
 			"uploads a new folder when asking for the limit %s, leaving the limit to the server",
 			async (_, lookup) => {
@@ -1046,6 +1051,55 @@ describe("uploadFolder", () => {
 				expect(registered).toHaveLength(3);
 			},
 		);
+
+		it("refuses too many files for a given folder the server doesn't have, before sending any", async () => {
+			lookUpFolder = async () => refused(404, "Not found");
+			lookUpLimits = limitedTo(2);
+			const { created } = server();
+
+			const error = await uploadFolder(config, threeFiles, "public", {
+				folderId: givenFolderId,
+			}).catch((e) => e);
+
+			expect(error).toBeInstanceOf(ValidationError);
+			expect(created).toEqual([]);
+		});
+
+		it("asks for the limit with the key given and renews an expired JWT to ask again", async () => {
+			const keyed: string[] = [];
+			lookUpLimits = async (_, init) => {
+				keyed.push(headersOf(init).Authorization);
+				return limitedTo(2)();
+			};
+			server();
+			await uploadFolder(config, threeFiles, "public", {
+				keys: "key-jwt",
+			}).catch(() => undefined);
+			expect(keyed).toEqual(["Bearer key-jwt"]);
+
+			const asked: string[] = [];
+			lookUpLimits = async (_, init) => {
+				const jwt = headersOf(init).Authorization;
+				asked.push(jwt);
+				return jwt === "Bearer t1"
+					? refused(401, "Token expired")
+					: limitedTo(2)();
+			};
+			const refreshJwt = jest.fn(async () => "t2");
+			const { created } = server();
+
+			const error = await uploadFolder(
+				{ ...config, pinataJwt: "t1" },
+				threeFiles,
+				"public",
+				{ refreshJwt },
+			).catch((e) => e);
+
+			expect(error).toBeInstanceOf(ValidationError);
+			expect(asked).toEqual(["Bearer t1", "Bearer t2"]);
+			expect(refreshJwt).toHaveBeenCalledTimes(1);
+			expect(created).toEqual([]);
+		});
 
 		it("sends every file into a given folder that exists, whose files may be replaced", async () => {
 			lookUpLimits = limitedTo(2);
