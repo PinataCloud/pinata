@@ -5,6 +5,7 @@ import type {
 	FolderUploadOptions,
 	FolderUploadResponse,
 	PinataConfig,
+	UploadLimits,
 } from "../../types";
 import {
 	FolderUploadError,
@@ -32,6 +33,7 @@ import {
 	sendResumable,
 	type StoredUpload,
 } from "./resumable";
+import { fetchUploadLimits } from "./limits";
 import {
 	isFinalizing,
 	isOffline,
@@ -165,6 +167,7 @@ class FolderUpload {
 					);
 		this.stopsOnSharedFailure =
 			this.options.folderId !== undefined && exists !== false;
+		if (exists === false) await this.assertFolderHoldsAll();
 		const pending = exists ? entries : await this.createFolder();
 		await this.uploadAll(pending);
 		if (this.failed.length > 0) {
@@ -191,6 +194,41 @@ class FolderUpload {
 			);
 		}
 		return this.response(folder);
+	}
+
+	// A new folder holds at most the account's folder_max_files files: more are refused before
+	// any is sent, rather than every file past the limit failing on its own with 413. A JWT
+	// refused as expired (401) is renewed with refreshJwt, as for a file. When the limit can't
+	// be had otherwise (no answer, a key that can't read files), the server's refusals stand.
+	private async assertFolderHoldsAll(): Promise<void> {
+		const files = this.plan.entries.length;
+		const { refreshJwt, keys, signal } = this.options;
+		let limits: UploadLimits | undefined;
+		for (let renewals = 0; ; renewals++) {
+			const auth = this.credentials.tracked();
+			try {
+				limits = await fetchUploadLimits(this.endpoint, auth.headers(), signal);
+			} catch (error) {
+				if (
+					refreshJwt &&
+					!keys &&
+					renewals < MAX_RENEWALS &&
+					error instanceof PinataError &&
+					error.statusCode === 401 &&
+					(await this.credentials.renew(error, auth.jwt()))
+				) {
+					continue;
+				}
+			}
+			break;
+		}
+		const max = limits?.folder_max_files;
+		if (max !== undefined && files > max) {
+			throw new ValidationError(
+				`A folder holds at most ${max} files, and this upload has ${files}: upload them as several folders`,
+				{ code: "FOLDER_MAX_FILES", metadata: { folderMaxFiles: max, files } },
+			);
+		}
 	}
 
 	// Uploads the smallest of the shallowest files first: it creates the folder, and the

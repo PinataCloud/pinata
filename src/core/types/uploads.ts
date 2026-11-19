@@ -46,6 +46,17 @@ export type UploadOptions = {
 	waitForCid?: boolean;
 };
 
+/** The upload limits of the account (see `upload.limits()`). */
+export type UploadLimits = {
+	/**
+	 * The most files one folder can hold: 30,000 unless the account has its own limit. A
+	 * folder upload with more files is refused before any file is sent; a new path sent into
+	 * a folder that holds as many is refused with 413 (a path the folder already has can
+	 * still be replaced).
+	 */
+	folder_max_files: number;
+};
+
 /** A file of a folder upload and its path in the folder, e.g. `photos/2024/a.jpg`. */
 export type FolderEntry = {
 	path: string;

@@ -1,4 +1,5 @@
-import { PinataConfig } from "../../types";
+import { PinataConfig, UploadLimits } from "../../types";
+import { getUploadLimits } from "../../functions";
 import { formatConfig } from "../../../utils/format-config";
 
 import { PublicUpload } from "./PublicUpload";
@@ -17,5 +18,13 @@ export class Upload {
 
 	updateConfig(newConfig: PinataConfig): void {
 		this.config = newConfig;
+	}
+
+	/**
+	 * The upload limits of the account the JWT belongs to: `folder_max_files`, the most
+	 * files one folder can hold. Needs a key that can read files.
+	 */
+	limits(): Promise<UploadLimits> {
+		return getUploadLimits(this.config);
 	}
 }

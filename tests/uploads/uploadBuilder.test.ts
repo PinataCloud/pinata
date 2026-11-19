@@ -19,6 +19,12 @@ describe("UploadBuilder", () => {
 		const sent: Record<string, string>[] = [];
 		global.fetch = jest.fn(async (url: string, init: RequestInit) => {
 			const headers = init.headers as Record<string, string>;
+			if (init.method === "GET" && url.endsWith("/files/limits")) {
+				return new Response(
+					JSON.stringify({ data: { folder_max_files: 30000 } }),
+					{ status: 200 },
+				);
+			}
 			if (init.method === "PUT") {
 				return new Response(
 					JSON.stringify({
