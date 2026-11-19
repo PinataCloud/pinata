@@ -193,7 +193,7 @@ To promote a pre-release to `latest`, run `npm dist-tag add pinata@<version> lat
 
 The `@pinata/sdk` package in `packages/sdk-alias` is a thin alias that re-exports `pinata` (see its [README](packages/sdk-alias/README.md)). It depends on `pinata` with a caret range, so new `pinata` releases reach it without republishing. It only needs a release when the alias itself changes or `pinata` ships a new major.
 
-To release it, bump `version` in `packages/sdk-alias/package.json` and push to `main`. `.github/workflows/publish-sdk-alias.yml` runs its tests and publishes the new version with trusted publishing. The dist-tag comes from `publishConfig.tag` in that file. It's `next` while v3 is in preview; change it to `latest` when v3 is promoted.
+To release it, bump `version` in `packages/sdk-alias/package.json` and push to `main`. `.github/workflows/publish-sdk-alias.yml` runs its tests and publishes the new version with trusted publishing. The dist-tag comes from `publishConfig.tag` in that file: `latest` since v3 was promoted (3.0.2). The 2.x versions stay deprecated.
 
 On every pull request the `Code Quality` workflow (`.github/workflows/code-quality.yml`) runs Biome formatting checks and the Jest test suite.
 
